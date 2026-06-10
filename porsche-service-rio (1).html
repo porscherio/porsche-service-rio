@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#1a1a1a">
+<title>Porsche Service Rio</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --red:#E00000;--black:#1a1a1a;--mid:#2e2e2e;
+    --border:#e0e0e0;--bg:#f7f7f7;
+    --green:#1D9E75;--green-bg:#E1F5EE;--green-text:#085041;
+    --amber:#D4860A;--amber-bg:#FEF3E2;--amber-text:#854F0B;
+    --danger-bg:#FEE2E2;--danger-text:#991111;--danger-border:#E24B4A;
+  }
+  html,body{height:100%;width:100%;overflow:hidden;background:#000}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;color:var(--black)}
+  #app{height:100%;width:100%;max-width:430px;margin:0 auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+  /* Status bar */
+  .sbar{background:var(--black);padding:env(safe-area-inset-top,10px) 20px 6px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#888;flex-shrink:0}
+  .red-bar{height:3px;background:var(--red);flex-shrink:0}
+
+  /* Screens */
+  .screen{display:none;flex-direction:column;flex:1;overflow:hidden}
+  .screen.on{display:flex}
+  .scroll-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px}
+
+  /* Top bar */
+  .topbar{padding:12px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:#fff;flex-shrink:0}
+  .tb-title{font-size:15px;font-weight:600;color:var(--black);flex:1}
+  .back-btn{background:none;border:none;cursor:pointer;font-size:22px;color:#666;padding:4px;line-height:1}
+
+  /* Section label */
+  .sec-lbl{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+
+  /* Cards */
+  .card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:9px;cursor:pointer;transition:background .15s;-webkit-user-select:none;user-select:none}
+  .card:active{background:var(--bg)}
+  .card.locked{opacity:.45;pointer-events:none}
+  .card.pausado{border-color:var(--amber);border-width:1.5px}
+  .card.sugerida{border-left:3px solid var(--black)}
+  .crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .cro{font-size:13px;font-weight:600;color:var(--black)}
+  .cjob{font-size:12px;color:#666;margin-top:2px}
+
+  /* Badges */
+  .badge{display:inline-block;font-size:9px;font-weight:600;padding:3px 8px;border-radius:3px;white-space:nowrap;letter-spacing:.04em;flex-shrink:0}
+  .b-sug{background:var(--black);color:#fff}
+  .b-liv{background:#EAF3DE;color:#27500A}
+  .b-pau{background:var(--amber-bg);color:var(--amber-text)}
+  .b-lock{background:#f0f0f0;color:#666}
+  .b-atv{background:var(--green-bg);color:var(--green-text)}
+  .b-red{background:var(--red);color:#fff}
+
+  /* Status row */
+  .trow{display:flex;align-items:center;gap:6px;margin-top:6px}
+  .tdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .d-g{background:var(--green)}.d-a{background:var(--amber)}.d-r{background:var(--red)}.d-x{background:#ccc}
+  .tname{font-size:11px;color:#888}
+
+  /* Progress */
+  .prog-bg{height:2px;background:#eee;border-radius:2px;margin-top:7px}
+  .prog{height:2px;border-radius:2px;transition:width .3s}
+  .p-g{background:var(--green)}.p-a{background:var(--amber)}
+
+  /* Buttons */
+  .bigbtn{width:100%;padding:14px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em;-webkit-user-select:none;user-select:none;transition:opacity .15s}
+  .bigbtn:active{opacity:.8}
+  .btn-ini{background:var(--black);color:#fff}
+  .btn-pau{background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber)}
+  .btn-con{background:var(--green-bg);color:var(--green-text);border:1px solid var(--green)}
+  .btn-stop{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)}
+  .btn-cam{background:var(--bg);color:var(--black);border:1px solid var(--border)}
+  .btn-sec{background:#fff;color:#888;border:1px solid var(--border)}
+
+  /* Detail rows */
+  .drow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:center}
+  .drow:last-of-type{border-bottom:none}
+  .dlbl{color:#888}.dval{font-weight:600;color:var(--black);text-align:right}
+
+  /* Timer */
+  .timer-wrap{text-align:center;padding:16px 0 8px}
+  .timer{font-size:44px;font-weight:700;color:var(--black);letter-spacing:4px;font-variant-numeric:tabular-nums}
+  .timer-lbl{font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+
+  /* Alert */
+  .alert-box{background:var(--amber-bg);border:1px solid var(--amber);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--amber-text);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+  .err-box{background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--danger-text);display:flex;align-items:center;gap:8px;line-height:1.5}
+
+  /* Camera */
+  .camera-section{background:#111;border-radius:8px;overflow:hidden;margin-bottom:12px;position:relative}
+  #video-preview{width:100%;max-height:240px;object-fit:cover;display:block}
+  .cam-placeholder{width:100%;height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:#1a1a1a}
+  .cam-overlay{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.80);padding:8px 10px;font-size:9.5px;color:#fff;line-height:1.7;font-family:monospace}
+  .cam-overlay .ov-ro{color:var(--red);font-weight:700}
+  .media-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .mthumb{background:var(--bg);border:1px solid var(--border);border-radius:6px;height:80px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .mthumb img{width:100%;height:100%;object-fit:cover}
+  .mcount{position:absolute;bottom:4px;right:5px;font-size:8px;background:rgba(0,0,0,0.6);color:#fff;padding:2px 6px;border-radius:10px}
+  .audit-note{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#666}
+  .audit-note svg{color:var(--green);flex-shrink:0}
+
+  /* Completion */
+  .pct-row{display:flex;align-items:center;gap:10px;margin:12px 0}
+  .pct-lbl{font-size:12px;color:#888;width:90px;flex-shrink:0}
+  select{padding:10px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:14px;color:var(--black);width:100%;-webkit-appearance:none;appearance:none}
+  select.pct-sel{flex:1;width:auto}
+  .pct-note{font-size:11px;color:#888;margin-bottom:14px;line-height:1.5;padding:8px 10px;background:var(--bg);border-radius:4px}
+
+  /* Bottom nav */
+  .nav{display:flex;border-top:1px solid var(--border);background:#fff;flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0)}
+  .ntab{flex:1;padding:9px 0 7px;text-align:center;font-size:10px;color:#888;cursor:pointer;border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;text-transform:uppercase;letter-spacing:.05em;-webkit-user-select:none;user-select:none}
+  .ntab.on{color:var(--red)}
+
+  /* Login */
+  .login-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:28px 22px;overflow-y:auto}
+  .logo-area{text-align:center;margin-bottom:28px}
+  .logo-img{max-width:180px;width:80%;margin:0 auto 6px;display:block}
+  .logo-line{width:40px;height:2px;background:var(--red);margin:10px auto 0}
+  .login-sub{font-size:11px;color:#888;text-align:center;margin-top:8px;text-transform:uppercase;letter-spacing:.1em}
+  .ver-badge{display:inline-flex;align-items:center;gap:5px;background:#f0f0f0;border:1px solid var(--border);border-radius:3px;padding:4px 10px;font-size:10px;color:#888;letter-spacing:.05em;margin-top:10px}
+  .ver-badge b{color:var(--black);font-weight:600}
+  .field-wrap{margin-bottom:14px}
+  .field-lbl{font-size:11px;color:#888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;display:block}
+  input[type=password],input[type=text]{width:100%;padding:12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:18px;letter-spacing:6px;text-align:center;color:var(--black);-webkit-appearance:none}
+  input:focus{outline:none;border-color:var(--black)}
+  .btn-login{width:100%;padding:14px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--black);color:#fff;text-transform:uppercase;letter-spacing:.06em;transition:opacity .15s}
+  .btn-login:active{opacity:.8}
+
+  /* Active task bar */
+  .active-bar{background:var(--black);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+  .active-bar-title{font-size:12px;font-weight:600;color:#fff;letter-spacing:.04em}
+
+  /* Toast */
+  .toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;font-size:12px;padding:8px 16px;border-radius:20px;white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+  .toast.show{opacity:1}
+
+  /* Hidden canvas for photo capture */
+  #photo-canvas{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="sbar">
+    <span id="clk">--:--</span>
+    <span style="color:#bbb;font-size:10px;letter-spacing:.08em">PORSCHE SERVICE RIO</span>
+    <span style="font-size:13px">&#x1F4F6;</span>
+  </div>
+  <div class="red-bar"></div>
+
+  <!-- TELA 0: Login -->
+  <div class="screen on" id="s0">
+    <div class="login-wrap">
+      <div class="logo-area">
+        <img class="logo-img" id="logo-img" alt="Porsche RJ">
+        <div class="logo-line"></div>
+        <div class="login-sub">Gestão de Tarefas de Serviço</div>
+        <div style="display:flex;justify-content:center">
+          <div class="ver-badge">
+            &#x1F3F7; Versão <b>1.0.0</b>&nbsp;·&nbsp;Build <b id="build-date">--/--/----</b>
+          </div>
+        </div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-lbl" for="sel-tech">Técnico</label>
+        <select id="sel-tech" style="letter-spacing:0;font-size:15px;text-align:left">
+          <option value="">— selecione —</option>
+        </select>
+      </div>
+      <div class="field-wrap">
+        <label class="field-lbl" for="inp-pin">Senha</label>
+        <input type="password" id="inp-pin" placeholder="••••" maxlength="8" autocomplete="current-password">
+      </div>
+      <div class="err-box" id="login-err" style="display:none">
+        &#x26A0; Técnico ou senha incorretos.
+      </div>
+      <button class="btn-login" id="btn-login">Entrar</button>
+    </div>
+  </div>
+
+  <!-- TELA 1: Lista de tarefas -->
+  <div class="screen" id="s1">
+    <div class="topbar">
+      <div style="flex:1">
+        <div class="tb-title" id="t1-greet">Bom dia</div>
+        <div style="font-size:11px;color:#888" id="t1-sub">Carregando tarefas...</div>
+      </div>
+      <span style="font-size:20px;color:#aaa">&#x1F514;</span>
+    </div>
+    <div class="scroll-content" id="task-list-content"></div>
+    <div class="nav">
+      <button class="ntab on" onclick="goTo('s1')">&#x2705;<br>Tarefas</button>
+      <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
+      <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
+    </div>
+  </div>
+
+  <!-- TELA 2: Detalhe de tarefa -->
+  <div class="screen" id="s2">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('s1')" aria-label="Voltar">&#8592;</button>
+      <div class="tb-title" id="s2-ro">RO-0000</div>
+      <span class="badge" id="s2-badge">Livre</span>
+    </div>
+    <div class="scroll-content">
+      <div id="s2-alert" style="display:none" class="alert-box"></div>
+      <div class="drow"><span class="dlbl">Veículo</span><span class="dval" id="s2-vehicle"></span></div>
+      <div class="drow"><span class="dlbl">Placa</span><span class="dval" id="s2-plate"></span></div>
+      <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s2-job"></span></div>
+      <div class="drow"><span class="dlbl">Atribuída por</span><span class="dval" id="s2-assigned"></span></div>
+      <div class="drow"><span class="dlbl">Conclusão</span><span class="dval" id="s2-pct"></span></div>
+      <div id="s2-prog-wrap" style="margin:4px 0 8px;display:none">
+        <div class="prog-bg"><div class="prog p-a" id="s2-prog" style="width:0%"></div></div>
+      </div>
+      <div style="height:20px"></div>
+      <button class="bigbtn btn-ini" id="btn-start-task">&#x25B6; Iniciar tarefa</button>
+      <button class="bigbtn btn-sec" onclick="goTo('s1')">Voltar à lista</button>
+    </div>
+  </div>
+
+  <!-- TELA 3: Timer ativo -->
+  <div class="screen" id="s3">
+    <div class="active-bar">
+      <div class="active-bar-title">Em andamento</div>
+      <span class="badge b-atv">&#x1F512; Bloqueada</span>
+    </div>
+    <div class="scroll-content">
+      <div class="timer-wrap">
+        <div class="timer" id="timer-disp">00:00</div>
+        <div class="timer-lbl">tempo na tarefa</div>
+      </div>
+      <div style="height:4px;background:#f0f0f0;border-radius:2px;margin-bottom:16px">
+        <div style="height:4px;background:var(--red);border-radius:2px;width:35%;transition:width .5s" id="s3-prog"></div>
+      </div>
+      <div class="drow"><span class="dlbl">Veículo</span><span class="dval" id="s3-vehicle"></span></div>
+      <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s3-job"></span></div>
+      <div class="drow"><span class="dlbl">RO</span><span class="dval" id="s3-ro"></span></div>
+      <div style="height:14px"></div>
+      <button class="bigbtn btn-cam" onclick="goTo('s4')">&#x1F4F7; Registrar foto / vídeo</button>
+      <button class="bigbtn btn-pau" onclick="goTo('s5p')">&#x23F8; Pausar</button>
+      <button class="bigbtn btn-stop" onclick="goTo('s5c')">&#x23F9; Parar e concluir</button>
+    </div>
+  </div>
+
+  <!-- TELA 4: Câmera auditada -->
+  <div class="screen" id="s4">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('s3')" aria-label="Voltar">&#8592;</button>
+      <div class="tb-title">Registrar mídia</div>
+    </div>
+    <div class="scroll-content">
+      <div class="sec-lbl" id="s4-folder">Dropbox / RO-0000</div>
+      <div class="camera-section">
+        <video id="video-preview" autoplay playsinline muted style="display:none"></video>
+        <div class="cam-placeholder" id="cam-placeholder">
+          <span style="font-size:32px">&#x1F4F7;</span>
+          <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.06em">Câmera ao vivo</span>
+          <span style="font-size:10px;color:#444;margin-top:4px">Toque em "Abrir câmera" para iniciar</span>
+        </div>
+        <canvas id="photo-canvas"></canvas>
+        <div class="cam-overlay" id="cam-overlay">
+          <div id="ov-ts">--/--/---- --:--:--</div>
+          <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
+          <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
+          <div>RO: <span class="ov-ro" id="ov-ro"></span> — <span id="ov-vehicle" style="color:#fff"></span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.0.0</span></div>
+        </div>
+      </div>
+      <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
+      <button class="bigbtn btn-cam" id="btn-capture" style="display:none">&#x23FA; Capturar foto auditada</button>
+      <div class="media-grid" id="media-grid"></div>
+      <div class="audit-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Data, hora, GPS, técnico, RO e versão gravados permanentemente em cada foto
+      </div>
+      <div style="height:12px"></div>
+      <button class="bigbtn btn-sec" onclick="stopCamera();goTo('s3')">&#8592; Voltar ao timer</button>
+    </div>
+  </div>
+
+  <!-- TELA 5p: Pausar -->
+  <div class="screen" id="s5p">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('s3')" aria-label="Voltar">&#8592;</button>
+      <div class="tb-title">Pausar tarefa</div>
+    </div>
+    <div class="scroll-content">
+      <div class="alert-box">
+        &#x23F8; A tarefa ficará disponível para outro técnico continuar a partir desta percentagem.
+      </div>
+      <div class="drow"><span class="dlbl">RO</span><span class="dval" id="s5p-ro"></span></div>
+      <div class="drow"><span class="dlbl">Tempo registado</span><span class="dval" id="s5p-time"></span></div>
+      <div class="drow"><span class="dlbl">Fotos tiradas</span><span class="dval" id="s5p-photos">0</span></div>
+      <div class="pct-row">
+        <span class="pct-lbl">% concluído</span>
+        <select class="pct-sel" id="pct-pause">
+          <option>10%</option><option>25%</option><option selected>50%</option>
+          <option>60%</option><option>75%</option><option>90%</option>
+        </select>
+      </div>
+      <div class="pct-note">A tarefa será marcada como pausada e o bloqueio libertado imediatamente.</div>
+      <button class="bigbtn btn-pau" onclick="confirmarPausa()">&#x23F8; Confirmar pausa e libertar</button>
+      <button class="bigbtn btn-sec" onclick="goTo('s3')">Cancelar — continuar a trabalhar</button>
+    </div>
+  </div>
+
+  <!-- TELA 5c: Concluir -->
+  <div class="screen" id="s5c">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('s3')" aria-label="Voltar">&#8592;</button>
+      <div class="tb-title">Concluir tarefa</div>
+    </div>
+    <div class="scroll-content">
+      <div class="drow"><span class="dlbl">RO</span><span class="dval" id="s5c-ro"></span></div>
+      <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s5c-job"></span></div>
+      <div class="drow"><span class="dlbl">Tempo total</span><span class="dval" id="s5c-time"></span></div>
+      <div class="drow"><span class="dlbl">Fotos tiradas</span><span class="dval" id="s5c-photos">0</span></div>
+      <div class="pct-row">
+        <span class="pct-lbl">% concluído</span>
+        <select class="pct-sel" id="pct-done">
+          <option>25%</option><option>50%</option><option>75%</option><option selected>100%</option>
+        </select>
+      </div>
+      <div class="pct-note" id="pct-note">100% — tarefa concluída. Bloqueio libertado.</div>
+      <button class="bigbtn btn-ini" onclick="confirmarConclusao()">&#x2714; Confirmar e libertar bloqueio</button>
+      <button class="bigbtn btn-sec" onclick="goTo('s3')">Cancelar — continuar a trabalhar</button>
+    </div>
+  </div>
+
+  <!-- TELA Histórico -->
+  <div class="screen" id="s-hist">
+    <div class="topbar">
+      <div class="tb-title">Histórico de hoje</div>
+    </div>
+    <div class="scroll-content" id="hist-list">
+      <div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma tarefa concluída hoje.</div>
+    </div>
+    <div class="nav">
+      <button class="ntab" onclick="goTo('s1')">&#x2705;<br>Tarefas</button>
+      <button class="ntab on">&#x1F4CB;<br>Histórico</button>
+      <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────────────────
+const API_URL = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec'; // substitua pelo URL do Apps Script
+
+const APP_VERSION = '1.0.0';
+const BUILD_DATE  = (() => { const n=new Date(); return pad(n.getDate())+'/'+pad(n.getMonth()+1)+'/'+n.getFullYear(); })();
+
+// Utilizadores e senhas — em produção: ler do Apps Script
+const USERS = {
+  'Alvaro Mello':   '1234',
+  'Andre Sampaio':  '1234',
+  'Claudio Reis':   '1234',
+  'Jose Carlos':    '1234',
+  'Mike Luciano':   '1234',
+  'Raynan Ventura': '1234',
+  'Silvania':       '1234',
+};
+
+// Tarefas de demonstração — em produção: carregar do Apps Script via getJoblines()
+const DEMO_TASKS = [
+  {id:'JL-001',ro:'RO-1042',vehicle:'Porsche 911 GT3',plate:'POR-0911',job:'Inspeção de freios dianteiros',status:'free',suggested:true,assignedBy:'Gerente',pct:0,lockedBy:''},
+  {id:'JL-002',ro:'RO-1038',vehicle:'Porsche Cayenne Turbo',plate:'POR-0938',job:'Serviço de ar condicionado',status:'paused',suggested:true,assignedBy:'Gerente',pct:50,lockedBy:'João'},
+  {id:'JL-003',ro:'RO-1045',vehicle:'Porsche Macan GTS',plate:'POR-0945',job:'Revisão de 20.000 km',status:'free',suggested:false,assignedBy:'',pct:0,lockedBy:''},
+  {id:'JL-004',ro:'RO-1041',vehicle:'Porsche Panamera 4S',plate:'POR-0941',job:'Diagnóstico de motor',status:'locked',suggested:false,assignedBy:'',pct:30,lockedBy:'Carlos'},
+  {id:'JL-005',ro:'RO-1047',vehicle:'Porsche Taycan Cross Turismo',plate:'POR-0947',job:'Actualização de software',status:'free',suggested:false,assignedBy:'',pct:0,lockedBy:''},
+];
+
+// ── STATE ───────────────────────────────────────────────────────────
+let currentTech = '';
+let activeTask  = null;
+let seconds     = 0;
+let timerIv     = null;
+let timerOn     = false;
+let photoCount  = 0;
+let history     = [];
+let gpsCoords   = { lat: null, lng: null };
+let videoStream = null;
+
+// ── INIT ────────────────────────────────────────────────────────────
+document.getElementById('build-date').textContent = BUILD_DATE;
+document.getElementById('logo-img').src = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAQABAADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACuY1Xx5ouj6nPp929wJ4SA4SBmHKhhyPYiunrwvx7/yPWrf78X/omOubFVZUoKUe57OSYGljcRKnVvZRvp6pfqew6Hrtl4gsnu7BpGiWQxnehQ5ABPB+orTrhfhV/wAivc/9f0v8lruq0ozc6ak+pxZhQhh8VOlDZMKKKK1OMKKKKACkzXk/x/1TUNJ8Gafcabf3VnMdRVDJbTNGxHlScZUj0FfO3/CbeK/+hn1r/wAD5f8A4qgD7hz/AJxS5r4e/wCE28Wf9DRrX/gwl/8Aiq09H+KnjXRbsTxeIb25HG6K9lNwjDOcYfOOnUEH3oA+zqK4n4bfEay+IGjySrF9m1K1wt1bZyBnOGU91OD7ggg9ie2oAKK8p+P2p3+k+BbG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oAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACjFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAf//Z';
+
+// Populate tech list
+const sel = document.getElementById('sel-tech');
+Object.keys(USERS).forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name; opt.textContent = name;
+  sel.appendChild(opt);
+});
+
+// GPS
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(pos => {
+    gpsCoords.lat = pos.coords.latitude.toFixed(5);
+    gpsCoords.lng = pos.coords.longitude.toFixed(5);
+    const el = document.getElementById('ov-gps');
+    if (el) el.textContent = 'GPS: ' + gpsCoords.lat + ', ' + gpsCoords.lng;
+  }, () => {}, { enableHighAccuracy: true });
+}
+
+// Clock
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clk').textContent = pad(n.getHours()) + ':' + pad(n.getMinutes());
+}
+updateClock(); setInterval(updateClock, 10000);
+
+// ── AUTH ────────────────────────────────────────────────────────────
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('inp-pin').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+function doLogin() {
+  const tech = document.getElementById('sel-tech').value;
+  const pin  = document.getElementById('inp-pin').value;
+  const err  = document.getElementById('login-err');
+  if (!tech || USERS[tech] !== pin) { err.style.display='flex'; return; }
+  err.style.display = 'none';
+  currentTech = tech;
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  document.getElementById('t1-greet').textContent = greet + ', ' + tech;
+  loadTasks();
+  goTo('s1');
+}
+
+function doLogout() {
+  currentTech = ''; activeTask = null;
+  clearTimer();
+  document.getElementById('inp-pin').value = '';
+  document.getElementById('sel-tech').value = '';
+  goTo('s0');
+}
+
+// ── NAVIGATION ──────────────────────────────────────────────────────
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  if (id === 's3' && !timerOn) startTimer();
+  if ((id === 's5p' || id === 's5c') && timerOn) {
+    pauseTimer();
+    const t = fmtTime(seconds);
+    if (id === 's5p') {
+      document.getElementById('s5p-ro').textContent = activeTask ? activeTask.ro + ' — ' + activeTask.vehicle : '';
+      document.getElementById('s5p-time').textContent = t;
+      document.getElementById('s5p-photos').textContent = photoCount + ' foto(s)';
+    } else {
+      document.getElementById('s5c-ro').textContent = activeTask ? activeTask.ro + ' — ' + activeTask.vehicle : '';
+      document.getElementById('s5c-job').textContent = activeTask ? activeTask.job : '';
+      document.getElementById('s5c-time').textContent = t;
+      document.getElementById('s5c-photos').textContent = photoCount + ' foto(s)';
+    }
+  }
+  if (id === 's4') { updateOverlay(); requestCameraPermission(); }
+  if (id === 's1') loadTasks();
+}
+
+// ── TASKS ────────────────────────────────────────────────────────────
+async function loadTasks() {
+  // Em produção: fetch do Apps Script
+  // const res = await fetch(API_URL + '?action=joblines');
+  // const tasks = await res.json();
+  renderTasks(DEMO_TASKS);
+}
+
+function renderTasks(tasks) {
+  const suggested = tasks.filter(t => t.suggested && t.status !== 'locked');
+  const free      = tasks.filter(t => !t.suggested && t.status === 'free');
+  const locked    = tasks.filter(t => t.status === 'locked');
+  const count     = suggested.length + free.length;
+  document.getElementById('t1-sub').textContent = 'Terça · ' + count + ' tarefas disponíveis';
+
+  let html = '';
+  if (suggested.length) {
+    html += '<div class="sec-lbl">Sugeridas para você hoje</div>';
+    suggested.forEach(t => html += taskCard(t));
+  }
+  if (free.length) {
+    html += '<div class="sec-lbl" style="margin-top:6px">Fila livre</div>';
+    free.forEach(t => html += taskCard(t));
+  }
+  if (locked.length) {
+    html += '<div class="sec-lbl" style="margin-top:6px">Em andamento</div>';
+    locked.forEach(t => html += taskCard(t));
+  }
+  const el = document.getElementById('task-list-content');
+  el.innerHTML = html;
+  el.querySelectorAll('.card:not(.locked)').forEach(card => {
+    card.addEventListener('click', () => openTask(card.dataset.id));
+  });
+}
+
+function taskCard(t) {
+  const isLocked = t.status === 'locked';
+  const isPaused = t.status === 'paused';
+  let dotCls = 'd-g', statusTxt = 'Disponível', badgeCls = 'b-liv', badgeTxt = 'Livre';
+  if (isLocked)  { dotCls='d-r'; statusTxt=''+t.lockedBy+' a trabalhar agora'; badgeCls='b-lock'; badgeTxt='&#x1F512; Bloqueada'; }
+  if (isPaused)  { dotCls='d-a'; statusTxt='Iniciada por '+t.lockedBy+' — continuar?'; badgeCls='b-pau'; badgeTxt='Pausada '+t.pct+'%'; }
+  if (t.suggested && !isLocked) { badgeCls='b-sug'; badgeTxt='Sugerida'; }
+  let prog = isPaused ? '<div class="prog-bg"><div class="prog p-a" style="width:'+t.pct+'%"></div></div>' : '';
+  return `<div class="card${isLocked?' locked':''}${isPaused?' pausado':''}${t.suggested?' sugerida':''}" data-id="${t.id}">
+    <div class="crow">
+      <div><div class="cro">${t.ro} — ${t.vehicle}</div><div class="cjob">${t.job}</div></div>
+      <span class="badge ${badgeCls}">${badgeTxt}</span>
+    </div>
+    <div class="trow"><div class="tdot ${dotCls}"></div><span class="tname">${statusTxt}</span></div>
+    ${prog}
+  </div>`;
+}
+
+function openTask(id) {
+  const t = DEMO_TASKS.find(x => x.id === id);
+  if (!t) return;
+  activeTask = t;
+  document.getElementById('s2-ro').textContent = t.ro;
+  document.getElementById('s2-vehicle').textContent = t.vehicle;
+  document.getElementById('s2-plate').textContent = t.plate;
+  document.getElementById('s2-job').textContent = t.job;
+  document.getElementById('s2-assigned').textContent = t.assignedBy || 'Fila livre';
+  document.getElementById('s2-pct').textContent = t.pct + '%';
+  const alert = document.getElementById('s2-alert');
+  const progWrap = document.getElementById('s2-prog-wrap');
+  const btnStart = document.getElementById('btn-start-task');
+  if (t.status === 'paused') {
+    alert.style.display='flex';
+    alert.textContent = '⏸ '+t.lockedBy+' pausou esta tarefa em '+t.pct+'%. Pode continuar a partir daqui.';
+    progWrap.style.display='block';
+    document.getElementById('s2-prog').style.width = t.pct+'%';
+    document.getElementById('s2-badge').textContent = 'Pausada';
+    document.getElementById('s2-badge').className = 'badge b-pau';
+    btnStart.textContent = '▶ Continuar a partir de '+t.pct+'%';
+  } else {
+    alert.style.display='none';
+    progWrap.style.display='none';
+    document.getElementById('s2-badge').textContent = 'Livre';
+    document.getElementById('s2-badge').className = 'badge b-liv';
+    btnStart.textContent = '▶ Iniciar tarefa';
+  }
+  btnStart.onclick = () => startTask(t);
+  goTo('s2');
+}
+
+// ── TASK ACTIONS ────────────────────────────────────────────────────
+async function startTask(t) {
+  // Em produção: chamar API /lock
+  // const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'lock', ro_number:t.ro, jobline_id:t.id, tech:currentTech }) });
+  // const data = await res.json();
+  // if (!data.ok) { showToast('Bloqueada por ' + data.by); return; }
+  activeTask = t;
+  photoCount = 0;
+  document.getElementById('media-grid').innerHTML = '';
+  seconds = t.status === 'paused' ? 0 : 0;
+  document.getElementById('s3-vehicle').textContent = t.vehicle;
+  document.getElementById('s3-job').textContent = t.job;
+  document.getElementById('s3-ro').textContent = t.ro;
+  document.getElementById('s4-folder').textContent = 'Dropbox / ' + t.ro + ' — ' + t.vehicle;
+  document.getElementById('ov-ro').textContent = t.ro;
+  document.getElementById('ov-vehicle').textContent = t.vehicle;
+  document.getElementById('ov-tech').textContent = currentTech;
+  goTo('s3');
+}
+
+function confirmarPausa() {
+  const pct = document.getElementById('pct-pause').value;
+  releaseTask('paused', parseInt(pct));
+  showToast('Tarefa pausada em ' + pct + '. Bloqueio libertado.');
+  goTo('s1');
+}
+
+function confirmarConclusao() {
+  const pct = document.getElementById('pct-done').value;
+  releaseTask(pct === '100%' ? 'free' : 'paused', parseInt(pct));
+  if (pct === '100%') {
+    history.unshift({ ro: activeTask.ro, vehicle: activeTask.vehicle, job: activeTask.job, time: fmtTime(seconds), date: new Date().toLocaleString('pt-BR') });
+    renderHistory();
+    showToast('Tarefa concluída! Bloqueio libertado.');
+  } else {
+    showToast('Pausada em ' + pct + '. Bloqueio libertado.');
+  }
+  clearTimer();
+  activeTask = null;
+  goTo('s1');
+}
+
+async function releaseTask(status, pct) {
+  // Em produção: chamar API /release
+  // await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'release', ro_number:activeTask.ro, jobline_id:activeTask.id, pct, elapsed_seconds:seconds }) });
+  clearTimer();
+}
+
+// ── TIMER ───────────────────────────────────────────────────────────
+function startTimer() {
+  timerOn = true;
+  timerIv = setInterval(() => {
+    seconds++;
+    document.getElementById('timer-disp').textContent = fmtTime(seconds);
+  }, 1000);
+}
+function pauseTimer() {
+  if (timerIv) { clearInterval(timerIv); timerIv = null; timerOn = false; }
+}
+function clearTimer() {
+  pauseTimer(); seconds = 0;
+  document.getElementById('timer-disp').textContent = '00:00';
+}
+
+// ── CAMERA ──────────────────────────────────────────────────────────
+function requestCameraPermission() {
+  document.getElementById('btn-open-cam').style.display = 'flex';
+  document.getElementById('btn-capture').style.display = 'none';
+}
+
+document.getElementById('btn-open-cam').addEventListener('click', async () => {
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    const video = document.getElementById('video-preview');
+    video.srcObject = videoStream;
+    video.style.display = 'block';
+    document.getElementById('cam-placeholder').style.display = 'none';
+    document.getElementById('btn-open-cam').style.display = 'none';
+    document.getElementById('btn-capture').style.display = 'flex';
+    updateOverlay();
+  } catch(e) {
+    showToast('Câmera não disponível: ' + e.message);
+  }
+});
+
+document.getElementById('btn-capture').addEventListener('click', capturePhoto);
+
+function capturePhoto() {
+  updateOverlay();
+  const video = document.getElementById('video-preview');
+  const canvas = document.getElementById('photo-canvas');
+  const now = new Date();
+
+  if (video.style.display !== 'none' && video.readyState >= 2) {
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+  } else {
+    canvas.width = 1280; canvas.height = 720;
+  }
+
+  const ctx = canvas.getContext('2d');
+  // Draw video frame or grey background
+  if (video.style.display !== 'none' && video.readyState >= 2) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = '#333'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#666'; ctx.font = '32px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Foto de demonstração', canvas.width/2, canvas.height/2);
+  }
+
+  // Burn-in overlay
+  const lineH = 26, pad2 = 14;
+  const lines = [
+    fmtDateTime(now),
+    'GPS: ' + (gpsCoords.lat ? gpsCoords.lat+', '+gpsCoords.lng : 'N/D'),
+    'Técnico: ' + currentTech,
+    'RO: ' + (activeTask ? activeTask.ro : '—') + ' — ' + (activeTask ? activeTask.vehicle : ''),
+    'App: v' + APP_VERSION,
+  ];
+  const overlayH = lines.length * lineH + pad2 * 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
+  ctx.fillRect(0, canvas.height - overlayH, canvas.width, overlayH);
+
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'left';
+  lines.forEach((line, i) => {
+    const y = canvas.height - overlayH + pad2 + lineH * i + 14;
+    if (i === 3) { // RO in red
+      ctx.fillStyle = '#E00000'; ctx.fillText('RO: ', pad2, y);
+      const roW = ctx.measureText('RO: ').width;
+      ctx.fillStyle = '#fff'; ctx.fillText(line.replace('RO: ',''), pad2 + roW, y);
+    } else if (i === 0) {
+      ctx.fillStyle = '#fff'; ctx.fillText(line, pad2, y);
+    } else {
+      ctx.fillStyle = '#ccc'; ctx.fillText(line, pad2, y);
+    }
+  });
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  photoCount++;
+  addPhotoThumb(dataUrl);
+  showToast('Foto ' + photoCount + ' capturada e auditada');
+
+  // Em produção: upload para Dropbox via Apps Script
+}
+
+function addPhotoThumb(dataUrl) {
+  const grid = document.getElementById('media-grid');
+  const div = document.createElement('div');
+  div.className = 'mthumb';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  const badge = document.createElement('div');
+  badge.className = 'mcount'; badge.textContent = 'auditada';
+  div.appendChild(img); div.appendChild(badge);
+  grid.appendChild(div);
+}
+
+function stopCamera() {
+  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+  const video = document.getElementById('video-preview');
+  video.style.display = 'none';
+  document.getElementById('cam-placeholder').style.display = 'flex';
+  document.getElementById('btn-open-cam').style.display = 'flex';
+  document.getElementById('btn-capture').style.display = 'none';
+}
+
+// ── OVERLAY ─────────────────────────────────────────────────────────
+function updateOverlay() {
+  const now = new Date();
+  document.getElementById('ov-ts').textContent = fmtDateTime(now);
+  if (gpsCoords.lat) {
+    document.getElementById('ov-gps').textContent = 'GPS: ' + gpsCoords.lat + ', ' + gpsCoords.lng;
+  }
+}
+
+// ── HISTORY ─────────────────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('hist-list');
+  if (!history.length) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma tarefa concluída hoje.</div>';
+    return;
+  }
+  el.innerHTML = history.map(h => `
+    <div class="card" style="cursor:default">
+      <div class="cro">${h.ro} — ${h.vehicle}</div>
+      <div class="cjob">${h.job}</div>
+      <div class="trow"><div class="tdot d-g"></div><span class="tname">Concluída · ${h.time} · ${h.date}</span></div>
+    </div>`).join('');
+}
+
+// ── COMPLETION NOTE ─────────────────────────────────────────────────
+document.getElementById('pct-done').addEventListener('change', function() {
+  const n = document.getElementById('pct-note');
+  n.textContent = this.value === '100%'
+    ? '100% — tarefa concluída. Bloqueio libertado.'
+    : this.value + ' — tarefa pausada. Outro técnico poderá continuar.';
+});
+
+// ── HELPERS ─────────────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2,'0'); }
+function fmtTime(s) { return pad(Math.floor(s/60)) + ':' + pad(s%60); }
+function fmtDateTime(d) {
+  return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+
+    ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+let toastTm;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTm);
+  toastTm = setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
