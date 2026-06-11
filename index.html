@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v1.4.0 — Build: 11/06/2026 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -136,7 +137,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.3.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.4.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -263,7 +264,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.3.0</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.4.0</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -341,7 +342,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -658,9 +659,10 @@ function startTask(j) {
 async function confirmarPausa() {
   const pct = parseInt(document.getElementById('pct-pause').value);
   await logWork('paused', pct);
-  // Release lock via API
   fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'release', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, tech:currentTech, pct:pct, elapsed_seconds:seconds, is_default:activeTask.is_default})});
-  // Update locally immediately
+  if (activeTask.is_default && pct >= 100) {
+    fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'complete_default', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, job_description:activeTask.job_description, tech:currentTech, pct:pct})});
+  }
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
   clearTimer();
   showToast('Pausada em '+pct+'%. Bloqueio libertado.');
@@ -670,9 +672,10 @@ async function confirmarPausa() {
 async function confirmarConclusao() {
   const pct = parseInt(document.getElementById('pct-done').value);
   await logWork(pct>=100?'completed':'paused', pct);
-  // Release lock via API
   fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'release', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, tech:currentTech, pct:pct, elapsed_seconds:seconds, is_default:activeTask.is_default})});
-  // Update locally immediately
+  if (activeTask.is_default && pct >= 100) {
+    fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'complete_default', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, job_description:activeTask.job_description, tech:currentTech, pct:pct})});
+  }
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
   if (pct>=100) {
     sessionHistory.unshift({ro:activeTask.ro_number, vehicle:activeRO?activeRO.vehicle:'', job:activeTask.job_description, time:fmtTime(seconds), date:new Date().toLocaleString('pt-BR')});
