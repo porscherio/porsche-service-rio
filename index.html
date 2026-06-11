@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.1 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.2 — Build: 11/06/2026 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -117,6 +117,9 @@ input:focus{outline:none;border-color:var(--black)}
 .active-bar-title{font-size:12px;font-weight:600;color:#fff;letter-spacing:.04em}
 .toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;font-size:12px;padding:8px 16px;border-radius:20px;white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;max-width:90%}
 .toast.show{opacity:1}
+.rec-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.video-timer{font-size:13px;font-weight:600;color:var(--red);letter-spacing:1px;font-variant-numeric:tabular-nums}
 .parts-box{border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.6}
 .parts-pending{background:#FEF3E2;border:1px solid var(--amber)}
 .parts-received{background:var(--green-bg);border:1px solid var(--green)}
@@ -145,7 +148,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -297,11 +300,19 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.1</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.2</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
       <button class="bigbtn btn-cam" id="btn-capture" style="display:none">&#x23FA; Capturar foto auditada</button>
+      <div id="video-rec-controls" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
+          <span class="rec-dot" id="rec-dot" style="display:none"></span>
+          <span class="video-timer" id="rec-timer">00:00 / 00:30</span>
+        </div>
+        <button class="bigbtn" id="btn-start-rec" style="background:#E00000;color:#fff">&#x23FA; Iniciar gravação</button>
+        <button class="bigbtn btn-stop" id="btn-stop-rec" style="display:none">&#x23F9; Parar gravação</button>
+      </div>
       <div class="media-grid" id="media-grid"></div>
       <div class="audit-note">&#x1F6E1; GPS, técnico, RO e versão gravados e enviados para Dropbox automaticamente</div>
       <div style="height:12px"></div>
@@ -375,7 +386,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -404,6 +415,8 @@ let photoCount = 0, sessionHistory = [];
 let gpsStart = null, gpsCurrent = null;
 let videoStream = null;
 let liveROs = [], liveJoblines = {};  // live data from Sheets
+let mediaRecorder = null, recordedChunks = [], recInterval = null, recSeconds = 0;
+const MAX_REC_SECONDS = 30;
 
 // ── Init ─────────────────────────────────────────────────────────
 const _n = new Date();
@@ -807,6 +820,7 @@ document.getElementById('btn-open-cam').addEventListener('click', async()=>{
     document.getElementById('cam-placeholder').style.display='none';
     document.getElementById('btn-open-cam').style.display='none';
     document.getElementById('btn-capture').style.display='flex';
+    document.getElementById('video-rec-controls').style.display='block';
     updateOverlay();
   } catch(e) { showToast('Câmera: '+e.message); }
 });
@@ -865,6 +879,115 @@ function stopCamera() {
   document.getElementById('cam-placeholder').style.display='flex';
   document.getElementById('btn-open-cam').style.display='flex';
   document.getElementById('btn-capture').style.display='none';
+  document.getElementById('video-rec-controls').style.display='none';
+  document.getElementById('btn-start-rec').style.display='flex';
+  document.getElementById('btn-stop-rec').style.display='none';
+  document.getElementById('rec-dot').style.display='none';
+  if(recInterval){clearInterval(recInterval);recInterval=null;}
+  if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();
+}
+
+// ── Video recording ──────────────────────────────────────────────
+document.getElementById('btn-start-rec').addEventListener('click', startRecording);
+document.getElementById('btn-stop-rec').addEventListener('click', stopRecording);
+
+function startRecording() {
+  if (!videoStream) { showToast('Abra a câmera primeiro'); return; }
+  recordedChunks = [];
+  recSeconds = 0;
+  document.getElementById('rec-timer').textContent = '00:00 / 00:30';
+  document.getElementById('btn-start-rec').style.display = 'none';
+  document.getElementById('btn-stop-rec').style.display = 'flex';
+  document.getElementById('btn-capture').style.display = 'none';
+  document.getElementById('rec-dot').style.display = 'inline-block';
+
+  const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+  mediaRecorder = new MediaRecorder(videoStream, { mimeType });
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => uploadVideo(mimeType);
+  mediaRecorder.start(1000);
+
+  recInterval = setInterval(() => {
+    recSeconds++;
+    const remaining = MAX_REC_SECONDS - recSeconds;
+    document.getElementById('rec-timer').textContent =
+      pad(Math.floor(recSeconds/60))+':'+pad(recSeconds%60)+
+      ' / 00:'+pad(MAX_REC_SECONDS);
+    if (recSeconds >= MAX_REC_SECONDS) stopRecording();
+  }, 1000);
+}
+
+function stopRecording() {
+  if (recInterval) { clearInterval(recInterval); recInterval = null; }
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  document.getElementById('btn-start-rec').style.display = 'flex';
+  document.getElementById('btn-stop-rec').style.display = 'none';
+  document.getElementById('btn-capture').style.display = 'flex';
+  document.getElementById('rec-dot').style.display = 'none';
+  document.getElementById('rec-timer').textContent = '00:00 / 00:30';
+}
+
+async function uploadVideo(mimeType) {
+  const ext      = mimeType.includes('mp4') ? 'mp4' : 'webm';
+  const n        = new Date();
+  const filename = 'PSR_VID_' + fmtFileDate(n) + '.' + ext;
+  const blob     = new Blob(recordedChunks, { type: mimeType });
+  showToast('Vídeo ' + fmtTime(recSeconds) + ' — a enviar para Dropbox...');
+
+  // Add thumbnail to grid
+  const div = document.createElement('div'); div.className = 'mthumb';
+  const icon = document.createElement('div');
+  icon.style.cssText = 'font-size:28px;text-align:center';
+  icon.textContent = '🎥';
+  const badge = document.createElement('div'); badge.className = 'mcount'; badge.textContent = filename;
+  const statusEl = document.createElement('div'); statusEl.className = 'us us-loading'; statusEl.textContent = 'a enviar...';
+  div.appendChild(icon); div.appendChild(badge); div.appendChild(statusEl);
+  document.getElementById('media-grid').appendChild(div);
+  photoCount++;
+
+  try {
+    // Get fresh token from Apps Script
+    const tokenRes = await fetch(API_URL + '?action=get_dropbox_token');
+    const tokenData = await tokenRes.json();
+    if (!tokenData.ok) throw new Error('Token fetch failed');
+
+    // Build Dropbox path
+    const roNum     = activeTask ? String(activeTask.ro_number) : '0';
+    const roInt     = parseInt(roNum);
+    const floor1000 = Math.floor(roInt / 1000) * 1000;
+    const floor100  = Math.floor(roInt / 100) * 100;
+    const rangeL1   = '#' + floor1000 + ' a #' + (floor1000 + 999);
+    const rangeL2   = '#' + floor100  + ' a #' + (floor100  + 99);
+    const jobDesc   = sanitiseNameClient(activeTask ? activeTask.job_description : 'demo');
+    const dropboxPath = '/CTPRJ_NEW/vag ros/' + rangeL1 + '/' + rangeL2 +
+      '/#' + roNum + '/fotos/' + roNum + '_' + jobDesc + '/' + filename;
+
+    const apiArgs = JSON.stringify({ path: dropboxPath, mode: 'add', autorename: true, mute: false });
+    const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method:  'POST',
+      headers: {
+        'Authorization':   'Bearer ' + tokenData.token,
+        'Dropbox-API-Arg': apiArgs,
+        'Content-Type':    'application/octet-stream',
+      },
+      body: blob,
+    });
+    const result = await uploadRes.json();
+    if (result.error_summary) throw new Error(result.error_summary);
+    statusEl.className = 'us us-ok'; statusEl.textContent = 'Vídeo ✓';
+    showToast('Vídeo guardado: ' + result.path_display);
+  } catch(e) {
+    statusEl.className = 'us us-err'; statusEl.textContent = 'Erro';
+    showToast('Erro ao enviar vídeo: ' + e.message);
+  }
+}
+
+function sanitiseNameClient(str) {
+  return String(str)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9 _-]/g, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 50);
 }
 
 function updateOverlay() {
