@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.2 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.3 — Build: 11/06/2026 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -148,7 +148,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -300,7 +300,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.2</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.3</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -386,7 +386,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.5.3';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -814,7 +814,7 @@ function requestCameraPermission(){ document.getElementById('btn-open-cam').styl
 
 document.getElementById('btn-open-cam').addEventListener('click', async()=>{
   try {
-    videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:true});
     const v = document.getElementById('video-preview');
     v.srcObject=videoStream; v.style.display='block';
     document.getElementById('cam-placeholder').style.display='none';
@@ -891,7 +891,7 @@ function stopCamera() {
 document.getElementById('btn-start-rec').addEventListener('click', startRecording);
 document.getElementById('btn-stop-rec').addEventListener('click', stopRecording);
 
-function startRecording() {
+async function startRecording() {
   if (!videoStream) { showToast('Abra a câmera primeiro'); return; }
   recordedChunks = [];
   recSeconds = 0;
@@ -901,15 +901,61 @@ function startRecording() {
   document.getElementById('btn-capture').style.display = 'none';
   document.getElementById('rec-dot').style.display = 'inline-block';
 
-  const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-  mediaRecorder = new MediaRecorder(videoStream, { mimeType });
+  const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ? 'video/mp4' :
+                   MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+
+  // ── Burn audit frame onto canvas stream for first 3 seconds ──
+  const video  = document.getElementById('video-preview');
+  const canvas = document.getElementById('photo-canvas');
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
+
+  // Draw live frame
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Burn audit overlay — same style as photos
+  const n = new Date();
+  updateOverlay();
+  const lines = [
+    fmtDateTime(n),
+    'GPS: ' + (gpsCurrent || 'N/D'),
+    'Tecnico: ' + currentTech,
+    'RO: ' + (activeTask ? activeTask.ro_number : '—') + ' — ' + (activeRO ? activeRO.vehicle : ''),
+    'App: v' + APP_VERSION + '  [INICIO DE VIDEO]',
+  ];
+  const lh=26, p2=14, oh=lines.length*lh+p2*2;
+  ctx.fillStyle='rgba(0,0,0,0.82)'; ctx.fillRect(0,canvas.height-oh,canvas.width,oh);
+  ctx.font='bold 16px monospace'; ctx.textAlign='left';
+  lines.forEach((line,i)=>{
+    const y=canvas.height-oh+p2+lh*i+14;
+    if(i===3){ctx.fillStyle='#E00000';ctx.fillText('RO: ',p2,y);const w=ctx.measureText('RO: ').width;ctx.fillStyle='#fff';ctx.fillText(line.replace('RO: ',''),p2+w,y);}
+    else{ctx.fillStyle=i===0?'#fff':'#ccc';ctx.fillText(line,p2,y);}
+  });
+
+  // Create a combined stream: canvas (with audit frame) + audio from camera
+  const canvasStream = canvas.captureStream(30);
+  const audioTracks  = videoStream.getAudioTracks();
+  audioTracks.forEach(t => canvasStream.addTrack(t));
+
+  // Record canvas stream for 3 seconds (audit frame), then switch to live video stream
+  mediaRecorder = new MediaRecorder(canvasStream, { mimeType });
   mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
   mediaRecorder.onstop = () => uploadVideo(mimeType);
   mediaRecorder.start(1000);
 
+  // After 3 seconds switch canvas to live video feed
+  setTimeout(() => {
+    function drawLive() {
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(drawLive);
+    }
+    drawLive();
+  }, 3000);
+
   recInterval = setInterval(() => {
     recSeconds++;
-    const remaining = MAX_REC_SECONDS - recSeconds;
     document.getElementById('rec-timer').textContent =
       pad(Math.floor(recSeconds/60))+':'+pad(recSeconds%60)+
       ' / 00:'+pad(MAX_REC_SECONDS);
