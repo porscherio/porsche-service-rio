@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.4.0 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.4.2 — Build: 11/06/2026 -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -137,7 +137,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.4.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.4.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -199,7 +199,12 @@ input:focus{outline:none;border-color:var(--black)}
   <div class="screen" id="s3">
     <div class="topbar">
       <button class="back" onclick="goTo('s2')" aria-label="Voltar">&#8592;</button>
-      <div class="tb-title" id="s3-ro">RO #0000</div>
+      <div style="flex:1">
+        <div class="tb-title" id="s3-ro">RO #0000</div>
+        <div style="font-size:11px;color:var(--red);font-style:italic;margin-top:1px" id="s3-complaint"></div>
+        <div style="font-size:11px;color:#888;font-weight:500;margin-top:1px" id="s3-cust-name"></div>
+        <div style="font-size:10px;color:#888;margin-top:1px" id="s3-plate-vin"></div>
+      </div>
       <span class="badge" id="s3-badge">Livre</span>
     </div>
     <div class="scroll">
@@ -264,7 +269,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.4.0</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.4.2</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -342,7 +347,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.2';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -610,6 +615,9 @@ function openJobline(id, roNumber) {
   if (!j) return;
   activeTask = j;
   document.getElementById('s3-ro').textContent = 'RO #'+j.ro_number;
+  document.getElementById('s3-complaint').textContent = activeRO&&activeRO.complaint ? 'Cliente reclama de '+activeRO.complaint : '';
+  document.getElementById('s3-cust-name').textContent = activeRO&&activeRO.cust_name ? '👤 '+activeRO.cust_name : '';
+  document.getElementById('s3-plate-vin').textContent = [activeRO&&activeRO.plate?'Placa: '+activeRO.plate:'', activeRO&&activeRO.vin?'VIN: '+activeRO.vin:''].filter(Boolean).join('  ·  ');
   document.getElementById('s3-vehicle').textContent = activeRO?activeRO.vehicle:'';
   document.getElementById('s3-job').textContent = j.job_description;
   document.getElementById('s3-type').textContent = j.is_default?'Jobline padrão':'Jobline específica';
