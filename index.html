@@ -510,15 +510,33 @@ function renderJoblines(roNumber){
     is_default:true,
   }));
   const all=[...defaults,...specific];
-  const free=all.filter(j=>j.lock_status==='free'&&j.completion_pct<100);
-  const paused=all.filter(j=>j.lock_status==='paused');
-  const locked=all.filter(j=>j.lock_status==='locked');
-  const done=all.filter(j=>j.completion_pct>=100);
+  const defFree=all.filter(j=>j.is_default&&j.lock_status==='free'&&j.completion_pct<100);
+  const defPaused=all.filter(j=>j.is_default&&j.lock_status==='paused');
+  const defLocked=all.filter(j=>j.is_default&&j.lock_status==='locked');
+  const defDone=all.filter(j=>j.is_default&&j.completion_pct>=100);
+  const specFree=all.filter(j=>!j.is_default&&j.lock_status==='free'&&j.completion_pct<100);
+  const specPaused=all.filter(j=>!j.is_default&&j.lock_status==='paused');
+  const specLocked=all.filter(j=>!j.is_default&&j.lock_status==='locked');
+  const specDone=all.filter(j=>!j.is_default&&j.completion_pct>=100);
   let html='';
-  if(free.length){html+='<div class="sec-lbl">Disponíveis</div>';free.forEach(j=>html+=joblineCard(j));}
-  if(paused.length){html+='<div class="sec-lbl" style="margin-top:6px">Pausadas — continuar</div>';paused.forEach(j=>html+=joblineCard(j));}
-  if(locked.length){html+='<div class="sec-lbl" style="margin-top:6px">Em andamento</div>';locked.forEach(j=>html+=joblineCard(j));}
-  if(done.length){html+='<div class="sec-lbl" style="margin-top:6px">Concluídas</div>';done.forEach(j=>html+=joblineCard(j));}
+  // Default joblines first — clearly labelled as Padrão
+  const hasDefault=defFree.length||defPaused.length||defLocked.length||defDone.length;
+  if(hasDefault){
+    html+='<div class="sec-lbl" style="color:var(--red);border-bottom:1px solid #FECACA;padding-bottom:5px;margin-bottom:10px">&#x1F4CB; Padrão — todas as ordens</div>';
+    if(defFree.length)defFree.forEach(j=>html+=joblineCard(j));
+    if(defPaused.length){html+='<div class="sec-lbl" style="margin-top:4px">Pausadas</div>';defPaused.forEach(j=>html+=joblineCard(j));}
+    if(defLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento</div>';defLocked.forEach(j=>html+=joblineCard(j));}
+    if(defDone.length){html+='<div class="sec-lbl" style="margin-top:4px">Concluídas</div>';defDone.forEach(j=>html+=joblineCard(j));}
+  }
+  // Specific joblines — labelled as Disponíveis
+  const hasSpec=specFree.length||specPaused.length||specLocked.length||specDone.length;
+  if(hasSpec){
+    html+='<div class="sec-lbl" style="margin-top:14px;border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:10px">&#x1F527; Disponíveis — esta ordem</div>';
+    if(specFree.length)specFree.forEach(j=>html+=joblineCard(j));
+    if(specPaused.length){html+='<div class="sec-lbl" style="margin-top:4px">Pausadas — continuar</div>';specPaused.forEach(j=>html+=joblineCard(j));}
+    if(specLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento</div>';specLocked.forEach(j=>html+=joblineCard(j));}
+    if(specDone.length){html+='<div class="sec-lbl" style="margin-top:4px">Concluídas</div>';specDone.forEach(j=>html+=joblineCard(j));}
+  }
   const el=document.getElementById('jobline-list-content');
   el.innerHTML=html;
   el.querySelectorAll('.card:not(.locked)').forEach(c=>c.addEventListener('click',()=>openJobline(c.dataset.id,roNumber)));
