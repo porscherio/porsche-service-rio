@@ -134,7 +134,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.2.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.2.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -256,7 +256,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.2.0</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.2.1</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -334,7 +334,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -632,7 +632,7 @@ async function confirmarConclusao(){
 async function logWork(event, pct){
   if(!activeTask)return;
   try{
-    await fetch(API_URL,{method:'POST',body:JSON.stringify({
+    await fetch(API_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({
       action:'log_work',
       ro_number:activeTask.ro_number,
       jobline_id:activeTask.jobline_id,
@@ -700,10 +700,8 @@ async function capturePhoto(){
   document.getElementById('media-grid').appendChild(div);
   showToast('Foto '+photoCount+' — a enviar para Dropbox...');
   try{
-    const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'upload_media',ro_number:activeTask?activeTask.ro_number:'0',jobline_description:activeTask?activeTask.job_description:'demo',filename,data:b64})});
-    const result=await res.json();
-    if(result.ok){statusEl.className='us us-ok';statusEl.textContent='Dropbox \u2713';showToast('Guardado: '+result.path);}
-    else{statusEl.className='us us-err';statusEl.textContent='Erro';showToast('Erro: '+(result.error||'desconhecido'));}
+    await fetch(API_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upload_media',ro_number:activeTask?activeTask.ro_number:'0',jobline_description:activeTask?activeTask.job_description:'demo',filename,data:b64})});
+    statusEl.className='us us-ok';statusEl.textContent='Enviada \u2713';showToast('Foto '+photoCount+' enviada para o servidor');
   }catch(e){statusEl.className='us us-err';statusEl.textContent='Erro';showToast('Erro de ligacao');}
 }
 
