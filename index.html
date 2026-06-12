@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.6 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.7 — Build: 11/06/2026 -->
 <!-- Perf: RO list no longer reloads on every back navigation -->
 <!-- Perf: pause/complete updates RO progress bar locally -->
 <!-- Feature: RO search box on main screen -->
@@ -206,7 +206,11 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="font-size:11px;color:#888;margin-top:1px" id="s2-ro-customer"></div>
         <div style="font-size:10px;color:#aaa;margin-top:1px;font-family:monospace;letter-spacing:.03em" id="s2-ro-vin"></div>
       </div>
-      <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
+        <a id="s2-gantt-link" href="#" target="_blank"
+          style="display:inline-block;background:var(--black);color:#fff;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6">GANTT</a>
+      </div>
     </div>
     <div class="scroll">
       <div style="background:#FFF5F5;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;margin-bottom:14px">
@@ -313,7 +317,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.6</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.7</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -399,7 +403,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.6';
+const APP_VERSION = '1.5.7';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -687,6 +691,7 @@ function openRO(roNumber) {
   document.getElementById('s2-ro-vehicle').textContent = ro.vehicle+' · '+ro.plate;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
+  document.getElementById('s2-gantt-link').href = 'https://script.google.com/macros/s/AKfycbwejAExjenSdFD52g5oUKDPgcQ_QLtT5_JHQ-owOp__-yULniRlSm6DnUsgNSdAAves/exec?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
