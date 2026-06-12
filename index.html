@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.5 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.6 — Build: 11/06/2026 -->
 <!-- Perf: RO list no longer reloads on every back navigation -->
 <!-- Perf: pause/complete updates RO progress bar locally -->
 <!-- Feature: RO search box on main screen -->
@@ -203,6 +203,8 @@ input:focus{outline:none;border-color:var(--black)}
       <div style="flex:1">
         <div class="tb-title" id="s2-ro-title">RO #0000</div>
         <div class="tb-sub" id="s2-ro-vehicle"></div>
+        <div style="font-size:11px;color:#888;margin-top:1px" id="s2-ro-customer"></div>
+        <div style="font-size:10px;color:#aaa;margin-top:1px;font-family:monospace;letter-spacing:.03em" id="s2-ro-vin"></div>
       </div>
       <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
     </div>
@@ -311,7 +313,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.5</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.6</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -397,7 +399,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.5';
+const APP_VERSION = '1.5.6';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -683,6 +685,8 @@ function openRO(roNumber) {
   activeRO = ro;
   document.getElementById('s2-ro-title').textContent = 'RO #'+ro.ro_number;
   document.getElementById('s2-ro-vehicle').textContent = ro.vehicle+' · '+ro.plate;
+  document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
+  document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
