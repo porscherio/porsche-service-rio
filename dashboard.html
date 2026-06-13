@@ -28,24 +28,15 @@
     background: #0d0d0d;
     flex-shrink: 0;
   }
-  .header-left .title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-    letter-spacing: 0.01em;
-  }
-  .header-left .subtitle { font-size: 12px; color: #555; margin-top: 3px; }
+  .header-left .title { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: 0.01em; }
+  .header-left .subtitle { font-size: 12px; color: #aaa; margin-top: 3px; }
   .header-right { text-align: right; }
   .clock {
-    font-size: 36px;
-    font-weight: 700;
-    color: #fff;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
-    line-height: 1;
+    font-size: 36px; font-weight: 700; color: #fff;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.03em; line-height: 1;
   }
-  .last-sync { font-size: 11px; color: #444; margin-top: 4px; }
-  .last-sync span { color: #666; }
+  .last-sync { font-size: 11px; color: #888; margin-top: 4px; }
+  .last-sync span { color: #bbb; }
 
   /* STATS BAR */
   .stats-bar {
@@ -54,88 +45,61 @@
     background: #0d0d0d;
     flex-shrink: 0;
   }
-  .stat-cell {
-    flex: 1;
-    padding: 12px 20px;
-    border-right: 1px solid #2a2a2a;
-  }
+  .stat-cell { flex: 1; padding: 12px 20px; border-right: 1px solid #2a2a2a; }
   .stat-cell:last-child { border-right: none; }
   .stat-num { font-size: 28px; font-weight: 700; color: #fff; line-height: 1; }
-  .stat-label {
-    font-size: 11px; color: #555;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-top: 3px;
-  }
+  .stat-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
 
   /* MAIN */
-  .main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
+  .main { display: flex; flex: 1; overflow: hidden; }
 
   /* LEFT — TECHNICIANS */
   .panel-left {
-    flex: 1;
-    border-right: 1px solid #2a2a2a;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    flex: 1; border-right: 1px solid #2a2a2a;
+    display: flex; flex-direction: column; overflow: hidden;
   }
 
   .panel-header {
     padding: 9px 16px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #444;
-    border-bottom: 1px solid #1e1e1e;
-    display: flex;
-    align-items: center;
-    gap: 7px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: #aaa; border-bottom: 1px solid #1e1e1e;
+    display: flex; align-items: center; gap: 7px;
     flex-shrink: 0;
   }
-  .panel-header i { font-size: 13px; }
+  .panel-header i { font-size: 13px; color: #888; }
 
   .tech-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-    padding: 12px;
-    flex: 1;
-    align-content: start;
+    gap: 10px; padding: 12px;
+    flex: 1; align-content: start;
     overflow-y: auto;
   }
 
   .tech-card {
-    background: #1a1a1a;
-    border-radius: 8px;
-    padding: 12px;
-    border: 1.5px solid #2a2a2a;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    min-height: 118px;
+    background: #1a1a1a; border-radius: 8px;
+    padding: 12px; border: 1.5px solid #333;
+    display: flex; flex-direction: column; gap: 6px;
+    min-height: 148px;
   }
-  .tech-card.working { border-color: #1a6640; }
-  .tech-card.paused  { border-color: #7a5a00; }
+  .tech-card.working { border-color: #1a6640; background: #141f18; }
+  .tech-card.paused  { border-color: #7a5a00; background: #1c1800; }
+  .tech-card.idle    { border-color: #2a2a2a; background: #171717; }
 
   .tech-card-top { display: flex; align-items: center; gap: 8px; }
 
   .avatar {
-    width: 34px; height: 34px;
-    border-radius: 50%;
+    width: 34px; height: 34px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 700;
     flex-shrink: 0; letter-spacing: 0.02em;
   }
   .avatar.working { background: #1a6640; color: #4ade90; }
   .avatar.paused  { background: #5a3e00; color: #f0b429; }
-  .avatar.idle    { background: #252525; color: #555; }
+  .avatar.idle    { background: #2a2a2a; color: #aaa; }
 
-  .tech-name { font-size: 15px; font-weight: 600; color: #e8e8e8; flex: 1; }
+  .tech-name { font-size: 15px; font-weight: 600; color: #fff; flex: 1; }
 
   .status-badge {
     font-size: 10px; font-weight: 700;
@@ -144,64 +108,64 @@
   }
   .badge-working { background: #0d3a22; color: #4ade90; }
   .badge-paused  { background: #3d2800; color: #f0b429; }
-  .badge-idle    { color: #444; font-weight: 500; font-size: 11px; }
+  .badge-idle    { background: #222; color: #aaa; font-weight: 600; }
 
-  .tech-ro   { font-size: 13px; font-weight: 600; color: #ccc; }
-  .tech-task { font-size: 12px; color: #555; margin-top: 1px; }
+  /* RO info block */
+  .ro-block { display: flex; flex-direction: column; gap: 3px; }
+  .ro-top { display: flex; align-items: center; gap: 8px; }
+  .ro-number { font-size: 13px; font-weight: 700; color: #fff; }
+  .ro-vehicle { font-size: 12px; color: #ccc; }
+  .ro-plate {
+    font-size: 10px; font-weight: 700;
+    background: #2a2a2a; color: #ddd;
+    padding: 1px 6px; border-radius: 3px;
+    letter-spacing: 0.08em; margin-left: auto;
+  }
+  .ro-task { font-size: 12px; color: #bbb; }
+  .ro-customer { font-size: 11px; color: #999; display: flex; align-items: center; gap: 4px; }
+  .ro-customer i { font-size: 11px; color: #777; }
+  .ro-eta { font-size: 11px; color: #f0b429; display: flex; align-items: center; gap: 4px; }
+  .ro-eta i { font-size: 11px; }
 
   .tech-footer {
     display: flex; align-items: center;
-    justify-content: space-between;
-    margin-top: auto;
+    justify-content: space-between; margin-top: auto;
   }
   .timer {
-    font-size: 12px; color: #555;
+    font-size: 12px; color: #aaa;
     font-variant-numeric: tabular-nums;
     display: flex; align-items: center; gap: 4px;
   }
   .timer i { font-size: 12px; }
   .timer.working { color: #4ade90; }
   .timer.paused  { color: #f0b429; }
-  .pct { font-size: 12px; color: #555; }
+  .pct { font-size: 12px; font-weight: 600; color: #aaa; }
   .pct.working { color: #4ade90; }
   .pct.paused  { color: #f0b429; }
 
-  .progress-bar { height: 3px; background: #252525; border-radius: 2px; overflow: hidden; margin-top: 2px; }
+  .progress-bar { height: 3px; background: #2a2a2a; border-radius: 2px; overflow: hidden; margin-top: 2px; }
   .progress-fill { height: 100%; border-radius: 2px; }
   .fill-working { background: #4ade90; }
   .fill-paused  { background: #f0b429; }
 
-  .no-task { font-size: 12px; color: #2e2e2e; margin-top: auto; padding-top: 4px; }
+  .no-task { font-size: 12px; color: #555; margin-top: auto; padding-top: 4px; }
 
   /* RIGHT PANEL */
-  .panel-right {
-    width: 300px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+  .panel-right { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
 
   /* RO SECTION */
   .ro-section { border-bottom: 1px solid #2a2a2a; padding-bottom: 10px; flex-shrink: 0; }
   .ro-cards { display: flex; gap: 8px; padding: 10px 12px 6px; }
-  .ro-card {
-    flex: 1; background: #1a1a1a;
-    border-radius: 8px; padding: 10px 12px;
-    border: 1px solid #222;
-  }
+  .ro-card { flex: 1; background: #1a1a1a; border-radius: 8px; padding: 10px 12px; border: 1px solid #2a2a2a; }
   .ro-num { font-size: 26px; font-weight: 700; color: #fff; line-height: 1; }
-  .ro-label { font-size: 11px; color: #555; margin-top: 2px; }
-  .ro-sub { font-size: 10px; color: #3a3a3a; margin-top: 2px; }
+  .ro-label { font-size: 11px; color: #aaa; margin-top: 2px; }
+  .ro-sub { font-size: 10px; color: #777; margin-top: 2px; }
 
   .closure-row { padding: 0 12px 2px; }
-  .closure-header {
-    display: flex; justify-content: space-between;
-    align-items: center; margin-bottom: 5px;
-  }
-  .closure-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #444; }
+  .closure-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .closure-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #aaa; }
   .closure-pct { font-size: 12px; font-weight: 600; color: #4ade90; }
-  .closure-bar { height: 3px; background: #222; border-radius: 2px; overflow: hidden; }
+  .closure-bar { height: 3px; background: #2a2a2a; border-radius: 2px; overflow: hidden; }
   .closure-fill { height: 100%; background: #4ade90; border-radius: 2px; transition: width 0.6s; }
 
   /* ETA SECTIONS */
@@ -212,21 +176,20 @@
   .eta-table { width: 100%; border-collapse: collapse; }
   .eta-table th {
     font-size: 10px; text-transform: uppercase;
-    letter-spacing: 0.08em; color: #3a3a3a;
+    letter-spacing: 0.08em; color: #aaa;
     padding: 4px 0; text-align: left; font-weight: 600;
-    border-bottom: 1px solid #1e1e1e;
+    border-bottom: 1px solid #2a2a2a;
   }
   .eta-table th:last-child { text-align: right; }
   .eta-table td {
     font-size: 12px; padding: 5px 0;
-    color: #888; border-bottom: 1px solid #1a1a1a;
+    color: #ccc; border-bottom: 1px solid #222;
     vertical-align: middle;
   }
-  .eta-table td:first-child { color: #555; font-size: 11px; width: 52px; }
+  .eta-table td:first-child { color: #aaa; font-size: 11px; width: 52px; }
   .eta-table td:last-child { text-align: right; }
   .eta-table tr:last-child td { border-bottom: none; }
-
-  .eta-empty { font-size: 11px; color: #2e2e2e; padding: 8px 0; text-align: center; }
+  .eta-empty { font-size: 11px; color: #666; padding: 8px 0; text-align: center; }
 
   .eta-tag {
     font-size: 10px; font-weight: 700;
@@ -235,33 +198,31 @@
     display: inline-block;
   }
   .tag-today    { background: #3a2a00; color: #f0b429; }
-  .tag-tomorrow { color: #4ade90; }
+  .tag-tomorrow { color: #4ade90; font-weight: 700; }
   .tag-overdue  { background: #3a0d0d; color: #f87171; }
   .tag-arrived  { color: #4ade90; font-weight: 700; }
-  .tag-pending  { color: #3a3a3a; }
+  .tag-pending  { color: #888; }
 
   /* FOOTER */
   .footer {
-    display: flex; justify-content: space-between;
-    align-items: center; padding: 7px 16px;
-    border-top: 1px solid #1e1e1e;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 16px; border-top: 1px solid #1e1e1e;
     background: #0d0d0d; flex-shrink: 0;
   }
   .legend { display: flex; gap: 16px; align-items: center; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #aaa; }
   .dot { width: 7px; height: 7px; border-radius: 50%; }
   .dot-w { background: #4ade90; }
   .dot-p { background: #f0b429; }
-  .dot-i { background: #333; }
-  .auto-refresh { font-size: 11px; color: #333; display: flex; align-items: center; gap: 5px; }
+  .dot-i { background: #555; }
+  .auto-refresh { font-size: 11px; color: #888; display: flex; align-items: center; gap: 5px; }
   .auto-refresh i { font-size: 12px; }
 
   /* ERROR BANNER */
   .error-banner {
     display: none; background: #3a0d0d;
     color: #f87171; font-size: 11px;
-    padding: 6px 16px; text-align: center;
-    flex-shrink: 0;
+    padding: 6px 16px; text-align: center; flex-shrink: 0;
   }
   .error-banner.visible { display: block; }
 </style>
@@ -322,9 +283,7 @@
     <div class="eta-section">
       <div class="eta-table-wrap">
         <table class="eta-table">
-          <thead><tr>
-            <th>OS</th><th>Veículo</th><th>ETA</th>
-          </tr></thead>
+          <thead><tr><th>OS</th><th>Veículo</th><th>ETA</th></tr></thead>
           <tbody id="vehicle-eta-body">
             <tr><td colspan="3" class="eta-empty">Nenhuma entrega hoje</td></tr>
           </tbody>
@@ -336,9 +295,7 @@
     <div class="parts-section">
       <div class="eta-table-wrap">
         <table class="eta-table">
-          <thead><tr>
-            <th>OS</th><th>Peça</th><th>Status</th>
-          </tr></thead>
+          <thead><tr><th>OS</th><th>Peça</th><th>Status</th></tr></thead>
           <tbody id="parts-eta-body">
             <tr><td colspan="3" class="eta-empty">Nenhuma peça pendente</td></tr>
           </tbody>
@@ -364,7 +321,6 @@ const REFRESH_INTERVAL = 30000;
 const timerIntervals = {};
 let lastSyncTime = null;
 
-// ── CLOCK ────────────────────────────────────────────────────────
 function fmt2(n) { return String(n).padStart(2, '0'); }
 
 function updateClock() {
@@ -383,18 +339,14 @@ function updateSyncAgo() {
   document.getElementById('sync-ago').textContent = secs + 's atrás';
 }
 
-// ── ELAPSED TIMER ────────────────────────────────────────────────
 function elapsedStr(lockStart) {
   const secs = Math.floor((Date.now() - lockStart) / 1000);
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
-  return h > 0
-    ? `${fmt2(h)}:${fmt2(m)}:${fmt2(s)}`
-    : `${fmt2(m)}:${fmt2(s)}`;
+  return h > 0 ? `${fmt2(h)}:${fmt2(m)}:${fmt2(s)}` : `${fmt2(m)}:${fmt2(s)}`;
 }
 
-// ── RENDER TECH CARDS ────────────────────────────────────────────
 function renderTechCards(lockStatus) {
   Object.values(timerIntervals).forEach(clearInterval);
   Object.keys(timerIntervals).forEach(k => delete timerIntervals[k]);
@@ -410,9 +362,9 @@ function renderTechCards(lockStatus) {
     else if (s === 'paused') paused++;
     else idle++;
 
-    const initials = lock.tech.split(' ').slice(0, 2).map(w => w[0]).join('');
+    const initials  = lock.tech.split(' ').slice(0, 2).map(w => w[0]).join('');
     const firstName = lock.tech.split(' ')[0];
-    const timerId = `timer-${initials}`;
+    const timerId   = `timer-${initials}`;
 
     const badgeHtml = s === 'working'
       ? `<span class="status-badge badge-working">Trabalhando</span>`
@@ -423,24 +375,42 @@ function renderTechCards(lockStatus) {
     const card = document.createElement('div');
     card.className = `tech-card ${s}`;
 
-    const bodyHtml = lock.ro ? `
-      <div>
-        <div class="tech-ro">${lock.ro}</div>
-        <div class="tech-task">${lock.task || ''}</div>
-      </div>
-      <div>
-        <div class="tech-footer">
-          <span class="timer ${s}" id="${timerId}">
-            <i class="ti ti-clock" aria-hidden="true"></i>
-            ${lock.lockStart ? elapsedStr(lock.lockStart) : (s === 'paused' ? 'pausado' : '00:00')}
-          </span>
-          <span class="pct ${s}">${lock.pct}%</span>
+    let bodyHtml = '';
+    if (lock.ro) {
+      const etaHtml = lock.eta
+        ? `<div class="ro-eta"><i class="ti ti-clock" aria-hidden="true"></i>${lock.eta}</div>`
+        : '';
+      const custHtml = lock.custName
+        ? `<div class="ro-customer"><i class="ti ti-user" aria-hidden="true"></i>${lock.custName}</div>`
+        : '';
+
+      bodyHtml = `
+        <div class="ro-block">
+          <div class="ro-top">
+            <span class="ro-number">${lock.ro}</span>
+            <span class="ro-vehicle">${lock.vehicle || ''}</span>
+            ${lock.plate ? `<span class="ro-plate">${lock.plate}</span>` : ''}
+          </div>
+          <div class="ro-task">${lock.task || ''}</div>
+          ${custHtml}
+          ${etaHtml}
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill fill-${s}" style="width:${lock.pct}%"></div>
+        <div>
+          <div class="tech-footer">
+            <span class="timer ${s}" id="${timerId}">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              ${lock.lockStart ? elapsedStr(lock.lockStart) : (s === 'paused' ? 'pausado' : '00:00')}
+            </span>
+            <span class="pct ${s}">${lock.pct}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill fill-${s}" style="width:${lock.pct}%"></div>
+          </div>
         </div>
-      </div>
-    ` : `<div class="no-task">Sem tarefa ativa</div>`;
+      `;
+    } else {
+      bodyHtml = `<div class="no-task">Sem tarefa ativa</div>`;
+    }
 
     card.innerHTML = `
       <div class="tech-card-top">
@@ -468,18 +438,16 @@ function renderTechCards(lockStatus) {
   document.getElementById('stat-idle').textContent    = idle;
 }
 
-// ── RENDER RO SUMMARY ────────────────────────────────────────────
 function renderROSummary(data) {
-  document.getElementById('ro-open').textContent   = data.open;
-  document.getElementById('ro-closed').textContent = data.closed;
-  document.getElementById('ro-closed-sub').textContent = `de ${data.total} este mês`;
-  document.getElementById('stat-done').textContent  = data.closed;
+  document.getElementById('ro-open').textContent        = data.open;
+  document.getElementById('ro-closed').textContent      = data.closed;
+  document.getElementById('ro-closed-sub').textContent  = `de ${data.total} este mês`;
+  document.getElementById('stat-done').textContent      = data.closed;
   const pct = data.total > 0 ? Math.round((data.closed / data.total) * 100) : 0;
-  document.getElementById('closure-pct').textContent = pct + '%';
-  document.getElementById('closure-fill').style.width = pct + '%';
+  document.getElementById('closure-pct').textContent    = pct + '%';
+  document.getElementById('closure-fill').style.width   = pct + '%';
 }
 
-// ── RENDER VEHICLE ETAs ──────────────────────────────────────────
 function renderVehicleEtas(rows) {
   const tbody = document.getElementById('vehicle-eta-body');
   if (!rows || rows.length === 0) {
@@ -489,13 +457,12 @@ function renderVehicleEtas(rows) {
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${r.ro}</td>
-      <td style="color:#aaa;">${r.vehicle}</td>
+      <td style="color:#ddd;">${r.vehicle}</td>
       <td><span class="eta-tag ${r.tag}">${r.eta}</span></td>
     </tr>
   `).join('');
 }
 
-// ── RENDER PARTS ETAs ────────────────────────────────────────────
 function renderPartsEtas(rows) {
   const tbody = document.getElementById('parts-eta-body');
   if (!rows || rows.length === 0) {
@@ -505,19 +472,17 @@ function renderPartsEtas(rows) {
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${r.ro}</td>
-      <td style="color:#aaa;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.part}</td>
+      <td style="color:#ddd;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.part}</td>
       <td><span class="eta-tag ${r.tag}">${r.status}</span></td>
     </tr>
   `).join('');
 }
 
-// ── FETCH DATA ───────────────────────────────────────────────────
 function showError(msg) {
-  const banner = document.getElementById('error-banner');
-  banner.textContent = msg;
-  banner.classList.add('visible');
+  const b = document.getElementById('error-banner');
+  b.textContent = msg;
+  b.classList.add('visible');
 }
-
 function hideError() {
   document.getElementById('error-banner').classList.remove('visible');
 }
@@ -526,12 +491,10 @@ async function fetchData() {
   try {
     const res  = await fetch(API_URL);
     const data = await res.json();
-
     renderTechCards(data.lockStatus);
     renderROSummary(data.roSummary);
     renderVehicleEtas(data.vehicleEtas);
     renderPartsEtas(data.partsEtas);
-
     lastSyncTime = Date.now();
     hideError();
   } catch (err) {
@@ -540,11 +503,9 @@ async function fetchData() {
   }
 }
 
-// ── INIT ─────────────────────────────────────────────────────────
 updateClock();
 setInterval(updateClock, 1000);
 setInterval(updateSyncAgo, 1000);
-
 fetchData();
 setInterval(fetchData, REFRESH_INTERVAL);
 </script>
