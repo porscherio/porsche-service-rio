@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.10 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.11 — Build: 11/06/2026 -->
 <!-- Perf: RO list no longer reloads on every back navigation -->
 <!-- Perf: pause/complete updates RO progress bar locally -->
 <!-- Feature: RO search box on main screen -->
@@ -151,7 +151,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.10</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.11</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -317,7 +317,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.10</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.11</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -403,7 +403,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.10';
+const APP_VERSION = '1.5.11';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -651,9 +651,9 @@ function filterAndRenderROList(q) {
 }
 
 function renderROList(ros) {
-  const sug    = ros.filter(r => r.suggested && r.lock_status !== 'locked');
-  const free   = ros.filter(r => !r.suggested && r.lock_status === 'free');
-  const paused = ros.filter(r => !r.suggested && r.lock_status === 'paused');
+  const sug    = ros.filter(r => r.suggested === currentTech && r.lock_status !== 'locked');
+  const free   = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'free');
+  const paused = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'paused');
   const locked = ros.filter(r => r.lock_status === 'locked');
   let html = '';
   if (!ros.length) { html='<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma ordem de serviço aberta.</div>'; }
@@ -673,11 +673,11 @@ function roCard(r) {
   let dot='d-g', status='Disponível', bc='b-liv', bt='Livre';
   if (isLocked) { dot='d-r'; status=r.locked_by+' a trabalhar'; bc='b-lock'; bt='&#x1F512; Bloqueada'; }
   if (isPaused) { dot='d-a'; status='Pausada · '+r.locked_by; bc='b-pau'; bt='Pausada'; }
-  if (r.suggested && !isLocked) { bc='b-sug'; bt='Sugerida'; }
+  if (r.suggested === currentTech && !isLocked) { bc='b-sug'; bt='Sugerida'; }
   const total = (parseInt(r.total_joblines)||0);
   const done  = parseInt(r.done_joblines)||0;
   const pct   = total>0 ? Math.round(done/total*100) : 0;
-  return '<div class="card'+(isLocked?' locked':'')+(isPaused?' pausado':'')+(r.suggested?' sugerida':'')+'" data-ro="'+r.ro_number+'">'+
+  return '<div class="card'+(isLocked?' locked':'')+(isPaused?' pausado':'')+(r.suggested===currentTech?' sugerida':'')+'" data-ro="'+r.ro_number+'">'+
     '<div class="crow"><div>'+
     '<div class="cro">RO #'+r.ro_number+' &mdash; '+r.vehicle+'</div>'+
     '<div class="cjob">Placa: '+r.plate+'</div>'+
