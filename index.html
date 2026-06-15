@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.11 — Build: 11/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.12 — Build: 15/06/2026 -->
 <!-- Perf: RO list no longer reloads on every back navigation -->
 <!-- Perf: pause/complete updates RO progress bar locally -->
 <!-- Feature: RO search box on main screen -->
@@ -132,6 +132,8 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-list{color:var(--black);font-size:11px}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
+/* ── v1.5.12 addition ── */
+.pill-btn{display:inline-block;background:var(--black);color:#fff;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
 </style>
 </head>
 <body>
@@ -151,7 +153,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.11</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.12</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -189,9 +191,12 @@ input:focus{outline:none;border-color:var(--black)}
     <div class="scroll" id="ro-list-content">
       <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
     </div>
+    <!-- v1.5.12: GANTT + SI tabs -->
     <div class="nav">
       <button class="ntab on" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
+      <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
+      <button class="ntab" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -206,10 +211,13 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="font-size:11px;color:#888;margin-top:1px" id="s2-ro-customer"></div>
         <div style="font-size:10px;color:#aaa;margin-top:1px;font-family:monospace;letter-spacing:.03em" id="s2-ro-vin"></div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <!-- v1.5.12: SI pill added next to GANTT -->
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
-        <a id="s2-gantt-link" href="#" target="_blank"
-          style="display:inline-block;background:var(--black);color:#fff;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6">GANTT</a>
+        <div style="display:flex;gap:5px">
+          <a id="s2-gantt-link" href="#" target="_blank" class="pill-btn">GANTT</a>
+          <a href="#" onclick="return openSIForRO()" class="pill-btn">SI</a>
+        </div>
       </div>
     </div>
     <div class="scroll">
@@ -317,7 +325,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.11</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.12</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -391,9 +399,12 @@ input:focus{outline:none;border-color:var(--black)}
     <div class="scroll" id="hist-list">
       <div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma tarefa concluída hoje.</div>
     </div>
+    <!-- v1.5.12: GANTT + SI tabs -->
     <div class="nav">
       <button class="ntab" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab on">&#x1F4CB;<br>Histórico</button>
+      <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
+      <button class="ntab" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -403,7 +414,10 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.11';
+const APP_VERSION = '1.5.12';
+// ── v1.5.12: centralised URL constants ───────────────────────────
+const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
+const SI_URL      = 'YOUR_SI_DEPLOYMENT_URL'; // ← paste your SI web app URL here
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -696,7 +710,7 @@ function openRO(roNumber) {
   document.getElementById('s2-ro-vehicle').textContent = ro.vehicle+' · '+ro.plate;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
-  document.getElementById('s2-gantt-link').href = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec?os=' + ro.ro_number;
+  document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number; // v1.5.12
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
@@ -1015,6 +1029,33 @@ document.getElementById('pct-done').addEventListener('change', function(){
     ? '100% — tarefa concluída. Bloqueio libertado.'
     : this.value+' — tarefa pausada. Outro técnico poderá continuar.';
 });
+
+
+// ── v1.5.12: GANTT / SI navigation ───────────────────────────────
+
+// Entry point 1 — bottom nav GANTT tab
+function openGanttNav() {
+  window.open(activeRO ? GANTT_URL+'?os='+activeRO.ro_number : GANTT_URL, '_blank');
+}
+
+// Entry point 1 — bottom nav SI tab
+// RO open → use its plate; no RO → open SI search page (advisor types plate)
+function openSINav() {
+  if (activeRO && activeRO.plate) {
+    window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
+    fetch(SI_URL+'?placa='+encodeURIComponent(activeRO.plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
+  } else {
+    window.open(SI_URL, '_blank');
+  }
+}
+
+// Entry point 2 — SI pill in RO header (same architecture as GANTT pill)
+function openSIForRO() {
+  if (!activeRO || !activeRO.plate) return false;
+  window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
+  fetch(SI_URL+'?placa='+encodeURIComponent(activeRO.plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
+  return false; // prevent href="#" scroll-to-top
+}
 
 // ── Helpers ───────────────────────────────────────────────────────
 function pad(n){return String(n).padStart(2,'0');}
