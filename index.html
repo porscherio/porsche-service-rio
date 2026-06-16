@@ -411,6 +411,20 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
+
+  <!-- SI PLATE INPUT MODAL (v1.5.12) -->
+  <div id="si-modal" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:100;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:22px 18px;width:calc(100% - 48px);max-width:340px">
+      <div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:4px">Consulta SI</div>
+      <div style="font-size:11px;color:#888;margin-bottom:12px">Introduza a placa para consultar o histórico de manutenção</div>
+      <label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Placa</label>
+      <input type="text" id="si-plate-input" placeholder="ex: MDJ0308" inputmode="text" maxlength="8" onkeydown="if(event.key==='Enter')confirmSIInput()"
+        style="width:100%;padding:12px;border-radius:4px;border:1px solid #e0e0e0;background:#f7f7f7;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;color:#1a1a1a;-webkit-appearance:none;outline:none;box-sizing:border-box;margin-bottom:14px">
+      <button onclick="confirmSIInput()" style="width:100%;padding:13px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#E00000;color:#fff;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Consultar</button>
+      <button onclick="closeSIModal()" style="width:100%;padding:13px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:#888;border:1px solid #e0e0e0">Cancelar</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -419,7 +433,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 const APP_VERSION = '1.5.12';
 // ── v1.5.12: centralised URL constants ───────────────────────────
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
-const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec'; // ← paste your SI web app URL here
+const SI_URL      = 'YOUR_SI_DEPLOYMENT_URL'; // ← paste your SI web app URL here
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -1041,14 +1055,30 @@ function openGanttNav() {
 }
 
 // Entry point 1 — bottom nav SI tab
-// RO open → use its plate; no RO → open SI search page (advisor types plate)
+// RO open → use its plate directly; no RO → modal plate input inside the PWA
 function openSINav() {
   if (activeRO && activeRO.plate) {
     window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
     fetch(SI_URL+'?placa='+encodeURIComponent(activeRO.plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
   } else {
-    window.open(SI_URL, '_blank');
+    const modal = document.getElementById('si-modal');
+    const inp   = document.getElementById('si-plate-input');
+    modal.style.display = 'flex';
+    inp.value = '';
+    setTimeout(() => inp.focus(), 150);
   }
+}
+
+function closeSIModal() {
+  document.getElementById('si-modal').style.display = 'none';
+}
+
+function confirmSIInput() {
+  const plate = document.getElementById('si-plate-input').value.trim().toUpperCase();
+  if (!plate) { showToast('Digite a placa primeiro.'); return; }
+  closeSIModal();
+  window.open(SI_URL+'?placa='+encodeURIComponent(plate), '_blank');
+  fetch(SI_URL+'?placa='+encodeURIComponent(plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
 }
 
 // Entry point 2 — SI pill in RO header (same architecture as GANTT pill)
