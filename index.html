@@ -134,6 +134,9 @@ input:focus{outline:none;border-color:var(--black)}
 #photo-canvas{display:none}
 /* ── v1.5.14 addition ── */
 .pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
+.auth-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:3px;margin-top:6px;margin-bottom:2px}
+.auth-ok{background:#1565C0;color:#fff}
+.auth-no{background:var(--red);color:#fff}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
 </style>
@@ -708,12 +711,16 @@ function roCard(r) {
   const total = (parseInt(r.total_joblines)||0);
   const done  = parseInt(r.done_joblines)||0;
   const pct   = total>0 ? Math.round(done/total*100) : 0;
+  const authTag = r.authorized
+    ? '<span class="auth-tag auth-ok">&#x2714; Autorizada</span>'
+    : '<span class="auth-tag auth-no">&#x26A0; N&#xE3;o autorizada</span>';
   return '<div class="card'+(isLocked?' locked':'')+(isPaused?' pausado':'')+(r.suggested===currentTech?' sugerida':'')+'" data-ro="'+r.ro_number+'">'+
     '<div class="crow"><div>'+
     '<div class="cro">RO #'+r.ro_number+' &mdash; '+r.vehicle+'</div>'+
     '<div class="cjob">Placa: '+r.plate+'</div>'+
     '<div class="cdesc">'+r.complaint+'</div>'+
     '</div><span class="badge '+bc+'">'+bt+'</span></div>'+
+    authTag+
     '<div class="trow"><div class="tdot '+dot+'"></div><span class="tname">'+status+'</span></div>'+
     '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:'+pct+'%"></div></div>'+
     '<span class="ro-prog-txt">'+done+'/'+total+' joblines</span></div></div>';
