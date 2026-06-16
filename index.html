@@ -132,7 +132,7 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-list{color:var(--black);font-size:11px}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
-/* ── v1.5.12 addition ── */
+/* ── v1.5.13 addition ── */
 .pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
@@ -193,7 +193,7 @@ input:focus{outline:none;border-color:var(--black)}
     <div class="scroll" id="ro-list-content">
       <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
     </div>
-    <!-- v1.5.12: GANTT + SI tabs -->
+    <!-- v1.5.13: GANTT + SI tabs -->
     <div class="nav">
       <button class="ntab on" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
@@ -213,7 +213,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="font-size:11px;color:#888;margin-top:1px" id="s2-ro-customer"></div>
         <div style="font-size:10px;color:#aaa;margin-top:1px;font-family:monospace;letter-spacing:.03em" id="s2-ro-vin"></div>
       </div>
-      <!-- v1.5.12: SI pill added next to GANTT -->
+      <!-- v1.5.13: SI pill added next to GANTT -->
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
         <div style="display:flex;gap:5px">
@@ -401,7 +401,7 @@ input:focus{outline:none;border-color:var(--black)}
     <div class="scroll" id="hist-list">
       <div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma tarefa concluída hoje.</div>
     </div>
-    <!-- v1.5.12: GANTT + SI tabs -->
+    <!-- v1.5.13: GANTT + SI tabs -->
     <div class="nav">
       <button class="ntab" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab on">&#x1F4CB;<br>Histórico</button>
@@ -412,7 +412,7 @@ input:focus{outline:none;border-color:var(--black)}
   </div>
 
 
-  <!-- SI PLATE INPUT MODAL (v1.5.12) -->
+  <!-- SI PLATE INPUT MODAL (v1.5.13) -->
   <div id="si-modal" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:100;align-items:center;justify-content:center">
     <div style="background:#fff;border-radius:12px;padding:22px 18px;width:calc(100% - 48px);max-width:340px">
       <div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:4px">Consulta SI</div>
@@ -432,7 +432,7 @@ input:focus{outline:none;border-color:var(--black)}
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
 const APP_VERSION = '1.5.13';
-// ── v1.5.12: centralised URL constants ───────────────────────────
+// ── v1.5.13: centralised URL constants ───────────────────────────
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -727,7 +727,7 @@ function openRO(roNumber) {
   document.getElementById('s2-ro-vehicle').textContent = ro.vehicle+' · '+ro.plate;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
-  document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number; // v1.5.12
+  document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number; // v1.5.13
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
@@ -1048,7 +1048,7 @@ document.getElementById('pct-done').addEventListener('change', function(){
 });
 
 
-// ── v1.5.12: GANTT / SI navigation ───────────────────────────────
+// ── v1.5.13: GANTT / SI navigation ───────────────────────────────
 
 // Entry point 1 — bottom nav GANTT tab
 function openGanttNav() {
