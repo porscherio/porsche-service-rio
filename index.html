@@ -133,7 +133,9 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
 /* ── v1.5.12 addition ── */
-.pill-btn{display:inline-block;background:var(--black);color:#fff;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
+.pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
+.pill-gantt{background:var(--green);color:#fff}
+.pill-si{background:var(--red);color:#fff}
 </style>
 </head>
 <body>
@@ -215,8 +217,8 @@ input:focus{outline:none;border-color:var(--black)}
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
         <div style="display:flex;gap:5px">
-          <a id="s2-gantt-link" href="#" target="_blank" class="pill-btn">GANTT</a>
-          <a href="#" onclick="return openSIForRO()" class="pill-btn">SI</a>
+          <a id="s2-gantt-link" href="#" target="_blank" class="pill-btn pill-gantt">GANTT</a>
+          <a href="#" onclick="return openSIForRO()" class="pill-btn pill-si">SI</a>
         </div>
       </div>
     </div>
@@ -417,7 +419,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 const APP_VERSION = '1.5.12';
 // ── v1.5.12: centralised URL constants ───────────────────────────
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
-const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec'; // ← paste your SI web app URL here
+const SI_URL      = 'YOUR_SI_DEPLOYMENT_URL'; // ← paste your SI web app URL here
 
 const USERS = {
   'Alvaro Mello':   '1234',
