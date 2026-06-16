@@ -720,6 +720,7 @@ function roCard(r) {
     '<div class="crow"><div>'+
     '<div class="cro">RO #'+r.ro_number+' &mdash; '+r.vehicle+'</div>'+
     '<div class="cjob">Placa: '+r.plate+'</div>'+
+    (r.cust_name ? '<div class="cjob">&#x1F464; '+r.cust_name+'</div>' : '')+
     '<div class="cdesc">'+r.complaint+'</div>'+
     '</div><span class="badge '+bc+'">'+bt+'</span></div>'+
     authTag+
