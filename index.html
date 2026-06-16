@@ -747,7 +747,7 @@ function renderJoblines(roNumber, joblines) {
   let html = '';
   const hasDef = defFree.length||defPaused.length||defLocked.length||defDone.length;
   if (hasDef) {
-    html += '<div class="sec-lbl" style="color:var(--red);border-bottom:1px solid #FECACA;padding-bottom:5px;margin-bottom:10px">&#x1F4CB; Padrão — todas as ordens</div>';
+    html += '<div class="sec-lbl" style="color:var(--red);border-bottom:1px solid #FECACA;padding-bottom:5px;margin-bottom:10px">&#x1F4CB; Tarefas fixas · obrigatórias em todas as OS</div>';
     defFree.forEach(j=>html+=joblineCard(j));
     if(defPaused.length){html+='<div class="sec-lbl" style="margin-top:4px">Pausadas</div>';defPaused.forEach(j=>html+=joblineCard(j));}
     if(defLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento</div>';defLocked.forEach(j=>html+=joblineCard(j));}
@@ -755,7 +755,7 @@ function renderJoblines(roNumber, joblines) {
   }
   const hasSp = spFree.length||spPaused.length||spLocked.length||spDone.length;
   if (hasSp) {
-    html += '<div class="sec-lbl" style="margin-top:14px;border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:10px">&#x1F527; Disponíveis — esta ordem</div>';
+    html += '<div class="sec-lbl" style="margin-top:14px;border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:10px">&#x1F527; Serviços solicitados para esta OS</div>';
     spFree.forEach(j=>html+=joblineCard(j));
     if(spPaused.length){html+='<div class="sec-lbl" style="margin-top:4px">Pausadas — continuar</div>';spPaused.forEach(j=>html+=joblineCard(j));}
     if(spLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento</div>';spLocked.forEach(j=>html+=joblineCard(j));}
