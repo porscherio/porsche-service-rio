@@ -1,8 +1,6 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.18 — Build: 15/06/2026 -->
-<!-- Perf: RO list no longer reloads on every back navigation -->
-<!-- Perf: pause/complete updates RO progress bar locally -->
-<!-- Feature: RO search box on main screen -->
+<!-- Porsche Service Rio PWA — v1.5.19 — Build: 16/06/2026 -->
+<!-- Feature: Luiz Fernando added as technician -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -158,7 +156,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.18</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.19</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -196,7 +194,6 @@ input:focus{outline:none;border-color:var(--black)}
     <div class="scroll" id="ro-list-content">
       <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
     </div>
-    <!-- v1.5.18: GANTT + SI tabs -->
     <div class="nav">
       <button class="ntab on" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
@@ -216,7 +213,6 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="font-size:11px;color:#888;margin-top:1px" id="s2-ro-customer"></div>
         <div style="font-size:10px;color:#aaa;margin-top:1px;font-family:monospace;letter-spacing:.03em" id="s2-ro-vin"></div>
       </div>
-      <!-- v1.5.18: SI pill added next to GANTT -->
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="reloadJoblines()" title="Actualizar">&#x21BB;</button>
         <div style="display:flex;gap:5px">
@@ -330,7 +326,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.18</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.19</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -404,7 +400,6 @@ input:focus{outline:none;border-color:var(--black)}
     <div class="scroll" id="hist-list">
       <div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma tarefa concluída hoje.</div>
     </div>
-    <!-- v1.5.18: GANTT + SI tabs -->
     <div class="nav">
       <button class="ntab" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab on">&#x1F4CB;<br>Histórico</button>
@@ -414,8 +409,7 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
-
-  <!-- SI PLATE INPUT MODAL (v1.5.18) -->
+  <!-- SI PLATE INPUT MODAL -->
   <div id="si-modal" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:100;align-items:center;justify-content:center">
     <div style="background:#fff;border-radius:12px;padding:22px 18px;width:calc(100% - 48px);max-width:340px">
       <div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:4px">Consulta SI</div>
@@ -434,8 +428,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.18';
-// ── v1.5.18: centralised URL constants ───────────────────────────
+const APP_VERSION = '1.5.19';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -448,7 +441,7 @@ const USERS = {
   'Raynan Ventura': '1234',
   'Silvania':       '1234',
   'Joao Pedro':     '1234',
-  'Luiz Fernando':   '1234',
+  'Luiz Fernando':  '1234',
 };
 
 const DEFAULT_JOBLINES = [
@@ -474,7 +467,7 @@ const MAX_REC_SECONDS = 30;
 const _n = new Date();
 document.getElementById('build-date').textContent = pad(_n.getDate())+'/'+pad(_n.getMonth()+1)+'/'+_n.getFullYear();
 document.getElementById('logo-img').src = 'https://dastek.com.br/logo/porsche_rj_logo.jpg';
-  Object.keys(USERS).forEach(n => {
+Object.keys(USERS).forEach(n => {
   const o = document.createElement('option'); o.value = n; o.textContent = n;
   document.getElementById('sel-tech').appendChild(o);
 });
@@ -503,7 +496,7 @@ function doLogin() {
   currentTech = tech;
   const h = new Date().getHours();
   document.getElementById('t1-greet').textContent = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
-  loadROs();   // only on login
+  loadROs();
   goTo('s1');
 }
 
@@ -519,9 +512,6 @@ function doLogout() {
 }
 
 // ── Navigation ────────────────────────────────────────────────────
-// PERF FIX: goTo('s1') no longer calls loadROs().
-// RO list is loaded on login and on manual refresh (↻ button).
-// After pause/complete, updateLocalROProgress() updates the list in-place.
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
@@ -638,8 +628,6 @@ function updateLocalJobline(roNumber, joblineId, pct, tech) {
   renderJoblines(roNumber, liveJoblines[roNumber]);
 }
 
-// PERF FIX: update RO progress bar in the cached liveROs list without
-// fetching from the server. Called after pause/complete.
 function updateLocalROProgress(roNumber) {
   const ro = liveROs.find(r => String(r.ro_number) === String(roNumber));
   if (!ro || !liveJoblines[roNumber]) return;
@@ -647,13 +635,11 @@ function updateLocalROProgress(roNumber) {
   const doneSpec = joblines.filter(j => !j.is_default && j.completion_pct >= 100).length;
   const doneDef  = joblines.filter(j =>  j.is_default && j.completion_pct >= 100).length;
   ro.done_joblines = doneSpec + doneDef;
-  // Update lock status: if nobody is working on this RO anymore, set free
   const anyLocked = joblines.some(j => j.lock_status === 'locked');
   if (!anyLocked) { ro.lock_status = 'free'; ro.locked_by = ''; }
   renderROList(liveROs);
 }
 
-// ── RO list rendering ─────────────────────────────────────────────
 // ── RO search ─────────────────────────────────────────────────────
 document.getElementById('ro-search').addEventListener('input', function() {
   const q = this.value.trim();
@@ -742,7 +728,6 @@ function roCard(r) {
   );
 }
 
-
 function openRO(roNumber) {
   const ro = liveROs.find(r => String(r.ro_number)===String(roNumber));
   if (!ro) return;
@@ -751,7 +736,7 @@ function openRO(roNumber) {
   document.getElementById('s2-ro-vehicle').textContent = ro.vehicle+' · '+ro.plate;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
-  document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number; // v1.5.18
+  document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
@@ -874,7 +859,7 @@ async function confirmarPausa() {
     fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'complete_default', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, job_description:activeTask.job_description, tech:currentTech, pct:pct})});
   }
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
-  updateLocalROProgress(activeTask.ro_number);  // ← update RO card without server call
+  updateLocalROProgress(activeTask.ro_number);
   clearTimer();
   showToast('Pausada em '+pct+'%. Bloqueio libertado.');
   goTo('s2');
@@ -888,7 +873,7 @@ async function confirmarConclusao() {
     fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'complete_default', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, job_description:activeTask.job_description, tech:currentTech, pct:pct})});
   }
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
-  updateLocalROProgress(activeTask.ro_number);  // ← update RO card without server call
+  updateLocalROProgress(activeTask.ro_number);
   if (pct>=100) {
     sessionHistory.unshift({ro:activeTask.ro_number, vehicle:activeRO?activeRO.vehicle:'', job:activeTask.job_description, time:fmtTime(seconds), date:new Date().toLocaleString('pt-BR')});
     renderHistory();
@@ -1071,16 +1056,11 @@ document.getElementById('pct-done').addEventListener('change', function(){
     : this.value+' — tarefa pausada. Outro técnico poderá continuar.';
 });
 
-
-// ── v1.5.18: GANTT / SI navigation ───────────────────────────────
-
-// Entry point 1 — bottom nav GANTT tab
+// ── GANTT / SI navigation ─────────────────────────────────────────
 function openGanttNav() {
   window.open(activeRO ? GANTT_URL+'?os='+activeRO.ro_number : GANTT_URL, '_blank');
 }
 
-// Entry point 1 — bottom nav SI tab
-// RO open → use its plate directly; no RO → modal plate input inside the PWA
 function openSINav() {
   if (activeRO && activeRO.plate) {
     addSIRecentPlate(activeRO.plate);
@@ -1109,13 +1089,12 @@ function confirmSIInput() {
   fetch(SI_URL+'?placa='+encodeURIComponent(plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
 }
 
-// Entry point 2 — SI pill in RO header (same architecture as GANTT pill)
 function openSIForRO() {
   if (!activeRO || !activeRO.plate) return false;
   addSIRecentPlate(activeRO.plate);
   window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
   fetch(SI_URL+'?placa='+encodeURIComponent(activeRO.plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
-  return false; // prevent href="#" scroll-to-top
+  return false;
 }
 
 // ── SI recent plates (localStorage, max 6) ───────────────────────
