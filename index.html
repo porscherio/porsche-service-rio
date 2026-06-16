@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.12 — Build: 15/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.5.13 — Build: 15/06/2026 -->
 <!-- Perf: RO list no longer reloads on every back navigation -->
 <!-- Perf: pause/complete updates RO progress bar locally -->
 <!-- Feature: RO search box on main screen -->
@@ -155,7 +155,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.12</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.13</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -327,7 +327,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.12</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.13</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -418,8 +418,9 @@ input:focus{outline:none;border-color:var(--black)}
       <div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:4px">Consulta SI</div>
       <div style="font-size:11px;color:#888;margin-bottom:12px">Introduza a placa para consultar o histórico de manutenção</div>
       <label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Placa</label>
-      <input type="text" id="si-plate-input" placeholder="ex: MDJ0308" inputmode="text" maxlength="8" onkeydown="if(event.key==='Enter')confirmSIInput()"
-        style="width:100%;padding:12px;border-radius:4px;border:1px solid #e0e0e0;background:#f7f7f7;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;color:#1a1a1a;-webkit-appearance:none;outline:none;box-sizing:border-box;margin-bottom:14px">
+      <input type="text" id="si-plate-input" placeholder="ex: MDJ0308" inputmode="text" maxlength="8" onkeydown="if(event.key==='Enter')confirmSIInput()" oninput="this.value=this.value.toUpperCase()"
+        style="width:100%;padding:12px;border-radius:4px;border:1px solid #e0e0e0;background:#f7f7f7;font-size:20px;letter-spacing:4px;text-align:center;text-transform:uppercase;color:#1a1a1a;-webkit-appearance:none;outline:none;box-sizing:border-box;margin-bottom:10px">
+      <div id="si-recent-list" style="display:none;margin-bottom:12px"></div>
       <button onclick="confirmSIInput()" style="width:100%;padding:13px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#E00000;color:#fff;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Consultar</button>
       <button onclick="closeSIModal()" style="width:100%;padding:13px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:#888;border:1px solid #e0e0e0">Cancelar</button>
     </div>
@@ -430,10 +431,10 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.12';
+const APP_VERSION = '1.5.13';
 // ── v1.5.12: centralised URL constants ───────────────────────────
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
-const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec'; // ← paste your SI web app URL here
+const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
 const USERS = {
   'Alvaro Mello':   '1234',
@@ -1058,6 +1059,7 @@ function openGanttNav() {
 // RO open → use its plate directly; no RO → modal plate input inside the PWA
 function openSINav() {
   if (activeRO && activeRO.plate) {
+    addSIRecentPlate(activeRO.plate);
     window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
     fetch(SI_URL+'?placa='+encodeURIComponent(activeRO.plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
   } else {
@@ -1065,6 +1067,7 @@ function openSINav() {
     const inp   = document.getElementById('si-plate-input');
     modal.style.display = 'flex';
     inp.value = '';
+    renderSIRecentPlates();
     setTimeout(() => inp.focus(), 150);
   }
 }
@@ -1077,6 +1080,7 @@ function confirmSIInput() {
   const plate = document.getElementById('si-plate-input').value.trim().toUpperCase();
   if (!plate) { showToast('Digite a placa primeiro.'); return; }
   closeSIModal();
+  addSIRecentPlate(plate);
   window.open(SI_URL+'?placa='+encodeURIComponent(plate), '_blank');
   fetch(SI_URL+'?placa='+encodeURIComponent(plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
 }
@@ -1084,9 +1088,40 @@ function confirmSIInput() {
 // Entry point 2 — SI pill in RO header (same architecture as GANTT pill)
 function openSIForRO() {
   if (!activeRO || !activeRO.plate) return false;
+  addSIRecentPlate(activeRO.plate);
   window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
   fetch(SI_URL+'?placa='+encodeURIComponent(activeRO.plate)+'&action=png',{mode:'no-cors'}).catch(()=>{});
   return false; // prevent href="#" scroll-to-top
+}
+
+// ── SI recent plates (localStorage, max 6) ───────────────────────
+function getSIRecentPlates() {
+  try { return JSON.parse(localStorage.getItem('si_recent') || '[]'); } catch(e) { return []; }
+}
+
+function addSIRecentPlate(plate) {
+  if (!plate) return;
+  let list = getSIRecentPlates().filter(p => p !== plate);
+  list.unshift(plate);
+  try { localStorage.setItem('si_recent', JSON.stringify(list.slice(0, 6))); } catch(e) {}
+}
+
+function renderSIRecentPlates() {
+  const list = getSIRecentPlates();
+  const el   = document.getElementById('si-recent-list');
+  if (!el) return;
+  if (!list.length) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Recentes</div>' +
+    list.map(function(p) {
+      return '<button onclick="siPickRecent('' + p + '')" style="display:inline-block;margin:0 5px 6px 0;padding:4px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f7f7f7;font-size:11px;font-weight:700;letter-spacing:2px;color:#1a1a1a;cursor:pointer">' + p + '</button>';
+    }).join('');
+}
+
+function siPickRecent(plate) {
+  document.getElementById('si-plate-input').value = plate;
+  confirmSIInput();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
