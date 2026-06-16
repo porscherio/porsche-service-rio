@@ -1107,16 +1107,19 @@ function addSIRecentPlate(plate) {
 }
 
 function renderSIRecentPlates() {
-  const list = getSIRecentPlates();
-  const el   = document.getElementById('si-recent-list');
+  var list = getSIRecentPlates();
+  var el   = document.getElementById('si-recent-list');
   if (!el) return;
   if (!list.length) { el.style.display = 'none'; return; }
   el.style.display = 'block';
-  el.innerHTML =
-    '<div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Recentes</div>' +
+  var btnStyle = 'display:inline-block;margin:0 5px 6px 0;padding:4px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f7f7f7;font-size:11px;font-weight:700;letter-spacing:2px;color:#1a1a1a;cursor:pointer';
+  el.innerHTML = '<div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Recentes</div>' +
     list.map(function(p) {
-      return '<button onclick="siPickRecent('' + p + '')" style="display:inline-block;margin:0 5px 6px 0;padding:4px 12px;border-radius:20px;border:1px solid #e0e0e0;background:#f7f7f7;font-size:11px;font-weight:700;letter-spacing:2px;color:#1a1a1a;cursor:pointer">' + p + '</button>';
+      return '<button data-plate="' + p + '" style="' + btnStyle + '">' + p + '</button>';
     }).join('');
+  el.querySelectorAll('button[data-plate]').forEach(function(btn) {
+    btn.addEventListener('click', function() { siPickRecent(this.dataset.plate); });
+  });
 }
 
 function siPickRecent(plate) {
