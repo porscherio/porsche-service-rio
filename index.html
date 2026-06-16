@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.5.19 — Build: 16/06/2026 -->
-<!-- Feature: Luiz Fernando added as technician -->
+<!-- Porsche Service Rio PWA — v1.5.20 — Build: 16/06/2026 -->
+<!-- Feature: same-tech lock bypass + EOD auto-release support -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -38,6 +38,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .card.sugerida{border-left:3px solid var(--black)}
 .card.default-jl{border-left:3px solid var(--red)}
 .card.done-jl{opacity:.7;pointer-events:none}
+.card.retomar{border-color:var(--amber);border-width:1.5px;border-left:3px solid var(--amber)}
 .crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .cro{font-size:13px;font-weight:600;color:var(--black)}
 .cjob{font-size:12px;color:#666;margin-top:2px}
@@ -130,7 +131,6 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-list{color:var(--black);font-size:11px}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
-/* ── v1.5.18 addition ── */
 .pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
 .auth-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:3px;margin-top:6px;margin-bottom:2px}
 .auth-ok{background:#1565C0;color:#fff}
@@ -156,7 +156,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.19</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.5.20</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -326,7 +326,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.5.19</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.5.20</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -428,7 +428,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.5.19';
+const APP_VERSION = '1.5.20';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -747,27 +747,32 @@ function openRO(roNumber) {
 function renderJoblines(roNumber, joblines) {
   const defFree   = joblines.filter(j=>j.is_default&&j.lock_status==='free'&&j.completion_pct<100);
   const defPaused = joblines.filter(j=>j.is_default&&j.lock_status==='paused');
-  const defLocked = joblines.filter(j=>j.is_default&&j.lock_status==='locked');
+  const defLocked = joblines.filter(j=>j.is_default&&j.lock_status==='locked'&&j.locked_by!==currentTech);
+  const defRetomar= joblines.filter(j=>j.is_default&&j.lock_status==='locked'&&j.locked_by===currentTech);
   const defDone   = joblines.filter(j=>j.is_default&&j.completion_pct>=100);
   const spFree    = joblines.filter(j=>!j.is_default&&j.lock_status==='free'&&j.completion_pct<100);
   const spPaused  = joblines.filter(j=>!j.is_default&&j.lock_status==='paused');
-  const spLocked  = joblines.filter(j=>!j.is_default&&j.lock_status==='locked');
+  const spLocked  = joblines.filter(j=>!j.is_default&&j.lock_status==='locked'&&j.locked_by!==currentTech);
+  const spRetomar = joblines.filter(j=>!j.is_default&&j.lock_status==='locked'&&j.locked_by===currentTech);
   const spDone    = joblines.filter(j=>!j.is_default&&j.completion_pct>=100);
+
   let html = '';
-  const hasDef = defFree.length||defPaused.length||defLocked.length||defDone.length;
+  const hasDef = defFree.length||defPaused.length||defLocked.length||defRetomar.length||defDone.length;
   if (hasDef) {
     html += '<div class="sec-lbl" style="color:var(--red);border-bottom:1px solid #FECACA;padding-bottom:5px;margin-bottom:10px">&#x1F4CB; Tarefas fixas · obrigatórias em todas as OS</div>';
     defFree.forEach(j=>html+=joblineCard(j));
+    if(defRetomar.length){html+='<div class="sec-lbl" style="margin-top:4px;color:var(--amber-text)">&#x21BA; Retomar — bloqueadas por você</div>';defRetomar.forEach(j=>html+=joblineCard(j));}
     if(defPaused.length){html+='<div class="sec-lbl" style="margin-top:4px">Pausadas</div>';defPaused.forEach(j=>html+=joblineCard(j));}
-    if(defLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento</div>';defLocked.forEach(j=>html+=joblineCard(j));}
+    if(defLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento por outros</div>';defLocked.forEach(j=>html+=joblineCard(j));}
     if(defDone.length){html+='<div class="sec-lbl" style="margin-top:4px">Concluídas</div>';defDone.forEach(j=>html+=joblineCard(j));}
   }
-  const hasSp = spFree.length||spPaused.length||spLocked.length||spDone.length;
+  const hasSp = spFree.length||spPaused.length||spLocked.length||spRetomar.length||spDone.length;
   if (hasSp) {
     html += '<div class="sec-lbl" style="margin-top:14px;border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:10px">&#x1F527; Serviços solicitados para esta OS</div>';
     spFree.forEach(j=>html+=joblineCard(j));
+    if(spRetomar.length){html+='<div class="sec-lbl" style="margin-top:4px;color:var(--amber-text)">&#x21BA; Retomar — bloqueadas por você</div>';spRetomar.forEach(j=>html+=joblineCard(j));}
     if(spPaused.length){html+='<div class="sec-lbl" style="margin-top:4px">Pausadas — continuar</div>';spPaused.forEach(j=>html+=joblineCard(j));}
-    if(spLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento</div>';spLocked.forEach(j=>html+=joblineCard(j));}
+    if(spLocked.length){html+='<div class="sec-lbl" style="margin-top:4px">Em andamento por outros</div>';spLocked.forEach(j=>html+=joblineCard(j));}
     if(spDone.length){html+='<div class="sec-lbl" style="margin-top:4px">Concluídas</div>';spDone.forEach(j=>html+=joblineCard(j));}
   }
   if (!hasDef && !hasSp) html = '<div style="text-align:center;color:#aaa;font-size:13px;padding:30px 0">Nenhuma jobline encontrada.</div>';
@@ -776,21 +781,45 @@ function renderJoblines(roNumber, joblines) {
   el.querySelectorAll('.card:not(.locked):not(.done-jl)').forEach(c => c.addEventListener('click', ()=>openJobline(c.dataset.id, roNumber)));
 }
 
+// ── v1.5.20: lockedByMe bypass — same tech can reclaim their own lock ──
 function joblineCard(j) {
-  const isLocked=j.lock_status==='locked', isPaused=j.lock_status==='paused', isDone=j.completion_pct>=100;
-  let dot='d-g', status='Disponível', bc='b-liv', bt='Livre';
-  if (isDone)        { dot='d-g'; status='Concluída'; bc='b-atv'; bt='&#x2714; Concluída'; }
-  else if (isLocked) { dot='d-r'; status=j.locked_by+' a trabalhar'; bc='b-lock'; bt='&#x1F512; Bloqueada'; }
-  else if (isPaused) { dot='d-a'; status='Pausada em '+j.completion_pct+'% · '+j.locked_by; bc='b-pau'; bt='Pausada '+j.completion_pct+'%'; }
-  if (j.suggested_tech===currentTech && !isLocked && !isDone) { bc='b-sug'; bt='Sugerida'; }
-  if (j.is_default && !isLocked && !isDone && !isPaused) { bc='b-def'; bt='Padrão'; }
-  const prog = isPaused ? '<div class="prog-bg"><div class="prog p-a" style="width:'+j.completion_pct+'%"></div></div>' : '';
-  const lastTech = j.last_tech ? '<div class="clast">&#x1F464; Último: '+j.last_tech+'</div>' : '';
-  return '<div class="card'+(isLocked?' locked':'')+(isPaused?' pausado':'')+(isDone?' done-jl':'')+(j.is_default?' default-jl':'')+'" data-id="'+j.jobline_id+'" data-ro="'+j.ro_number+'">'+
-    '<div class="crow"><div><div class="cro">'+j.job_description+'</div></div>'+
-    '<span class="badge '+bc+'">'+bt+'</span></div>'+
-    '<div class="trow"><div class="tdot '+dot+'"></div><span class="tname">'+status+'</span></div>'+
-    lastTech+prog+'</div>';
+  const isLocked   = j.lock_status === 'locked';
+  const isPaused   = j.lock_status === 'paused';
+  const isDone     = j.completion_pct >= 100;
+  const lockedByMe = isLocked && j.locked_by === currentTech;
+
+  let dot = 'd-g', status = 'Disponível', bc = 'b-liv', bt = 'Livre';
+
+  if (isDone) {
+    dot = 'd-g'; status = 'Concluída'; bc = 'b-atv'; bt = '&#x2714; Concluída';
+  } else if (lockedByMe) {
+    dot = 'd-a'; status = 'Em andamento por você'; bc = 'b-pau'; bt = '&#x21BA; Retomar';
+  } else if (isLocked) {
+    dot = 'd-r'; status = j.locked_by + ' a trabalhar'; bc = 'b-lock'; bt = '&#x1F512; Bloqueada';
+  } else if (isPaused) {
+    dot = 'd-a'; status = 'Pausada em ' + j.completion_pct + '% · ' + j.locked_by; bc = 'b-pau'; bt = 'Pausada ' + j.completion_pct + '%';
+  }
+
+  if (j.suggested_tech === currentTech && !isLocked && !isDone) { bc = 'b-sug'; bt = 'Sugerida'; }
+  if (j.is_default && !isLocked && !isDone && !isPaused)        { bc = 'b-def'; bt = 'Padrão'; }
+
+  const prog     = isPaused ? '<div class="prog-bg"><div class="prog p-a" style="width:' + j.completion_pct + '%"></div></div>' : '';
+  const lastTech = j.last_tech ? '<div class="clast">&#x1F464; Último: ' + j.last_tech + '</div>' : '';
+
+  return (
+    '<div class="card' +
+      ((isLocked && !lockedByMe) ? ' locked' : '') +
+      (lockedByMe                ? ' retomar' : '') +
+      (isPaused                  ? ' pausado'  : '') +
+      (isDone                    ? ' done-jl'  : '') +
+      (j.is_default              ? ' default-jl' : '') +
+    '" data-id="' + j.jobline_id + '" data-ro="' + j.ro_number + '">' +
+      '<div class="crow"><div><div class="cro">' + j.job_description + '</div></div>' +
+      '<span class="badge ' + bc + '">' + bt + '</span></div>' +
+      '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
+      lastTech + prog +
+    '</div>'
+  );
 }
 
 function openJobline(id, roNumber) {
@@ -808,24 +837,36 @@ function openJobline(id, roNumber) {
   document.getElementById('s3-assigned').textContent = j.suggested_tech||'Fila livre';
   document.getElementById('s3-lasttech').textContent = j.last_tech||'—';
   document.getElementById('s3-pct').textContent = j.completion_pct+'%';
-  const alert = document.getElementById('s3-alert');
+
+  const alertEl  = document.getElementById('s3-alert');
   const progWrap = document.getElementById('s3-prog-wrap');
   const btnStart = document.getElementById('btn-start-task');
-  if (j.lock_status==='paused') {
-    alert.style.display='flex';
-    alert.textContent = '⏸ '+j.locked_by+' pausou em '+j.completion_pct+'%. Pode continuar daqui.';
-    progWrap.style.display='block';
-    document.getElementById('s3-prog').style.width = j.completion_pct+'%';
-    document.getElementById('s3-badge').textContent='Pausada';
-    document.getElementById('s3-badge').className='badge b-pau';
-    btnStart.textContent='▶ Continuar a partir de '+j.completion_pct+'%';
+  const lockedByMe = j.lock_status === 'locked' && j.locked_by === currentTech;
+
+  if (lockedByMe) {
+    // Phone restart scenario — show amber alert, allow resume
+    alertEl.style.display = 'flex';
+    alertEl.textContent = '↺ Esta tarefa estava bloqueada por você. Pode retomar agora.';
+    progWrap.style.display = 'none';
+    document.getElementById('s3-badge').textContent = 'Retomar';
+    document.getElementById('s3-badge').className = 'badge b-pau';
+    btnStart.textContent = '▶ Retomar tarefa';
+  } else if (j.lock_status === 'paused') {
+    alertEl.style.display = 'flex';
+    alertEl.textContent = '⏸ ' + j.locked_by + ' pausou em ' + j.completion_pct + '%. Pode continuar daqui.';
+    progWrap.style.display = 'block';
+    document.getElementById('s3-prog').style.width = j.completion_pct + '%';
+    document.getElementById('s3-badge').textContent = 'Pausada';
+    document.getElementById('s3-badge').className = 'badge b-pau';
+    btnStart.textContent = '▶ Continuar a partir de ' + j.completion_pct + '%';
   } else {
-    alert.style.display='none'; progWrap.style.display='none';
-    document.getElementById('s3-badge').textContent = j.is_default?'Padrão':'Livre';
-    document.getElementById('s3-badge').className = 'badge '+(j.is_default?'b-def':'b-liv');
-    btnStart.textContent='▶ Iniciar tarefa';
+    alertEl.style.display = 'none';
+    progWrap.style.display = 'none';
+    document.getElementById('s3-badge').textContent = j.is_default ? 'Padrão' : 'Livre';
+    document.getElementById('s3-badge').className = 'badge ' + (j.is_default ? 'b-def' : 'b-liv');
+    btnStart.textContent = '▶ Iniciar tarefa';
   }
-  btnStart.onclick = ()=>startTask(j);
+  btnStart.onclick = () => startTask(j);
   if (activeRO) {
     fetch(API_URL+'?action=parts&ro_number='+activeRO.ro_number)
       .then(r=>r.json()).then(data=>renderParts(data,'s3')).catch(()=>{});
