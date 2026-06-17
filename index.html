@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.6 — Build: 16/06/2026 -->
-<!-- v1.6: same-tech lock bypass + EOD auto-release -->
+<!-- Porsche Service Rio PWA — v1.6.3 — Build: 16/06/2026 -->
+<!-- v1.6.3: same-tech lock bypass + EOD auto-release -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -122,7 +122,7 @@ input:focus{outline:none;border-color:var(--black)}
 .rec-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 .video-timer{font-size:13px;font-weight:600;color:var(--red);letter-spacing:1px;font-variant-numeric:tabular-nums}
-.parts-box{border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.6}
+.parts-box{border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.6.3}
 .parts-pending{background:#FEF3E2;border:1px solid var(--amber)}
 .parts-received{background:var(--green-bg);border:1px solid var(--green)}
 .parts-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
@@ -131,7 +131,7 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-list{color:var(--black);font-size:11px}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
-.pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6}
+.pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6.3}
 .auth-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:3px;margin-top:6px;margin-bottom:2px}
 .auth-ok{background:#1565C0;color:#fff}
 .auth-no{background:var(--red);color:#fff}
@@ -156,7 +156,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.6</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.6.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -326,7 +326,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.6</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.6.3</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -428,7 +428,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.6.3';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -675,7 +675,6 @@ function filterAndRenderROList(q) {
 
 function renderROList(ros) {
   if (ros.length) console.log('[PSR] cust_name sample:', ros[0].ro_number, '|', ros[0].cust_name);
-  if (ros.length) console.log('[PSR] vin sample:', ros[0].ro_number, '|', JSON.stringify(ros[0].vin), '| length:', ros[0].vin ? String(ros[0].vin).length : 0);
   const sug    = ros.filter(r => r.suggested === currentTech && r.lock_status !== 'locked');
   const free   = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'free');
   const paused = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'paused');
@@ -782,7 +781,7 @@ function renderJoblines(roNumber, joblines) {
   el.querySelectorAll('.card:not(.locked):not(.done-jl)').forEach(c => c.addEventListener('click', ()=>openJobline(c.dataset.id, roNumber)));
 }
 
-// ── v1.6: lockedByMe bypass — same tech can reclaim their own lock ──
+// ── v1.6.3: lockedByMe bypass — same tech can reclaim their own lock ──
 function joblineCard(j) {
   const isLocked   = j.lock_status === 'locked';
   const isPaused   = j.lock_status === 'paused';
@@ -1186,7 +1185,6 @@ function vinToModelYear(vin) {
     '6':'2006','7':'2007','8':'2008','9':'2009',
   };
   const code = clean.charAt(9).toUpperCase();
-  console.log('[VIN]', clean, '→ pos10:', code, '→ year:', map[code] || 'unknown');
   return map[code] || '';
 }
 
