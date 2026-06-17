@@ -675,6 +675,7 @@ function filterAndRenderROList(q) {
 
 function renderROList(ros) {
   if (ros.length) console.log('[PSR] cust_name sample:', ros[0].ro_number, '|', ros[0].cust_name);
+  if (ros.length) console.log('[PSR] vin sample:', ros[0].ro_number, '|', JSON.stringify(ros[0].vin), '| length:', ros[0].vin ? String(ros[0].vin).length : 0);
   const sug    = ros.filter(r => r.suggested === currentTech && r.lock_status !== 'locked');
   const free   = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'free');
   const paused = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'paused');
@@ -1173,7 +1174,9 @@ function siPickRecent(plate) {
 
 // ── VIN → Model Year (position 10, index 9) ──────────────────────
 function vinToModelYear(vin) {
-  if (!vin || String(vin).length < 10) return '';
+  if (!vin) return '';
+  const clean = String(vin).trim().replace(/\s+/g, '');
+  if (clean.length < 10) return '';
   const map = {
     'A':'2010','B':'2011','C':'2012','D':'2013','E':'2014',
     'F':'2015','G':'2016','H':'2017','J':'2018','K':'2019',
@@ -1182,7 +1185,8 @@ function vinToModelYear(vin) {
     '1':'2001','2':'2002','3':'2003','4':'2004','5':'2005',
     '6':'2006','7':'2007','8':'2008','9':'2009',
   };
-  const code = String(vin).charAt(9).toUpperCase();
+  const code = clean.charAt(9).toUpperCase();
+  console.log('[VIN]', clean, '→ pos10:', code, '→ year:', map[code] || 'unknown');
   return map[code] || '';
 }
 
