@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.6.3 — Build: 16/06/2026 -->
-<!-- v1.6.3: same-tech lock bypass + EOD auto-release -->
+<!-- Porsche Service Rio PWA — v1.7 — Build: 17/06/2026 -->
+<!-- v1.7: jobline approval system (Aprovacoes / Aprovadores tabs) -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -137,6 +137,17 @@ input:focus{outline:none;border-color:var(--black)}
 .auth-no{background:var(--red);color:#fff}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
+/* ── Approval panel ──────────────────────────────────────── */
+.apv-panel{position:absolute;inset:0;background:#fff;z-index:300;display:flex;flex-direction:column;overflow:hidden}
+.apv-jl-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0f0f0}
+.apv-jl-desc{font-size:13px;color:var(--black);flex:1;line-height:1.4}
+.apv-cb{width:22px;height:22px;cursor:pointer;accent-color:var(--green);flex-shrink:0}
+.apv-status{font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;letter-spacing:.04em;white-space:nowrap;flex-shrink:0}
+.apv-ok{background:var(--green-bg);color:var(--green-text)}
+.apv-no{background:var(--danger-bg);color:var(--danger-text)}
+.apv-none{background:#f0f0f0;color:#999}
+.b-apv-ok{background:#1D9E75;color:#fff}
+.b-apv-no{background:#E00000;color:#fff}
 </style>
 </head>
 <body>
@@ -156,7 +167,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.6.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.7</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -182,6 +193,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="tb-sub" id="t1-sub">A carregar ordens de serviço...</div>
       </div>
       <button style="background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="loadROs()" title="Actualizar">&#x21BB;</button>
+      <button id="btn-approval" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openApprovalPanel()" title="Aprovar Joblines">&#x2705;</button>
     </div>
     <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
       <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0 10px;gap:8px">
@@ -326,7 +338,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.6.3</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.7</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -423,12 +435,53 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
+  <!-- APPROVAL PANEL -->
+  <div class="apv-panel" id="apv-panel" style="display:none">
+    <!-- Step 1: RO list -->
+    <div id="apv-step1" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="closeApprovalPanel()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title">Aprovação de Joblines</div>
+          <div class="tb-sub">Selecione uma OS</div>
+        </div>
+      </div>
+      <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
+        <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0 10px;gap:8px">
+          <span style="font-size:14px;color:#aaa">&#x1F50D;</span>
+          <input type="text" id="apv-search" placeholder="Filtrar por OS, placa ou nome..." inputmode="text"
+            style="flex:1;border:none;background:transparent;padding:9px 0;font-size:13px;color:var(--black);outline:none">
+        </div>
+      </div>
+      <div class="scroll" id="apv-ro-list"></div>
+    </div>
+    <!-- Step 2: Jobline checkboxes -->
+    <div id="apv-step2" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="apvGoStep1()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title" id="apv-ro-title">RO #----</div>
+          <div class="tb-sub" id="apv-ro-sub"></div>
+        </div>
+      </div>
+      <div class="scroll" style="padding:14px 16px">
+        <div style="font-size:11px;color:#888;background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:12px;line-height:1.5">
+          &#x2714; Marque as joblines aprovadas pelo cliente. Desmarcadas ficam como N&#xC3;O APROVADO. Joblines sem interac&#xE7;&#xE3;o n&#xE3;o ser&#xE3;o gravadas.
+        </div>
+        <div id="apv-jl-list"></div>
+        <div style="height:14px"></div>
+        <button class="bigbtn btn-ini" onclick="saveApprovals()">&#x2714; Guardar aprova&#xE7;&#xF5;es</button>
+        <button class="bigbtn btn-sec" onclick="apvGoStep1()">&#8592; Voltar &#xE0;s OS</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.6.3';
+const APP_VERSION = '1.7';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -444,6 +497,9 @@ const USERS = {
   'Luiz Fernando':  '1234',
 };
 
+// Techs allowed to use the approval panel — also maintained in Aprovadores sheet tab
+const APPROVERS = ['Raynan Ventura'];
+
 const DEFAULT_JOBLINES = [
   'VAL de entrada',
   'Checklist entrada',
@@ -455,6 +511,9 @@ const DEFAULT_JOBLINES = [
 
 // ── State ────────────────────────────────────────────────────────
 let currentTech = '', activeTask = null, activeRO = null;
+let approvalCache = {}; // { roNumber: { jobDescription: true|false } }
+let apvCurrentRO  = null;
+let apvCheckboxes = {}; // active editing session { jobDescription: bool|null }
 let seconds = 0, timerIv = null, timerOn = false;
 let photoCount = 0, sessionHistory = [];
 let gpsStart = null, gpsCurrent = null;
@@ -497,17 +556,19 @@ function doLogin() {
   const h = new Date().getHours();
   document.getElementById('t1-greet').textContent = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
   loadROs();
+  checkAndShowApprovalButton();
   goTo('s1');
 }
 
 function doLogout() {
   currentTech=''; activeTask=null; activeRO=null;
-  liveROs=[]; liveJoblines={};
+  liveROs=[]; liveJoblines={}; approvalCache={};
   clearTimer();
   document.getElementById('inp-pin').value='';
   document.getElementById('sel-tech').value='';
   document.getElementById('ro-search').value='';
   document.getElementById('ro-search-clear').style.display='none';
+  document.getElementById('btn-approval').style.display='none';
   goTo('s0');
 }
 
@@ -558,14 +619,20 @@ async function loadJoblines(roNumber) {
   document.getElementById('jobline-list-content').innerHTML =
     '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar joblines...</div></div>';
   try {
-    const res = await fetch(API_URL+'?action=joblines&ro_number='+roNumber+'&tech='+encodeURIComponent(currentTech));
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      liveJoblines[roNumber] = data;
-      renderJoblines(roNumber, data);
-    } else {
+    const [jlResult, apvResult] = await Promise.allSettled([
+      fetch(API_URL+'?action=joblines&ro_number='+roNumber+'&tech='+encodeURIComponent(currentTech)).then(r=>r.json()),
+      fetch(API_URL+'?action=getApprovals&ro_number='+roNumber).then(r=>r.json()),
+    ]);
+    if (jlResult.status !== 'fulfilled' || !Array.isArray(jlResult.value)) {
       showError('jobline-list-content', 'Erro ao carregar joblines.');
+      return;
     }
+    liveJoblines[roNumber] = jlResult.value;
+    if (apvResult.status === 'fulfilled' && Array.isArray(apvResult.value)) {
+      approvalCache[roNumber] = {};
+      apvResult.value.forEach(a => { approvalCache[roNumber][a.jobline] = a.approved; });
+    }
+    renderJoblines(roNumber, liveJoblines[roNumber]);
   } catch(e) {
     showError('jobline-list-content', 'Sem ligação ao servidor.');
   }
@@ -783,6 +850,14 @@ function renderJoblines(roNumber, joblines) {
 
 // ── v1.6.3: lockedByMe bypass — same tech can reclaim their own lock ──
 function joblineCard(j) {
+  // Approval badge (visible to all techs)
+  const _apvState = (approvalCache[j.ro_number] || {})[j.job_description];
+  const apvBadge  = _apvState === true
+    ? '<span class="badge b-apv-ok" style="display:inline-block;margin-top:5px">&#x2714; APROVADO</span>'
+    : _apvState === false
+      ? '<span class="badge b-apv-no" style="display:inline-block;margin-top:5px">&#x2716; N&#xC3;O APROVADO</span>'
+      : '';
+
   const isLocked   = j.lock_status === 'locked';
   const isPaused   = j.lock_status === 'paused';
   const isDone     = j.completion_pct >= 100;
@@ -817,7 +892,7 @@ function joblineCard(j) {
       '<div class="crow"><div><div class="cro">' + j.job_description + '</div></div>' +
       '<span class="badge ' + bc + '">' + bt + '</span></div>' +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
-      lastTech + prog +
+      lastTech + prog + apvBadge +
     '</div>'
   );
 }
@@ -1191,6 +1266,161 @@ function vinToModelYear(vin) {
 function vehicleWithYear(vehicle, vin) {
   const yr = vinToModelYear(vin);
   return yr ? vehicle + ' ' + yr : vehicle;
+}
+
+// ── APPROVAL PANEL ────────────────────────────────────────────────
+function checkAndShowApprovalButton() {
+  const btn = document.getElementById('btn-approval');
+  if (btn) btn.style.display = APPROVERS.includes(currentTech) ? 'flex' : 'none';
+}
+
+function openApprovalPanel() {
+  document.getElementById('apv-panel').style.display = 'flex';
+  apvGoStep1();
+  // Fresh search listener each open (avoid duplicate listeners)
+  const old = document.getElementById('apv-search');
+  const neo = old.cloneNode(true);
+  old.parentNode.replaceChild(neo, old);
+  neo.addEventListener('input', function() { renderApvROList(this.value); });
+  renderApvROList('');
+}
+
+function closeApprovalPanel() {
+  document.getElementById('apv-panel').style.display = 'none';
+}
+
+function apvGoStep1() {
+  document.getElementById('apv-step1').style.display = 'flex';
+  document.getElementById('apv-step2').style.display = 'none';
+}
+
+function renderApvROList(query) {
+  const q   = (query || '').toLowerCase().replace(/[-\s]/g, '');
+  const ros = q
+    ? liveROs.filter(r =>
+        String(r.ro_number).includes(q) ||
+        String(r.plate     || '').toLowerCase().replace(/[-\s]/g,'').includes(q) ||
+        String(r.cust_name || '').toLowerCase().replace(/\s/g,'').includes(q)
+      )
+    : liveROs;
+  const el = document.getElementById('apv-ro-list');
+  if (!ros.length) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma OS encontrada.</div>';
+    return;
+  }
+  el.innerHTML = ros.map(r =>
+    '<div class="card" data-ro-apv="'+r.ro_number+'" style="cursor:pointer">' +
+      '<div class="crow">' +
+        '<div>' +
+          '<div class="cro">RO #'+r.ro_number+' &mdash; '+vehicleWithYear(r.vehicle,r.vin)+'</div>' +
+          '<div class="cjob">Placa: '+r.plate+(r.cust_name?' &nbsp;&middot;&nbsp; &#x1F464; '+r.cust_name:'')+'</div>' +
+        '</div>' +
+        '<span style="font-size:18px;color:#ccc">&#x276F;</span>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+  el.querySelectorAll('[data-ro-apv]').forEach(card => {
+    card.addEventListener('click', () => apvSelectRO(card.dataset.roApv));
+  });
+}
+
+async function apvSelectRO(roNumber) {
+  apvCurrentRO = liveROs.find(r => String(r.ro_number) === String(roNumber));
+  document.getElementById('apv-ro-title').textContent = 'RO #' + roNumber;
+  document.getElementById('apv-ro-sub').textContent   = apvCurrentRO
+    ? vehicleWithYear(apvCurrentRO.vehicle, apvCurrentRO.vin) + ' · ' + apvCurrentRO.plate : '';
+  document.getElementById('apv-step1').style.display = 'none';
+  document.getElementById('apv-step2').style.display = 'flex';
+  document.getElementById('apv-jl-list').innerHTML   =
+    '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
+
+  try {
+    const fetches = [fetch(API_URL+'?action=getApprovals&ro_number='+roNumber).then(r=>r.json())];
+    if (!liveJoblines[roNumber])
+      fetches.push(fetch(API_URL+'?action=joblines&ro_number='+roNumber+'&tech='+encodeURIComponent(currentTech)).then(r=>r.json()));
+
+    const results = await Promise.allSettled(fetches);
+
+    if (results[0].status==='fulfilled' && Array.isArray(results[0].value)) {
+      approvalCache[roNumber] = {};
+      results[0].value.forEach(a => { approvalCache[roNumber][a.jobline] = a.approved; });
+    }
+    if (results[1] && results[1].status==='fulfilled' && Array.isArray(results[1].value))
+      liveJoblines[roNumber] = results[1].value;
+
+    if (!liveJoblines[roNumber]) {
+      document.getElementById('apv-jl-list').innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar joblines.</div>';
+      return;
+    }
+    renderApvJoblines(roNumber);
+  } catch(e) {
+    document.getElementById('apv-jl-list').innerHTML = '<div class="err-box">&#x26A0; Erro de ligação.</div>';
+  }
+}
+
+function renderApvJoblines(roNumber) {
+  const joblines = liveJoblines[roNumber] || [];
+  const cache    = approvalCache[roNumber] || {};
+  apvCheckboxes  = {};
+  joblines.forEach(j => {
+    apvCheckboxes[j.job_description] = j.job_description in cache ? cache[j.job_description] : null;
+  });
+
+  const rows = joblines.map(function(j, idx) {
+    const val   = apvCheckboxes[j.job_description];
+    const stCls = val === null ? 'apv-none' : (val ? 'apv-ok' : 'apv-no');
+    const stTxt = val === null ? 'Pendente'  : (val ? '✔ APROVADO' : '✖ NÃO APROVADO');
+    const icon  = j.is_default ? '&#x1F4CB;' : '&#x1F527;';
+    return (
+      '<div class="apv-jl-row">' +
+        '<span class="apv-jl-desc">'+icon+' '+j.job_description+'</span>' +
+        '<span class="apv-status '+stCls+'" id="apvst-'+idx+'">'+stTxt+'</span>' +
+        '<input type="checkbox" class="apv-cb" id="apvcb-'+idx+'" data-idx="'+idx+
+          '" data-desc="'+encodeURIComponent(j.job_description)+'"'+(val===true?' checked':'')+'>'+
+      '</div>'
+    );
+  });
+
+  const el = document.getElementById('apv-jl-list');
+  el.innerHTML = rows.length
+    ? rows.join('')
+    : '<div style="text-align:center;color:#aaa;font-size:13px;padding:30px 0">Nenhuma jobline.</div>';
+
+  el.querySelectorAll('.apv-cb').forEach(cb => {
+    cb.addEventListener('change', function() {
+      const desc   = decodeURIComponent(this.dataset.desc);
+      const idx    = this.dataset.idx;
+      apvCheckboxes[desc] = this.checked;
+      const st = document.getElementById('apvst-' + idx);
+      if (st) { st.className = 'apv-status '+(this.checked?'apv-ok':'apv-no'); st.textContent = this.checked?'✔ APROVADO':'✖ NÃO APROVADO'; }
+    });
+  });
+}
+
+function saveApprovals() {
+  if (!apvCurrentRO) return;
+  const roNumber  = apvCurrentRO.ro_number;
+  const approvals = Object.entries(apvCheckboxes)
+    .filter(([, val]) => val !== null)
+    .map(([jobline, approved]) => ({ jobline, approved }));
+
+  // Optimistic local update
+  approvalCache[roNumber] = {};
+  approvals.forEach(a => { approvalCache[roNumber][a.jobline] = a.approved; });
+
+  // Fire-and-forget (consistent with rest of codebase)
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action:'saveApprovals', ro_number:roNumber, tech:currentTech, approvals }),
+  });
+
+  // Re-render joblines in the main view if this RO is open
+  if (liveJoblines[roNumber]) renderJoblines(roNumber, liveJoblines[roNumber]);
+
+  const nApv = approvals.filter(a=>a.approved).length;
+  const nNo  = approvals.filter(a=>!a.approved).length;
+  showToast('&#x2714; '+nApv+' aprovada(s) · '+nNo+' não aprovada(s) · guardado');
+  closeApprovalPanel();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
