@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.7 — Build: 17/06/2026 -->
-<!-- v1.7: jobline approval system (Aprovacoes / Aprovadores tabs) -->
+<!-- Porsche Service Rio PWA — v1.7.1 — Build: 17/06/2026 -->
+<!-- v1.7.1: jobline approval system (Aprovacoes / Aprovadores tabs) -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -167,7 +167,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.7</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.7.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -338,7 +338,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.7</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.7.1</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -481,7 +481,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.7';
+const APP_VERSION = '1.7.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -495,6 +495,10 @@ const USERS = {
   'Silvania':       '1234',
   'Joao Pedro':     '1234',
   'Luiz Fernando':  '1234',
+  'Eytan Lubicz':   '1234',
+  'Sidney Lubicz':  '1234',
+  'Matheus Pego':   '1234',
+  'Sebastiao Neto': '1234',
 };
 
 // Techs allowed to use the approval panel — also maintained in Aprovadores sheet tab
