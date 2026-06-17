@@ -1401,8 +1401,7 @@ function saveApprovals() {
   if (!apvCurrentRO) return;
   const roNumber  = apvCurrentRO.ro_number;
   const approvals = Object.entries(apvCheckboxes)
-    .filter(([, val]) => val !== null)
-    .map(([jobline, approved]) => ({ jobline, approved }));
+    .map(([jobline, val]) => ({ jobline, approved: val === true }));
 
   // Optimistic local update
   approvalCache[roNumber] = {};
