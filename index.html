@@ -519,7 +519,7 @@ function goTo(id) {
   if ((id==='s6p'||id==='s6c') && timerOn) {
     pauseTimer();
     const t = fmtTime(seconds);
-    const roTxt = activeTask ? '#'+activeTask.ro_number+' — '+(activeRO?activeRO.vehicle:'') : '';
+    const roTxt = activeTask ? '#'+activeTask.ro_number+' — '+(activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '') : '';
     if (id==='s6p') {
       document.getElementById('s6p-ro').textContent = roTxt;
       document.getElementById('s6p-job').textContent = activeTask?activeTask.job_description:'';
@@ -715,7 +715,7 @@ function roCard(r) {
       (r.suggested === currentTech ? ' sugerida' : '') +
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + ' &mdash; ' + r.vehicle + '</div>' +
+        '<div class="cro">RO #' + r.ro_number + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
         '<div class="cjob">Placa: ' + r.plate + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
@@ -733,7 +733,7 @@ function openRO(roNumber) {
   if (!ro) return;
   activeRO = ro;
   document.getElementById('s2-ro-title').textContent = 'RO #'+ro.ro_number;
-  document.getElementById('s2-ro-vehicle').textContent = ro.vehicle+' · '+ro.plate;
+  document.getElementById('s2-ro-vehicle').textContent = vehicleWithYear(ro.vehicle, ro.vin)+' · '+ro.plate;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
   document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
@@ -831,7 +831,7 @@ function openJobline(id, roNumber) {
   document.getElementById('s3-complaint').textContent = activeRO&&activeRO.complaint ? 'Cliente reclama de '+activeRO.complaint : '';
   document.getElementById('s3-cust-name').textContent = activeRO&&activeRO.cust_name ? '👤 '+activeRO.cust_name : '';
   document.getElementById('s3-plate-vin').textContent = [activeRO&&activeRO.plate?'Placa: '+activeRO.plate:'', activeRO&&activeRO.vin?'VIN: '+activeRO.vin:''].filter(Boolean).join('  ·  ');
-  document.getElementById('s3-vehicle').textContent = activeRO?activeRO.vehicle:'';
+  document.getElementById('s3-vehicle').textContent = activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
   document.getElementById('s3-job').textContent = j.job_description;
   document.getElementById('s3-type').textContent = j.is_default?'Jobline padrão':'Jobline específica';
   document.getElementById('s3-assigned').textContent = j.suggested_tech||'Fila livre';
@@ -879,12 +879,12 @@ function startTask(j) {
   activeTask=j; photoCount=0; gpsStart=gpsCurrent;
   document.getElementById('media-grid').innerHTML='';
   document.getElementById('s4-ro').textContent='#'+j.ro_number;
-  document.getElementById('s4-vehicle').textContent=activeRO?activeRO.vehicle:'';
+  document.getElementById('s4-vehicle').textContent=activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
   document.getElementById('s4-job').textContent=j.job_description;
   document.getElementById('s4-title').textContent='Em andamento — RO #'+j.ro_number;
   document.getElementById('s5-folder').textContent='Dropbox / #'+j.ro_number+' / '+j.job_description;
   document.getElementById('ov-ro').textContent=j.ro_number;
-  document.getElementById('ov-vehicle').textContent=activeRO?activeRO.vehicle:'';
+  document.getElementById('ov-vehicle').textContent=activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
   document.getElementById('ov-tech').textContent=currentTech;
   seconds=0;
   logWork('started', 0);
@@ -916,7 +916,7 @@ async function confirmarConclusao() {
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
   updateLocalROProgress(activeTask.ro_number);
   if (pct>=100) {
-    sessionHistory.unshift({ro:activeTask.ro_number, vehicle:activeRO?activeRO.vehicle:'', job:activeTask.job_description, time:fmtTime(seconds), date:new Date().toLocaleString('pt-BR')});
+    sessionHistory.unshift({ro:activeTask.ro_number, vehicle:activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '', job:activeTask.job_description, time:fmtTime(seconds), date:new Date().toLocaleString('pt-BR')});
     renderHistory();
     showToast('Concluída! ✔ Log registado.');
   } else {
@@ -1169,6 +1169,26 @@ function renderSIRecentPlates() {
 function siPickRecent(plate) {
   document.getElementById('si-plate-input').value = plate;
   confirmSIInput();
+}
+
+// ── VIN → Model Year (position 10, index 9) ──────────────────────
+function vinToModelYear(vin) {
+  if (!vin || String(vin).length < 10) return '';
+  const map = {
+    'A':'2010','B':'2011','C':'2012','D':'2013','E':'2014',
+    'F':'2015','G':'2016','H':'2017','J':'2018','K':'2019',
+    'L':'2020','M':'2021','N':'2022','P':'2023','R':'2024',
+    'S':'2025','T':'2026',
+    '1':'2001','2':'2002','3':'2003','4':'2004','5':'2005',
+    '6':'2006','7':'2007','8':'2008','9':'2009',
+  };
+  const code = String(vin).charAt(9).toUpperCase();
+  return map[code] || '';
+}
+
+function vehicleWithYear(vehicle, vin) {
+  const yr = vinToModelYear(vin);
+  return yr ? vehicle + ' ' + yr : vehicle;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
