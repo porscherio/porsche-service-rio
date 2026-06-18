@@ -1516,7 +1516,7 @@ async function loadPartsSummaries(roNumbers) {
 function partsBadgeHtml(roNumber) {
   const s = partsSummaryCache[roNumber];
   if (!s || s.color === 'none' || !s.total) return '';
-  const labels = { red: 'Peças pendentes', yellow: 'Peças em andamento', green: 'Peças prontas' };
+  const labels = { red: 'Peças pendentes', yellow: 'Peças em andamento', green: 'Peças disponíveis' };
   const cls = 'pb-' + s.color;
   return (
     '<span class="parts-badge ' + cls + '" data-ro="' + roNumber + '">' +
@@ -1740,6 +1740,18 @@ function pkgToggleOrderedFields(safeId, status) {
   if (!fieldsEl) return;
   const show = (status === 'Ordered' || status === 'Confirmed' || status === 'Back Order' || status === 'Delivered');
   fieldsEl.style.display = show ? 'block' : 'none';
+
+  // Auto-fill today's date when marking as Delivered, if not already set.
+  // Stays editable in case the Aprovador needs to correct it.
+  if (status === 'Delivered') {
+    const delEl = document.getElementById('pkg-delivered-' + safeId);
+    if (delEl && !delEl.value) delEl.value = todayDateStr();
+  }
+}
+
+function todayDateStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
 }
 
 async function pkgSavePart(roNumber, partKey) {
