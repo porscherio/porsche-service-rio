@@ -1,6 +1,9 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.7.2 — Build: 17/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.8 — Build: 17/06/2026 -->
 <!-- v1.7.2: jobline approval system (Aprovacoes / Aprovadores tabs) -->
+<!-- v1.8: Parts Requests system — read-only status badge on every RO card
+           (all techs) + popover detail; Aprovadores-only 📦 panel to
+           authorize/track parts purchase status per RO -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -31,7 +34,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .tb-sub{font-size:11px;color:#888;margin-top:1px}
 .back{background:none;border:none;cursor:pointer;font-size:22px;color:#666;padding:4px;line-height:1}
 .sec-lbl{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
-.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:9px;cursor:pointer;transition:background .15s}
+.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:9px;cursor:pointer;transition:background .15s;position:relative}
 .card:active{background:var(--bg)}
 .card.locked{opacity:.45;pointer-events:none}
 .card.pausado{border-color:var(--amber);border-width:1.5px}
@@ -148,6 +151,39 @@ input:focus{outline:none;border-color:var(--black)}
 .apv-none{background:#f0f0f0;color:#999}
 .b-apv-ok{background:#1D9E75;color:#fff}
 .b-apv-no{background:#E00000;color:#fff}
+/* ── Parts Requests (v1.8) ───────────────────────────────── */
+.parts-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.04em;cursor:pointer;white-space:nowrap;margin-top:6px;border:1px solid transparent}
+.pb-red{background:var(--danger-bg);color:var(--danger-text);border-color:var(--danger-border)}
+.pb-yellow{background:var(--amber-bg);color:var(--amber-text);border-color:var(--amber)}
+.pb-green{background:var(--green-bg);color:var(--green-text);border-color:var(--green)}
+.pb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pb-dot.pb-red{background:var(--red)}
+.pb-dot.pb-yellow{background:var(--amber)}
+.pb-dot.pb-green{background:var(--green)}
+.parts-pop-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:400;display:flex;align-items:flex-end;justify-content:center}
+.parts-pop{background:#fff;border-radius:14px 14px 0 0;width:100%;max-width:430px;max-height:70vh;overflow-y:auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0))}
+.parts-pop-title{font-size:13px;font-weight:600;color:var(--black);margin-bottom:2px}
+.parts-pop-sub{font-size:11px;color:#888;margin-bottom:12px}
+.pp-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0f0}
+.pp-row:last-child{border-bottom:none}
+.pp-desc{font-size:12.5px;color:var(--black);flex:1;line-height:1.4}
+.pp-qty{font-size:10.5px;color:#999;margin-top:1px}
+.pp-st{font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;letter-spacing:.03em;white-space:nowrap;flex-shrink:0}
+.pp-meta{font-size:9.5px;color:#aaa;margin-top:3px;line-height:1.5}
+.pkg-panel-fields{background:var(--bg);border-radius:6px;padding:10px 12px;margin-top:8px;display:none}
+.pkg-field-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pkg-field-row:last-child{margin-bottom:0}
+.pkg-field-lbl{font-size:10px;color:#888;width:78px;flex-shrink:0}
+.pkg-field-row input[type=text],.pkg-field-row input[type=date]{flex:1;padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;color:var(--black);-webkit-appearance:none}
+.pkg-part-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.pkg-part-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.pkg-part-desc{font-size:12.5px;font-weight:600;color:var(--black);flex:1;line-height:1.4}
+.pkg-part-qty{font-size:10.5px;color:#999;margin-top:1px}
+.pkg-status-sel{margin-top:8px;width:100%}
+.pkg-save-row{display:flex;justify-content:flex-end;margin-top:4px}
+.pkg-save-btn{font-size:10.5px;font-weight:700;padding:6px 14px;border-radius:4px;border:none;background:var(--black);color:#fff;cursor:pointer;letter-spacing:.03em}
+.pkg-add-form{background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:10px}
+.pkg-add-form input[type=text]{width:100%;padding:9px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;margin-bottom:8px;-webkit-appearance:none}
 </style>
 </head>
 <body>
@@ -167,7 +203,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.7.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.8</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -194,6 +230,7 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <button style="background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="loadROs()" title="Actualizar">&#x21BB;</button>
       <button id="btn-approval" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openApprovalPanel()" title="Aprovar Joblines">&#x2705;</button>
+      <button id="btn-parts-admin" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openPartsAdminPanel()" title="Gerir Peças">&#x1F4E6;</button>
     </div>
     <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
       <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0 10px;gap:8px">
@@ -238,16 +275,6 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Cliente reclama de</div>
         <div style="font-size:13px;color:var(--red);font-style:italic;font-weight:500" id="s2-complaint"></div>
       </div>
-      <div id="s2-parts" style="display:none">
-        <div id="s2-parts-pending" class="parts-box parts-pending" style="display:none">
-          <div class="parts-label parts-label-pending">&#x23F3; Peças pendentes</div>
-          <div class="parts-list" id="s2-pending-list"></div>
-        </div>
-        <div id="s2-parts-received" class="parts-box parts-received" style="display:none">
-          <div class="parts-label parts-label-received">&#x2714; Peças recebidas</div>
-          <div class="parts-list" id="s2-received-list"></div>
-        </div>
-      </div>
       <div id="jobline-list-content">
         <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar joblines...</div></div>
       </div>
@@ -276,16 +303,6 @@ input:focus{outline:none;border-color:var(--black)}
       <div class="drow"><span class="dlbl">Conclusão</span><span class="dval" id="s3-pct"></span></div>
       <div id="s3-prog-wrap" style="display:none;margin:4px 0 8px">
         <div class="prog-bg"><div class="prog p-a" id="s3-prog" style="width:0%"></div></div>
-      </div>
-      <div id="s3-parts" style="display:none;margin-top:10px">
-        <div id="s3-parts-pending" class="parts-box parts-pending" style="display:none">
-          <div class="parts-label parts-label-pending">&#x23F3; Peças pendentes</div>
-          <div class="parts-list" id="s3-pending-list"></div>
-        </div>
-        <div id="s3-parts-received" class="parts-box parts-received" style="display:none">
-          <div class="parts-label parts-label-received">&#x2714; Peças recebidas</div>
-          <div class="parts-list" id="s3-received-list"></div>
-        </div>
       </div>
       <div style="height:20px"></div>
       <button class="bigbtn btn-ini" id="btn-start-task">&#x25B6; Iniciar tarefa</button>
@@ -338,7 +355,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.7.2</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.8</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -476,13 +493,67 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
+  <!-- PARTS ADMIN PANEL (v1.8 — Aprovadores only) -->
+  <div class="apv-panel" id="pkg-panel" style="display:none">
+    <!-- Step 1: RO list -->
+    <div id="pkg-step1" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="closePartsAdminPanel()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title">Gestão de Peças</div>
+          <div class="tb-sub">Selecione uma OS</div>
+        </div>
+      </div>
+      <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
+        <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0 10px;gap:8px">
+          <span style="font-size:14px;color:#aaa">&#x1F50D;</span>
+          <input type="text" id="pkg-search" placeholder="Filtrar por OS, placa ou nome..." inputmode="text"
+            style="flex:1;border:none;background:transparent;padding:9px 0;font-size:13px;color:var(--black);outline:none">
+        </div>
+      </div>
+      <div class="scroll" id="pkg-ro-list"></div>
+    </div>
+    <!-- Step 2: Parts list / edit -->
+    <div id="pkg-step2" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="pkgGoStep1()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title" id="pkg-ro-title">RO #----</div>
+          <div class="tb-sub" id="pkg-ro-sub"></div>
+        </div>
+        <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="pkgReload()" title="Actualizar">&#x21BB;</button>
+      </div>
+      <div class="scroll" style="padding:14px 16px">
+        <div id="pkg-add-toggle-wrap" style="margin-bottom:10px">
+          <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="pkgToggleAddForm()">&#x2795; Adicionar peça manualmente</button>
+        </div>
+        <div class="pkg-add-form" id="pkg-add-form" style="display:none">
+          <input type="text" id="pkg-add-desc" placeholder="Descrição da peça">
+          <input type="text" id="pkg-add-qty" placeholder="Quantidade (ex: 1)" inputmode="numeric">
+          <button class="bigbtn btn-ini" style="margin-bottom:0" onclick="pkgSubmitManualPart()">&#x2714; Adicionar à lista</button>
+        </div>
+        <div id="pkg-parts-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTS STATUS POPOVER (read-only, all techs) -->
+  <div class="parts-pop-backdrop" id="parts-pop-backdrop" style="display:none" onclick="if(event.target===this)closePartsPopover()">
+    <div class="parts-pop">
+      <div class="parts-pop-title" id="pp-title">Peças — RO #----</div>
+      <div class="parts-pop-sub" id="pp-sub"></div>
+      <div id="pp-list"></div>
+      <button class="bigbtn btn-sec" style="margin-top:6px;margin-bottom:0" onclick="closePartsPopover()">Fechar</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.7.2';
-const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGKUqvo_7GyvqsgvdjicYK/exec';
+const APP_VERSION = '1.8';
+const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
 const USERS = {
@@ -501,8 +572,7 @@ const USERS = {
   'Sebastiao Neto': '1234',
 };
 
-// Approval rights managed in the Aprovadores sheet tab (queried via isApprover API)
-
+// Approval / parts-admin rights managed in the Aprovadores sheet tab (queried via isApprover API)
 
 const DEFAULT_JOBLINES = [
   'VAL de entrada',
@@ -513,11 +583,25 @@ const DEFAULT_JOBLINES = [
   'VAL de saida',
 ];
 
+const PARTS_STATUSES = ['On Stock', 'To Be Ordered', 'Ordered', 'Confirmed', 'Back Order', 'Delivered'];
+const PARTS_STATUS_PT = {
+  'On Stock':      'Em estoque',
+  'To Be Ordered': 'A solicitar',
+  'Ordered':       'Solicitada',
+  'Confirmed':     'Confirmada',
+  'Back Order':    'Back order',
+  'Delivered':     'Entregue',
+};
+
 // ── State ────────────────────────────────────────────────────────
 let currentTech = '', activeTask = null, activeRO = null;
+let isApproverTech = false; // cached after login, drives 📦 + ✅ visibility
 let approvalCache = {}; // { roNumber: { jobDescription: true|false } }
 let apvCurrentRO  = null;
 let apvCheckboxes = {}; // active editing session { jobDescription: bool|null }
+let partsSummaryCache = {}; // { roNumber: { color, total, red, yellow, green } }
+let partsDetailCache  = {}; // { roNumber: [ {part_key, status, ...} ] }
+let pkgCurrentRO = null;
 let seconds = 0, timerIv = null, timerOn = false;
 let photoCount = 0, sessionHistory = [];
 let gpsStart = null, gpsCurrent = null;
@@ -566,13 +650,15 @@ function doLogin() {
 
 function doLogout() {
   currentTech=''; activeTask=null; activeRO=null;
-  liveROs=[]; liveJoblines={}; approvalCache={};
+  liveROs=[]; liveJoblines={}; approvalCache={}; partsSummaryCache={}; partsDetailCache={};
+  isApproverTech=false;
   clearTimer();
   document.getElementById('inp-pin').value='';
   document.getElementById('sel-tech').value='';
   document.getElementById('ro-search').value='';
   document.getElementById('ro-search-clear').style.display='none';
   document.getElementById('btn-approval').style.display='none';
+  document.getElementById('btn-parts-admin').style.display='none';
   goTo('s0');
 }
 
@@ -611,6 +697,7 @@ async function loadROs() {
     if (Array.isArray(data)) {
       liveROs = data;
       renderROList(data);
+      loadPartsSummaries(data.map(r => r.ro_number));
     } else {
       showError('ro-list-content', 'Erro ao carregar ordens: '+(data.error||'desconhecido'));
     }
@@ -644,37 +731,6 @@ async function loadJoblines(roNumber) {
 
 function reloadJoblines() {
   if (activeRO) loadJoblines(activeRO.ro_number);
-}
-
-async function loadParts(roNumber) {
-  try {
-    const res  = await fetch(API_URL+'?action=parts&ro_number='+roNumber);
-    const data = await res.json();
-    renderParts(data, 's2');
-  } catch(e) {
-    console.warn('loadParts failed', e);
-  }
-}
-
-function renderParts(data, prefix) {
-  const box      = document.getElementById(prefix+'-parts');
-  const pendBox  = document.getElementById(prefix+'-parts-pending');
-  const recvBox  = document.getElementById(prefix+'-parts-received');
-  const pendList = document.getElementById(prefix+'-pending-list');
-  const recvList = document.getElementById(prefix+'-received-list');
-  if (!box) return;
-  const pending  = data.pending  || [];
-  const received = data.received || [];
-  if (!pending.length && !received.length) { box.style.display='none'; return; }
-  box.style.display = 'block';
-  if (pending.length) {
-    pendBox.style.display = 'block';
-    pendList.textContent = pending.join(' · ');
-  } else { pendBox.style.display = 'none'; }
-  if (received.length) {
-    recvBox.style.display = 'block';
-    recvList.textContent = received.join(' · ');
-  } else { recvBox.style.display = 'none'; }
 }
 
 function showError(containerId, msg) {
@@ -758,7 +814,14 @@ function renderROList(ros) {
   if (locked.length) { html+='<div class="sec-lbl" style="margin-top:6px">Em andamento por outros</div>'; locked.forEach(r=>html+=roCard(r)); }
   const el = document.getElementById('ro-list-content');
   el.innerHTML = html;
-  el.querySelectorAll('.card:not(.locked)').forEach(c => c.addEventListener('click', ()=>openRO(c.dataset.ro)));
+  el.querySelectorAll('.card:not(.locked)').forEach(c => c.addEventListener('click', (ev)=>{
+    if (ev.target.closest('.parts-badge')) return; // badge handles its own click
+    openRO(c.dataset.ro);
+  }));
+  el.querySelectorAll('.parts-badge').forEach(b => b.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    openPartsPopover(b.dataset.ro);
+  }));
   const count = sug.length + free.length + paused.length;
   document.getElementById('t1-sub').textContent = count+' ordem(ns) disponível(is)';
 }
@@ -779,6 +842,7 @@ function roCard(r) {
   const custLine = r.cust_name
     ? '<div class="cjob">&#x1F464; ' + r.cust_name + '</div>'
     : '';
+  const partsBadge = partsBadgeHtml(r.ro_number);
   return (
     '<div class="card' +
       (isLocked ? ' locked' : '') +
@@ -791,7 +855,7 @@ function roCard(r) {
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
       '</div><span class="badge ' + bc + '">' + bt + '</span></div>' +
-      authTag +
+      authTag + partsBadge +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
       '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:' + pct + '%"></div></div>' +
       '<span class="ro-prog-txt">' + done + '/' + total + ' joblines</span></div>' +
@@ -811,7 +875,6 @@ function openRO(roNumber) {
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
-  loadParts(roNumber);
 }
 
 // ── Jobline rendering ─────────────────────────────────────────────
@@ -946,10 +1009,6 @@ function openJobline(id, roNumber) {
     btnStart.textContent = '▶ Iniciar tarefa';
   }
   btnStart.onclick = () => startTask(j);
-  if (activeRO) {
-    fetch(API_URL+'?action=parts&ro_number='+activeRO.ro_number)
-      .then(r=>r.json()).then(data=>renderParts(data,'s3')).catch(()=>{});
-  }
   goTo('s3');
 }
 
@@ -1274,13 +1333,19 @@ function vehicleWithYear(vehicle, vin) {
 
 // ── APPROVAL PANEL ────────────────────────────────────────────────
 async function checkAndShowApprovalButton() {
-  const btn = document.getElementById('btn-approval');
-  if (!btn) return;
-  btn.style.display = 'none';
+  const btnApv = document.getElementById('btn-approval');
+  const btnPkg = document.getElementById('btn-parts-admin');
+  if (btnApv) btnApv.style.display = 'none';
+  if (btnPkg) btnPkg.style.display = 'none';
+  isApproverTech = false;
   try {
     const res  = await fetch(API_URL + '?action=isApprover&tech=' + encodeURIComponent(currentTech));
     const data = await res.json();
-    if (data.ok && data.isApprover) btn.style.display = 'flex';
+    if (data.ok && data.isApprover) {
+      isApproverTech = true;
+      if (btnApv) btnApv.style.display = 'flex';
+      if (btnPkg) btnPkg.style.display = 'flex';
+    }
   } catch(e) { console.warn('isApprover check failed', e); }
 }
 
@@ -1430,6 +1495,330 @@ function saveApprovals() {
   const nNo  = approvals.filter(a=>!a.approved).length;
   showToast('&#x2714; '+nApv+' aprovada(s) · '+nNo+' não aprovada(s) · guardado');
   closeApprovalPanel();
+}
+
+// ── PARTS REQUESTS (v1.8) ──────────────────────────────────────────
+
+// Batch-load lightweight summaries for the visible RO list (badges).
+async function loadPartsSummaries(roNumbers) {
+  if (!roNumbers || !roNumbers.length) return;
+  try {
+    const csv = roNumbers.join(',');
+    const res  = await fetch(API_URL + '?action=partsSummary&ro_numbers=' + encodeURIComponent(csv));
+    const data = await res.json();
+    if (data && typeof data === 'object') {
+      partsSummaryCache = Object.assign({}, partsSummaryCache, data);
+      renderROList(liveROs); // re-render so badges appear
+    }
+  } catch(e) { console.warn('loadPartsSummaries failed', e); }
+}
+
+function partsBadgeHtml(roNumber) {
+  const s = partsSummaryCache[roNumber];
+  if (!s || s.color === 'none' || !s.total) return '';
+  const labels = { red: 'Peças pendentes', yellow: 'Peças em andamento', green: 'Peças prontas' };
+  const cls = 'pb-' + s.color;
+  return (
+    '<span class="parts-badge ' + cls + '" data-ro="' + roNumber + '">' +
+      '<span class="pb-dot ' + cls + '"></span>' +
+      '&#x1F4E6; ' + (labels[s.color] || 'Peças') + ' (' + s.total + ')' +
+    '</span>'
+  );
+}
+
+// ── Read-only popover (all techs) ───────────────────────────────────
+async function openPartsPopover(roNumber) {
+  const backdrop = document.getElementById('parts-pop-backdrop');
+  const list     = document.getElementById('pp-list');
+  document.getElementById('pp-title').textContent = 'Peças — RO #' + roNumber;
+  document.getElementById('pp-sub').textContent    = 'A carregar...';
+  list.innerHTML = '<div class="loading-box"><div class="spinner"></div></div>';
+  backdrop.style.display = 'flex';
+
+  try {
+    const res  = await fetch(API_URL + '?action=partsRequests&ro_number=' + roNumber);
+    const data = await res.json();
+    if (!data.ok) {
+      document.getElementById('pp-sub').textContent = 'Erro ao carregar.';
+      list.innerHTML = '';
+      return;
+    }
+    partsDetailCache[roNumber] = data.parts;
+    document.getElementById('pp-sub').textContent = data.parts.length + ' peça(s) relacionada(s)';
+    list.innerHTML = data.parts.map(partRowReadOnlyHtml).join('') ||
+      '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px 0">Nenhuma peça registada.</div>';
+  } catch(e) {
+    document.getElementById('pp-sub').textContent = 'Sem ligação ao servidor.';
+    list.innerHTML = '';
+  }
+}
+
+function closePartsPopover() {
+  document.getElementById('parts-pop-backdrop').style.display = 'none';
+}
+
+function partRowReadOnlyHtml(p) {
+  const stCls = partsStatusClass(p.status);
+  const meta  = partMetaLine(p);
+  return (
+    '<div class="pp-row">' +
+      '<div>' +
+        '<div class="pp-desc">' + escapeHtml(p.part_description) + '</div>' +
+        '<div class="pp-qty">Qtd: ' + p.quantity + '</div>' +
+        (meta ? '<div class="pp-meta">' + meta + '</div>' : '') +
+      '</div>' +
+      '<span class="pp-st ' + stCls + '">' + (PARTS_STATUS_PT[p.status] || p.status) + '</span>' +
+    '</div>'
+  );
+}
+
+function partsStatusClass(status) {
+  if (status === 'Back Order' || status === 'To Be Ordered' || !status) return 'pb-red';
+  if (status === 'Delivered'  || status === 'On Stock')                 return 'pb-green';
+  return 'pb-yellow'; // Ordered, Confirmed
+}
+
+function partMetaLine(p) {
+  const bits = [];
+  if (p.po_number)      bits.push('PO ' + p.po_number);
+  if (p.date_ordered)   bits.push('Pedido ' + p.date_ordered);
+  if (p.eta)             bits.push('ETA ' + p.eta);
+  if (p.delivered_date) bits.push('Entregue ' + p.delivered_date);
+  return bits.join(' · ');
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+// ── Aprovador-only edit panel (📦) ───────────────────────────────────
+function openPartsAdminPanel() {
+  if (!isApproverTech) return;
+  document.getElementById('pkg-panel').style.display = 'flex';
+  pkgGoStep1();
+  const old = document.getElementById('pkg-search');
+  const neo = old.cloneNode(true);
+  old.parentNode.replaceChild(neo, old);
+  neo.addEventListener('input', function() { renderPkgROList(this.value); });
+  renderPkgROList('');
+}
+
+function closePartsAdminPanel() {
+  document.getElementById('pkg-panel').style.display = 'none';
+}
+
+function pkgGoStep1() {
+  document.getElementById('pkg-step1').style.display = 'flex';
+  document.getElementById('pkg-step2').style.display = 'none';
+  document.getElementById('pkg-add-form').style.display = 'none';
+}
+
+function renderPkgROList(query) {
+  const q   = (query || '').toLowerCase().replace(/[-\s]/g, '');
+  const ros = q
+    ? liveROs.filter(r =>
+        String(r.ro_number).includes(q) ||
+        String(r.plate     || '').toLowerCase().replace(/[-\s]/g,'').includes(q) ||
+        String(r.cust_name || '').toLowerCase().replace(/\s/g,'').includes(q)
+      )
+    : liveROs;
+  const el = document.getElementById('pkg-ro-list');
+  if (!ros.length) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma OS encontrada.</div>';
+    return;
+  }
+  el.innerHTML = ros.map(r => {
+    const s = partsSummaryCache[r.ro_number];
+    const tag = (s && s.total) ? '<span class="parts-badge pb-'+s.color+'" style="margin-top:4px"><span class="pb-dot pb-'+s.color+'"></span>'+s.total+' peça(s)</span>' : '';
+    return (
+      '<div class="card" data-ro-pkg="'+r.ro_number+'" style="cursor:pointer">' +
+        '<div class="crow">' +
+          '<div>' +
+            '<div class="cro">RO #'+r.ro_number+' &mdash; '+vehicleWithYear(r.vehicle,r.vin)+'</div>' +
+            '<div class="cjob">Placa: '+r.plate+(r.cust_name?' &nbsp;&middot;&nbsp; &#x1F464; '+r.cust_name:'')+'</div>' +
+            tag +
+          '</div>' +
+          '<span style="font-size:18px;color:#ccc">&#x276F;</span>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+  el.querySelectorAll('[data-ro-pkg]').forEach(card => {
+    card.addEventListener('click', () => pkgSelectRO(card.dataset.roPkg));
+  });
+}
+
+async function pkgSelectRO(roNumber) {
+  pkgCurrentRO = liveROs.find(r => String(r.ro_number) === String(roNumber));
+  document.getElementById('pkg-ro-title').textContent = 'RO #' + roNumber;
+  document.getElementById('pkg-ro-sub').textContent   = pkgCurrentRO
+    ? vehicleWithYear(pkgCurrentRO.vehicle, pkgCurrentRO.vin) + ' · ' + pkgCurrentRO.plate : '';
+  document.getElementById('pkg-step1').style.display = 'none';
+  document.getElementById('pkg-step2').style.display = 'flex';
+  document.getElementById('pkg-add-form').style.display = 'none';
+  await pkgLoadParts(roNumber);
+}
+
+function pkgReload() {
+  if (pkgCurrentRO) pkgLoadParts(pkgCurrentRO.ro_number);
+}
+
+async function pkgLoadParts(roNumber) {
+  const list = document.getElementById('pkg-parts-list');
+  list.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar peças...</div></div>';
+  try {
+    const res  = await fetch(API_URL + '?action=partsRequests&ro_number=' + roNumber);
+    const data = await res.json();
+    if (!data.ok) {
+      list.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar peças.</div>';
+      return;
+    }
+    partsDetailCache[roNumber] = data.parts;
+    partsSummaryCache[roNumber] = data.summary;
+    renderPkgPartsList(roNumber, data.parts);
+  } catch(e) {
+    list.innerHTML = '<div class="err-box">&#x26A0; Sem ligação ao servidor.</div>';
+  }
+}
+
+function renderPkgPartsList(roNumber, parts) {
+  const list = document.getElementById('pkg-parts-list');
+  if (!parts.length) {
+    list.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px 0">Nenhuma peça registada para esta OS.</div>';
+    return;
+  }
+  list.innerHTML = parts.map(pkgPartCardHtml).join('');
+
+  parts.forEach(function(p) {
+    const safeId = pkgSafeId(p.part_key);
+    const selEl  = document.getElementById('pkg-status-' + safeId);
+    const fieldsEl = document.getElementById('pkg-fields-' + safeId);
+    if (selEl) {
+      selEl.addEventListener('change', function() {
+        pkgToggleOrderedFields(safeId, this.value);
+      });
+    }
+    const saveBtn = document.getElementById('pkg-save-' + safeId);
+    if (saveBtn) saveBtn.addEventListener('click', function() { pkgSavePart(roNumber, p.part_key); });
+  });
+}
+
+function pkgSafeId(partKey) {
+  return String(partKey).replace(/[^a-zA-Z0-9_]/g, '_');
+}
+
+function pkgPartCardHtml(p) {
+  const safeId   = pkgSafeId(p.part_key);
+  const isOrdered = (p.status === 'Ordered' || p.status === 'Confirmed' || p.status === 'Back Order' || p.status === 'Delivered');
+  const opts = PARTS_STATUSES.map(function(s) {
+    return '<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+PARTS_STATUS_PT[s]+'</option>';
+  }).join('');
+  return (
+    '<div class="pkg-part-card">' +
+      '<div class="pkg-part-head">' +
+        '<div>' +
+          '<div class="pkg-part-desc">' + escapeHtml(p.part_description) + (p.source==='manual' ? ' <span style="color:#aaa;font-weight:400;font-size:10px">(manual)</span>' : '') + '</div>' +
+          '<div class="pkg-part-qty">Qtd: ' + p.quantity + (p.part_code ? ' · Cód: '+p.part_code : '') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<select class="pkg-status-sel" id="pkg-status-'+safeId+'">' + opts + '</select>' +
+      '<div class="pkg-panel-fields" id="pkg-fields-'+safeId+'" style="display:'+(isOrdered?'block':'none')+'">' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">Nº PO</span><input type="text" id="pkg-po-'+safeId+'" value="'+escapeHtml(p.po_number||'')+'" placeholder="ex: PO-12345"></div>' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">Data pedido</span><input type="date" id="pkg-date-'+safeId+'" value="'+(p.date_ordered||'')+'"></div>' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">ETA</span><input type="date" id="pkg-eta-'+safeId+'" value="'+(p.eta||'')+'"></div>' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">Entregue em</span><input type="date" id="pkg-delivered-'+safeId+'" value="'+(p.delivered_date||'')+'"></div>' +
+      '</div>' +
+      '<div class="pkg-save-row"><button class="pkg-save-btn" id="pkg-save-'+safeId+'">Guardar</button></div>' +
+    '</div>'
+  );
+}
+
+function pkgToggleOrderedFields(safeId, status) {
+  const fieldsEl = document.getElementById('pkg-fields-' + safeId);
+  if (!fieldsEl) return;
+  const show = (status === 'Ordered' || status === 'Confirmed' || status === 'Back Order' || status === 'Delivered');
+  fieldsEl.style.display = show ? 'block' : 'none';
+}
+
+async function pkgSavePart(roNumber, partKey) {
+  const safeId = pkgSafeId(partKey);
+  const parts  = partsDetailCache[roNumber] || [];
+  const p      = parts.find(function(x) { return x.part_key === partKey; });
+  if (!p) return;
+
+  const status = document.getElementById('pkg-status-' + safeId).value;
+  const poEl   = document.getElementById('pkg-po-' + safeId);
+  const dateEl = document.getElementById('pkg-date-' + safeId);
+  const etaEl  = document.getElementById('pkg-eta-' + safeId);
+  const delEl  = document.getElementById('pkg-delivered-' + safeId);
+
+  const body = {
+    action: 'savePartStatus',
+    ro_number: roNumber,
+    part_key: partKey,
+    part_code: p.part_code,
+    part_description: p.part_description,
+    quantity: p.quantity,
+    status: status,
+    po_number: poEl ? poEl.value : '',
+    date_ordered: dateEl ? dateEl.value : '',
+    eta: etaEl ? etaEl.value : '',
+    delivered_date: delEl ? delEl.value : '',
+    tech: currentTech,
+    source: p.source || 'auto',
+  };
+
+  try {
+    const res  = await fetch(API_URL, { method:'POST', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!data.ok) { showToast('Erro: '+(data.error||'não foi possível guardar')); return; }
+    showToast('&#x2714; Peça atualizada');
+    await pkgLoadParts(roNumber);          // refresh detail panel with new current-state
+    loadPartsSummaries(liveROs.map(r => r.ro_number)); // refresh badges on RO list
+  } catch(e) {
+    showToast('Erro de ligação ao guardar.');
+  }
+}
+
+function pkgToggleAddForm() {
+  const form = document.getElementById('pkg-add-form');
+  const showing = form.style.display === 'block';
+  form.style.display = showing ? 'none' : 'block';
+  if (!showing) {
+    document.getElementById('pkg-add-desc').value = '';
+    document.getElementById('pkg-add-qty').value  = '';
+  }
+}
+
+async function pkgSubmitManualPart() {
+  if (!pkgCurrentRO) return;
+  const desc = document.getElementById('pkg-add-desc').value.trim();
+  const qty  = parseInt(document.getElementById('pkg-add-qty').value) || 1;
+  if (!desc) { showToast('Digite a descrição da peça.'); return; }
+
+  try {
+    const res  = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'addManualPart',
+        ro_number: pkgCurrentRO.ro_number,
+        part_description: desc,
+        quantity: qty,
+        status: 'To Be Ordered',
+        tech: currentTech,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) { showToast('Erro: '+(data.error||'não foi possível adicionar')); return; }
+    showToast('&#x2714; Peça adicionada');
+    document.getElementById('pkg-add-form').style.display = 'none';
+    await pkgLoadParts(pkgCurrentRO.ro_number);
+    loadPartsSummaries(liveROs.map(r => r.ro_number));
+  } catch(e) {
+    showToast('Erro de ligação ao adicionar peça.');
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
