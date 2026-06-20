@@ -30,8 +30,7 @@
 html,body{height:100%;width:100%;overflow:hidden;background:#000}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--black)}
 #app{height:100%;width:100%;max-width:430px;margin:0 auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;position:relative}
-.sbar{background:var(--black);padding:env(safe-area-inset-top,10px) 20px 6px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#888;flex-shrink:0}
-.red-bar{height:3px;background:var(--red);flex-shrink:0}
+.sbar{background:var(--black);padding:env(safe-area-inset-top,10px) 20px 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:#888;flex-shrink:0}.red-bar{height:3px;background:var(--red);flex-shrink:0}
 .screen{display:none;flex-direction:column;flex:1;overflow:hidden}
 .screen.on{display:flex}
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px}
@@ -197,6 +196,7 @@ input:focus{outline:none;border-color:var(--black)}
   <div class="sbar">
     <span id="clk">--:--</span>
     <span style="color:#bbb;font-size:10px;letter-spacing:.08em">PORSCHE SERVICE RIO</span>
+    <span id="sbar-tech" style="display:none;color:#fff;font-size:10px;font-weight:600;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px"></span>
     <span>&#x1F4F6;</span>
   </div>
   <div class="red-bar"></div>
@@ -669,9 +669,20 @@ function doLogout() {
 }
 
 // ── Navigation ────────────────────────────────────────────────────
+const SCREENS_WITH_TECH_BAR = ['s2','s3','s4','s5','s6p','s6c'];
+
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
+  const sbarTech = document.getElementById('sbar-tech');
+  if (sbarTech) {
+    if (SCREENS_WITH_TECH_BAR.includes(id)) {
+      sbarTech.textContent = currentTech;
+      sbarTech.style.display = 'inline';
+    } else {
+      sbarTech.style.display = 'none';
+    }
+  }
   if (id==='s4' && !timerOn) { gpsStart=gpsCurrent; startTimer(); }
   if ((id==='s6p'||id==='s6c') && timerOn) {
     pauseTimer();
