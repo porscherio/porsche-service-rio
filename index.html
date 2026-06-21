@@ -1,5 +1,12 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.12 — Build: 21/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.13 — Build: 21/06/2026 -->
+<!-- v1.13: AUDIO REMARKS — new "Gravar áudio" button alongside the
+             text remark button on the active-timer screen. Records up
+             to 60s of audio (e.g. engine noise); tech can tap "Marcar
+             narração" mid-recording to mark, in seconds, when they
+             start describing what's captured. Audio file uploads to
+             the jobline's existing Dropbox folder; metadata (filename,
+             narration offset) logged to the Remarks tab. -->
 <!-- v1.12: REMARKS — tech can attach a free-text remark (typed or
              dictated via Web Speech API, pt-BR) to the jobline they're
              actively working on, from the active-timer screen. New
@@ -93,6 +100,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .btn-stop{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)}
 .btn-cam{background:var(--bg);color:var(--black);border:1px solid var(--border)}
 .btn-remark{background:#1565C0;color:#fff}
+.btn-audio{background:#6A1B9A;color:#fff}
 .btn-sec{background:#fff;color:#888;border:1px solid var(--border)}
 .drow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:flex-start;gap:12px}
 .drow:last-of-type{border-bottom:none}
@@ -226,7 +234,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.12</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.13</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -353,6 +361,7 @@ input:focus{outline:none;border-color:var(--black)}
       <div style="height:14px"></div>
       <button class="bigbtn btn-cam" onclick="goTo('s5')">&#x1F4F7; Registar foto / vídeo</button>
       <button class="bigbtn btn-remark" onclick="openRemarkPanel()">&#x1F4AC; Adicionar observação<span id="s4-remark-count" style="display:none"></span></button>
+      <button class="bigbtn btn-audio" onclick="openAudioRemarkPanel()">&#x1F3A4; Gravar áudio<span id="s4-audio-count" style="display:none"></span></button>
       <button class="bigbtn btn-pau" onclick="goTo('s6p')">&#x23F8; Pausar</button>
       <button class="bigbtn btn-stop" onclick="goTo('s6c')">&#x23F9; Parar e concluir</button>
     </div>
@@ -379,7 +388,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.12</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.13</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -587,12 +596,32 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
+  <!-- AUDIO REMARK PANEL (v1.13) — record up to 60s audio, optional narration marker -->
+  <div class="parts-pop-backdrop" id="audio-remark-backdrop" style="display:none" onclick="if(event.target===this)closeAudioRemarkPanel()">
+    <div class="parts-pop">
+      <div class="parts-pop-title">&#x1F3A4; Gravação de áudio</div>
+      <div class="parts-pop-sub" id="audio-remark-sub"></div>
+      <div style="text-align:center;padding:10px 0 16px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px">
+          <span class="rec-dot" id="audio-rec-dot" style="display:none"></span>
+          <span class="video-timer" id="audio-rec-timer">00:00 / 01:00</span>
+        </div>
+        <div id="audio-marker-note" style="display:none;font-size:11px;color:#1565C0;font-weight:600">&#x1F4E2; Narração marcada em <span id="audio-marker-secs">0</span>s</div>
+      </div>
+      <button class="bigbtn" id="btn-start-audio-rec" style="background:#E00000;color:#fff" onclick="startAudioRecording()">&#x23FA; Iniciar gravação</button>
+      <button class="bigbtn" id="btn-mark-narration" style="display:none;background:#1565C0;color:#fff" onclick="markNarrationStart()">&#x1F4E2; Marcar narração</button>
+      <button class="bigbtn btn-stop" id="btn-stop-audio-rec" style="display:none" onclick="stopAudioRecording()">&#x23F9; Parar gravação</button>
+      <button class="bigbtn btn-ini" id="audio-remark-save-btn" style="display:none" onclick="saveAudioRemarkNow()">&#x2714; Guardar áudio</button>
+      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="closeAudioRemarkPanel()">Cancelar</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.12';
+const APP_VERSION = '1.13';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1081,6 +1110,7 @@ function startTask(j) {
   document.getElementById('ov-tech').textContent=currentTech;
   seconds=0;
   document.getElementById('s4-remark-count').style.display='none';
+  document.getElementById('s4-audio-count').style.display='none';
   logWork('started', 0);
   fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'lock', ro_number:j.ro_number, jobline_id:j.jobline_id, tech:currentTech})});
   goTo('s4');
@@ -2059,6 +2089,178 @@ function updateRemarkCountBadge(joblineId) {
   if (!activeTask || activeTask.jobline_id !== joblineId) return;
   const n = remarkCountByJobline[joblineId] || 0;
   const el = document.getElementById('s4-remark-count');
+  if (!el) return;
+  if (n > 0) { el.style.display = 'inline'; el.textContent = ' (' + n + ')'; }
+  else { el.style.display = 'none'; }
+}
+
+// ── AUDIO REMARKS (v1.13) ─────────────────────────────────────────
+// Lets the tech record up to 60s of audio (e.g. an engine noise) and
+// attach it to the jobline they're actively working on, from the
+// active-timer screen. A "Marcar narração" button can be tapped mid-
+// recording to mark, in seconds from recording start, the moment the
+// tech begins narrating/describing what's being captured — stored as
+// metadata (narration_offset_seconds), not a file split. Independent
+// from the camera screen's video recorder: opens its own microphone
+// stream rather than reusing the camera's video+audio stream, since
+// the tech may not have opened the camera at all.
+const MAX_AUDIO_REC_SECONDS = 60;
+let audioRemarkStream    = null;
+let audioRemarkRecorder  = null;
+let audioRemarkChunks    = [];
+let audioRemarkInterval  = null;
+let audioRemarkSeconds   = 0;
+let audioNarrationOffset = null; // seconds, or null if never marked
+let audioCountByJobline  = {};   // jobline_id -> count, local session cache
+
+function openAudioRemarkPanel() {
+  if (!activeTask) return;
+  document.getElementById('audio-remark-sub').textContent =
+    'RO #' + activeTask.ro_number + ' — ' + activeTask.job_description;
+  resetAudioRemarkUI();
+  document.getElementById('audio-remark-backdrop').style.display = 'flex';
+}
+
+function closeAudioRemarkPanel() {
+  stopAudioStream();
+  document.getElementById('audio-remark-backdrop').style.display = 'none';
+}
+
+function resetAudioRemarkUI() {
+  audioRemarkChunks = [];
+  audioRemarkSeconds = 0;
+  audioNarrationOffset = null;
+  document.getElementById('audio-rec-timer').textContent = '00:00 / 01:00';
+  document.getElementById('audio-rec-dot').style.display = 'none';
+  document.getElementById('audio-marker-note').style.display = 'none';
+  document.getElementById('btn-start-audio-rec').style.display = 'flex';
+  document.getElementById('btn-mark-narration').style.display = 'none';
+  document.getElementById('btn-stop-audio-rec').style.display = 'none';
+  document.getElementById('audio-remark-save-btn').style.display = 'none';
+}
+
+function stopAudioStream() {
+  if (audioRemarkInterval) { clearInterval(audioRemarkInterval); audioRemarkInterval = null; }
+  if (audioRemarkRecorder && audioRemarkRecorder.state !== 'inactive') {
+    try { audioRemarkRecorder.stop(); } catch(e) {}
+  }
+  if (audioRemarkStream) { audioRemarkStream.getTracks().forEach(t => t.stop()); audioRemarkStream = null; }
+}
+
+async function startAudioRecording() {
+  try {
+    audioRemarkStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) {
+    showToast('Microfone: ' + e.message);
+    return;
+  }
+  audioRemarkChunks = [];
+  audioRemarkSeconds = 0;
+  audioNarrationOffset = null;
+  document.getElementById('audio-marker-note').style.display = 'none';
+  document.getElementById('audio-rec-timer').textContent = '00:00 / 01:00';
+  document.getElementById('btn-start-audio-rec').style.display = 'none';
+  document.getElementById('btn-mark-narration').style.display = 'flex';
+  document.getElementById('btn-stop-audio-rec').style.display = 'flex';
+  document.getElementById('audio-rec-dot').style.display = 'inline-block';
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm';
+  audioRemarkRecorder = new MediaRecorder(audioRemarkStream, { mimeType });
+  audioRemarkRecorder.ondataavailable = e => { if (e.data.size > 0) audioRemarkChunks.push(e.data); };
+  audioRemarkRecorder.onstop = () => { document.getElementById('audio-remark-save-btn').style.display = 'flex'; };
+  audioRemarkRecorder.start(1000);
+
+  audioRemarkInterval = setInterval(() => {
+    audioRemarkSeconds++;
+    document.getElementById('audio-rec-timer').textContent =
+      pad(Math.floor(audioRemarkSeconds/60)) + ':' + pad(audioRemarkSeconds%60) + ' / 01:00';
+    if (audioRemarkSeconds >= MAX_AUDIO_REC_SECONDS) stopAudioRecording();
+  }, 1000);
+}
+
+function markNarrationStart() {
+  if (audioNarrationOffset !== null) return; // only one marker per recording
+  audioNarrationOffset = audioRemarkSeconds;
+  document.getElementById('audio-marker-secs').textContent = audioNarrationOffset;
+  document.getElementById('audio-marker-note').style.display = 'block';
+  document.getElementById('btn-mark-narration').style.display = 'none';
+}
+
+function stopAudioRecording() {
+  if (audioRemarkInterval) { clearInterval(audioRemarkInterval); audioRemarkInterval = null; }
+  if (audioRemarkRecorder && audioRemarkRecorder.state !== 'inactive') audioRemarkRecorder.stop();
+  if (audioRemarkStream) { audioRemarkStream.getTracks().forEach(t => t.stop()); audioRemarkStream = null; }
+  document.getElementById('audio-rec-dot').style.display = 'none';
+  document.getElementById('btn-mark-narration').style.display = 'none';
+  document.getElementById('btn-stop-audio-rec').style.display = 'none';
+}
+
+async function saveAudioRemarkNow() {
+  if (!activeTask) { closeAudioRemarkPanel(); return; }
+  if (!audioRemarkChunks.length) { showToast('Nenhum áudio gravado.'); return; }
+
+  const task = activeTask; // snapshot
+  const mimeType = audioRemarkRecorder ? audioRemarkRecorder.mimeType : 'audio/webm';
+  const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
+  const narrationOffset = audioNarrationOffset; // snapshot before UI reset
+  const saveBtn = document.getElementById('audio-remark-save-btn');
+  saveBtn.disabled = true;
+  showToast('A guardar áudio...');
+
+  try {
+    const n = new Date();
+    const filename = 'PSR_AUDIO_' + fmtFileDate(n) + '.' + ext;
+    const blob = new Blob(audioRemarkChunks, { type: mimeType });
+
+    const tokenRes  = await fetch(API_URL+'?action=get_dropbox_token');
+    const tokenData = await tokenRes.json();
+    if (!tokenData.ok) throw new Error('Token fetch failed');
+    const roNum   = String(task.ro_number);
+    const folder  = buildDropboxFolderPath(roNum, task.job_description);
+    const apiArgs = JSON.stringify({ path: folder+filename, mode:'add', autorename:true, mute:false });
+    const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer '+tokenData.token,
+        'Dropbox-API-Arg': apiArgs,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: blob,
+    });
+    const result = await uploadRes.json();
+    if (result.error_summary) throw new Error(result.error_summary);
+
+    // Structured metadata row (fire-and-forget, consistent with rest of codebase)
+    fetch(API_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({
+        action: 'saveAudioRemark',
+        ro_number: roNum,
+        jobline_id: task.jobline_id,
+        job_description: task.job_description,
+        tech: currentTech,
+        filename: filename,
+        narration_offset_seconds: narrationOffset === null ? '' : narrationOffset,
+      }),
+    });
+
+    showToast('&#x2714; Áudio guardado');
+    audioCountByJobline[task.jobline_id] = (audioCountByJobline[task.jobline_id] || 0) + 1;
+    updateAudioCountBadge(task.jobline_id);
+  } catch(e) {
+    console.warn('audio remark upload failed', e);
+    showToast('Erro ao enviar áudio: ' + e.message);
+  }
+
+  saveBtn.disabled = false;
+  closeAudioRemarkPanel();
+}
+
+function updateAudioCountBadge(joblineId) {
+  if (!activeTask || activeTask.jobline_id !== joblineId) return;
+  const n = audioCountByJobline[joblineId] || 0;
+  const el = document.getElementById('s4-audio-count');
   if (!el) return;
   if (n > 0) { el.style.display = 'inline'; el.textContent = ' (' + n + ')'; }
   else { el.style.display = 'none'; }
