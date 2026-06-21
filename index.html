@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.13 — Build: 21/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.14 — Build: 21/06/2026 -->
+<!-- v1.14: confirmation step added before a jobline is marked 100%
+             complete ("Confirmar 100% concluído para a jobline X?").
+             A jobline marked complete can't be reopened, so this
+             guards against accidental taps. Pausing at 25/50/75% is
+             always resumable and is NOT gated — it proceeds straight
+             through as before. -->
 <!-- v1.13: AUDIO REMARKS — new "Gravar áudio" button alongside the
              text remark button on the active-timer screen. Records up
              to 60s of audio (e.g. engine noise); tech can tap "Marcar
@@ -234,7 +240,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.13</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.14</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -388,7 +394,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.13</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.14</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -451,8 +457,20 @@ input:focus{outline:none;border-color:var(--black)}
         </select>
       </div>
       <div class="pct-note" id="pct-note">100% — tarefa concluída. Bloqueio libertado.</div>
-      <button class="bigbtn btn-ini" onclick="confirmarConclusao()">&#x2714; Confirmar e libertar bloqueio</button>
+      <button class="bigbtn btn-ini" onclick="handleConcluirClick()">&#x2714; Confirmar e libertar bloqueio</button>
       <button class="bigbtn btn-sec" onclick="goTo('s4')">Cancelar — continuar a trabalhar</button>
+    </div>
+  </div>
+
+  <!-- CONFIRM 100% COMPLETION MODAL (v1.14) -->
+  <div class="parts-pop-backdrop" id="confirm100-backdrop" style="display:none">
+    <div class="parts-pop" style="text-align:center">
+      <div class="parts-pop-title" style="font-size:15px;margin-bottom:10px">&#x26A0; Confirmar conclusão</div>
+      <div style="font-size:13px;color:var(--black);line-height:1.5;margin-bottom:18px">
+        Confirmar 100% concluído para a jobline<br><b id="confirm100-job"></b>?
+      </div>
+      <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="confirm100Proceed()">&#x2714; OK — confirmar conclusão</button>
+      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="confirm100Cancel()">&#8592; Voltar</button>
     </div>
   </div>
 
@@ -621,7 +639,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.13';
+const APP_VERSION = '1.14';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1128,6 +1146,31 @@ async function confirmarPausa() {
   clearTimer();
   showToast('Pausada em '+pct+'%. Bloqueio libertado.');
   goTo('s2');
+}
+
+// ── CONFIRM 100% COMPLETION (v1.14) ───────────────────────────────
+// Techs sometimes tap 100%/Confirmar by mistake, and a jobline marked
+// complete can't be reopened — so 100% completion gets one extra
+// confirmation step. Pausing at 25/50/75% is always resumable, so
+// those percentages skip straight to confirmarConclusao() unchanged.
+function handleConcluirClick() {
+  const pct = parseInt(document.getElementById('pct-done').value);
+  if (pct >= 100) {
+    document.getElementById('confirm100-job').textContent = activeTask ? activeTask.job_description : '';
+    document.getElementById('confirm100-backdrop').style.display = 'flex';
+    return;
+  }
+  confirmarConclusao();
+}
+
+function confirm100Proceed() {
+  document.getElementById('confirm100-backdrop').style.display = 'none';
+  confirmarConclusao();
+}
+
+function confirm100Cancel() {
+  document.getElementById('confirm100-backdrop').style.display = 'none';
+  goTo('s4'); // back to the running clock, per spec — not just back to s6c
 }
 
 async function confirmarConclusao() {
