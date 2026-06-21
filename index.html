@@ -59,6 +59,76 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .b-lock{background:#f0f0f0;color:#666}
 .b-atv{background:var(--green-bg);color:var(--green-text)}
 .b-def{background:#FDECEA;color:var(--red)}
+.trow{display:flex;align-items:center;gap:6px;margin-top:6px}<!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v1.11 — Build: 21/06/2026 -->
+<!-- v1.7.2: jobline approval system (Aprovacoes / Aprovadores tabs) -->
+<!-- v1.8: Parts Requests system — read-only status badge on every RO card
+           (all techs) + popover detail; Aprovadores-only 📦 panel to
+           authorize/track parts purchase status per RO -->
+<!-- v1.8.1: renamed green badge label to "Peças disponíveis"; auto-fill
+             delivery date when a part's status is set to Delivered -->
+<!-- v1.8.2: fixed date display — dates were showing as raw ISO
+             timestamps (Sheets auto-converts date strings to Date
+             objects); now normalised server-side and formatted as
+             dd/MM/yyyy in the read-only popover -->
+<!-- v1.10: backend removed RO-level "authorized" flag (superseded by
+             per-jobline approvals) -->
+<!-- v1.11: restored an RO-list approval badge, now sourced from
+             per-jobline data — backend returns approval_total /
+             approval_approved / approval_status per RO (rolled up from
+             the Aprovacoes tab, default joblines excluded). RO card now
+             shows a blue oval "APROVADO X/Y" pill if 1+ jobline is
+             approved, or a red oval "NÃO APROVADO" pill if none are
+             (no pill if the RO has no eligible joblines at all). -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#1a1a1a">
+<title>Porsche Service Rio</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --red:#E00000;--black:#1a1a1a;
+  --border:#e0e0e0;--bg:#f7f7f7;
+  --green:#1D9E75;--green-bg:#E1F5EE;--green-text:#085041;
+  --amber:#D4860A;--amber-bg:#FEF3E2;--amber-text:#854F0B;
+  --danger-bg:#FEE2E2;--danger-text:#991111;--danger-border:#E24B4A;
+}
+html,body{height:100%;width:100%;overflow:hidden;background:#000}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--black)}
+#app{height:100%;width:100%;max-width:430px;margin:0 auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.sbar{background:var(--black);padding:env(safe-area-inset-top,10px) 20px 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:#888;flex-shrink:0}.red-bar{height:3px;background:var(--red);flex-shrink:0}
+.screen{display:none;flex-direction:column;flex:1;overflow:hidden}
+.screen.on{display:flex}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px}
+.topbar{padding:12px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:#fff;flex-shrink:0}
+.tb-title{font-size:15px;font-weight:600;color:var(--black);flex:1}
+.tb-sub{font-size:11px;color:#888;margin-top:1px}
+.back{background:none;border:none;cursor:pointer;font-size:22px;color:#666;padding:4px;line-height:1}
+.sec-lbl{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:9px;cursor:pointer;transition:background .15s;position:relative}
+.card:active{background:var(--bg)}
+.card.locked{opacity:.45;pointer-events:none}
+.card.pausado{border-color:var(--amber);border-width:1.5px}
+.card.sugerida{border-left:3px solid var(--black)}
+.card.default-jl{border-left:3px solid var(--red)}
+.card.done-jl{opacity:.7;pointer-events:none}
+.card.retomar{border-color:var(--amber);border-width:1.5px;border-left:3px solid var(--amber)}
+.crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.cro{font-size:13px;font-weight:600;color:var(--black)}
+.cjob{font-size:12px;color:#666;margin-top:2px}
+.cdesc{font-size:11px;color:#999;margin-top:3px;font-style:italic}
+.clast{font-size:10px;color:#aaa;margin-top:4px}
+.badge{display:inline-block;font-size:9px;font-weight:600;padding:3px 8px;border-radius:3px;white-space:nowrap;letter-spacing:.04em;flex-shrink:0}
+.b-sug{background:var(--black);color:#fff}
+.b-liv{background:#EAF3DE;color:#27500A}
+.b-pau{background:var(--amber-bg);color:var(--amber-text)}
+.b-lock{background:#f0f0f0;color:#666}
+.b-atv{background:var(--green-bg);color:var(--green-text)}
+.b-def{background:#FDECEA;color:var(--red)}
 .trow{display:flex;align-items:center;gap:6px;margin-top:6px}
 .tdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .d-g{background:var(--green)}.d-a{background:var(--amber)}.d-r{background:var(--red)}.d-x{background:#ccc}
@@ -140,9 +210,9 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
 .pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6.3}
-.auth-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:3px;margin-top:6px;margin-bottom:2px}
-.auth-ok{background:#1565C0;color:#fff}
-.auth-no{background:var(--red);color:#fff}
+.apr-pill{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-top:6px;margin-bottom:2px}
+.apr-ok{background:#1565C0;color:#fff}
+.apr-no{background:var(--red);color:#fff}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
 /* ── Approval panel ──────────────────────────────────────── */
@@ -853,9 +923,13 @@ function roCard(r) {
   const total   = parseInt(r.total_joblines) || 0;
   const done    = parseInt(r.done_joblines)  || 0;
   const pct     = total > 0 ? Math.round(done / total * 100) : 0;
-  const authTag = r.authorized
-    ? '<span class="auth-tag auth-ok">&#x2714; Autorizada</span>'
-    : '<span class="auth-tag auth-no">&#x26A0; N&#xE3;o autorizada</span>';
+  const approved = parseInt(r.approval_approved) || 0;
+  const elig     = parseInt(r.approval_total)    || 0;
+  const authTag  = r.approval_status === 'approved'
+    ? '<span class="apr-pill apr-ok">&#x2714; APROVADO ' + approved + '/' + elig + '</span>'
+    : r.approval_status === 'not_approved'
+      ? '<span class="apr-pill apr-no">&#x26A0; N&#xC3;O APROVADO</span>'
+      : '';
   const custLine = r.cust_name
     ? '<div class="cjob">&#x1F464; ' + r.cust_name + '</div>'
     : '';
@@ -1870,3 +1944,4 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 </script>
 </body>
 </html>
+
