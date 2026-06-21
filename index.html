@@ -1,66 +1,12 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.11 — Build: 19/06/2026 -->
-<!-- v1.7.2: jobline approval system (Aprovacoes / Aprovadores tabs) -->
-<!-- v1.8: Parts Requests system — read-only status badge on every RO card
-           (all techs) + popover detail; Aprovadores-only 📦 panel to
-           authorize/track parts purchase status per RO -->
-<!-- v1.8.1: renamed green badge label to "Peças disponíveis"; auto-fill
-             delivery date when a part's status is set to Delivered -->
-<!-- v1.8.2: fixed date display — dates were showing as raw ISO
-             timestamps (Sheets auto-converts date strings to Date
-             objects); now normalised server-side and formatted as
-             dd/MM/yyyy in the read-only popover -->
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="theme-color" content="#1a1a1a">
-<title>Porsche Service Rio</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{
-  --red:#E00000;--black:#1a1a1a;
-  --border:#e0e0e0;--bg:#f7f7f7;
-  --green:#1D9E75;--green-bg:#E1F5EE;--green-text:#085041;
-  --amber:#D4860A;--amber-bg:#FEF3E2;--amber-text:#854F0B;
-  --danger-bg:#FEE2E2;--danger-text:#991111;--danger-border:#E24B4A;
-}
-html,body{height:100%;width:100%;overflow:hidden;background:#000}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--black)}
-#app{height:100%;width:100%;max-width:430px;margin:0 auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;position:relative}
-.sbar{background:var(--black);padding:env(safe-area-inset-top,10px) 20px 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:#888;flex-shrink:0}.red-bar{height:3px;background:var(--red);flex-shrink:0}
-.screen{display:none;flex-direction:column;flex:1;overflow:hidden}
-.screen.on{display:flex}
-.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px}
-.topbar{padding:12px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:#fff;flex-shrink:0}
-.tb-title{font-size:15px;font-weight:600;color:var(--black);flex:1}
-.tb-sub{font-size:11px;color:#888;margin-top:1px}
-.back{background:none;border:none;cursor:pointer;font-size:22px;color:#666;padding:4px;line-height:1}
-.sec-lbl{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
-.card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:9px;cursor:pointer;transition:background .15s;position:relative}
-.card:active{background:var(--bg)}
-.card.locked{opacity:.45;pointer-events:none}
-.card.pausado{border-color:var(--amber);border-width:1.5px}
-.card.sugerida{border-left:3px solid var(--black)}
-.card.default-jl{border-left:3px solid var(--red)}
-.card.done-jl{opacity:.7;pointer-events:none}
-.card.retomar{border-color:var(--amber);border-width:1.5px;border-left:3px solid var(--amber)}
-.crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.cro{font-size:13px;font-weight:600;color:var(--black)}
-.cjob{font-size:12px;color:#666;margin-top:2px}
-.cdesc{font-size:11px;color:#999;margin-top:3px;font-style:italic}
-.clast{font-size:10px;color:#aaa;margin-top:4px}
-.badge{display:inline-block;font-size:9px;font-weight:600;padding:3px 8px;border-radius:3px;white-space:nowrap;letter-spacing:.04em;flex-shrink:0}
-.b-sug{background:var(--black);color:#fff}
-.b-liv{background:#EAF3DE;color:#27500A}
-.b-pau{background:var(--amber-bg);color:var(--amber-text)}
-.b-lock{background:#f0f0f0;color:#666}
-.b-atv{background:var(--green-bg);color:var(--green-text)}
-.b-def{background:#FDECEA;color:var(--red)}
-.trow{display:flex;align-items:center;gap:6px;margin-top:6px}<!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.11 — Build: 21/06/2026 -->
+<!-- Porsche Service Rio PWA — v1.12 — Build: 21/06/2026 -->
+<!-- v1.12: REMARKS — tech can attach a free-text remark (typed or
+             dictated via Web Speech API, pt-BR) to the jobline they're
+             actively working on, from the active-timer screen. New
+             bright-blue "Adicionar observação" button. Saved to the
+             backend Remarks tab (append-only) AND uploaded as its own
+             .txt file to the jobline's existing Dropbox folder. Timer
+             keeps running in the background while the panel is open. -->
 <!-- v1.7.2: jobline approval system (Aprovacoes / Aprovadores tabs) -->
 <!-- v1.8: Parts Requests system — read-only status badge on every RO card
            (all techs) + popover detail; Aprovadores-only 📦 panel to
@@ -146,6 +92,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .btn-pau{background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber)}
 .btn-stop{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)}
 .btn-cam{background:var(--bg);color:var(--black);border:1px solid var(--border)}
+.btn-remark{background:#1565C0;color:#fff}
 .btn-sec{background:#fff;color:#888;border:1px solid var(--border)}
 .drow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:flex-start;gap:12px}
 .drow:last-of-type{border-bottom:none}
@@ -279,7 +226,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.11</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>1.12</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -405,6 +352,7 @@ input:focus{outline:none;border-color:var(--black)}
       <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s4-job"></span></div>
       <div style="height:14px"></div>
       <button class="bigbtn btn-cam" onclick="goTo('s5')">&#x1F4F7; Registar foto / vídeo</button>
+      <button class="bigbtn btn-remark" onclick="openRemarkPanel()">&#x1F4AC; Adicionar observação<span id="s4-remark-count" style="display:none"></span></button>
       <button class="bigbtn btn-pau" onclick="goTo('s6p')">&#x23F8; Pausar</button>
       <button class="bigbtn btn-stop" onclick="goTo('s6c')">&#x23F9; Parar e concluir</button>
     </div>
@@ -431,7 +379,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.11</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v1.12</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -623,12 +571,28 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
+  <!-- REMARK PANEL (v1.12) — write or dictate a remark on the active jobline -->
+  <div class="parts-pop-backdrop" id="remark-backdrop" style="display:none" onclick="if(event.target===this)closeRemarkPanel()">
+    <div class="parts-pop">
+      <div class="parts-pop-title">&#x1F4AC; Observação</div>
+      <div class="parts-pop-sub" id="remark-sub"></div>
+      <textarea id="remark-text" rows="5" placeholder="Escreva ou dite uma observação sobre esta tarefa..."
+        style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:13px;color:var(--black);font-family:inherit;resize:vertical;margin-bottom:10px;-webkit-appearance:none"></textarea>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="bigbtn" id="remark-mic-btn" style="margin-bottom:0;background:#1565C0;color:#fff;flex:1" onclick="toggleRemarkMic()">&#x1F3A4; Falar (PT-BR)</button>
+      </div>
+      <div id="remark-mic-status" style="display:none;font-size:11px;color:var(--red);text-align:center;margin-bottom:10px">&#x1F534; A escutar... fale agora</div>
+      <button class="bigbtn btn-ini" id="remark-save-btn" style="margin-bottom:8px" onclick="saveRemarkNow()">&#x2714; Guardar observação</button>
+      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="closeRemarkPanel()">Cancelar</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.11';
+const APP_VERSION = '1.12';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1116,6 +1080,7 @@ function startTask(j) {
   document.getElementById('ov-vehicle').textContent=activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
   document.getElementById('ov-tech').textContent=currentTech;
   seconds=0;
+  document.getElementById('s4-remark-count').style.display='none';
   logWork('started', 0);
   fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'lock', ro_number:j.ro_number, jobline_id:j.jobline_id, tech:currentTech})});
   goTo('s4');
@@ -1311,6 +1276,18 @@ async function uploadVideo(mimeType) {
 }
 
 function sanitiseNameClient(str){return String(str).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9 _-]/g,'').replace(/\s+/g,'_').substring(0,50);}
+
+// Shared by photo/video/remark uploads — builds the same
+// /CTPRJ_NEW/vag ros/#L1/#L2/#RO/fotos/RO_jobdesc/ folder path.
+function buildDropboxFolderPath(roNum, jobDescription) {
+  const roInt     = parseInt(roNum);
+  const floor1000 = Math.floor(roInt/1000)*1000, floor100 = Math.floor(roInt/100)*100;
+  const rangeL1   = '#'+floor1000+' a #'+(floor1000+999);
+  const rangeL2   = '#'+floor100+' a #'+(floor100+99);
+  const jobDesc   = sanitiseNameClient(jobDescription || 'demo');
+  return '/CTPRJ_NEW/vag ros/'+rangeL1+'/'+rangeL2+'/#'+roNum+'/fotos/'+roNum+'_'+jobDesc+'/';
+}
+
 function updateOverlay(){const n=new Date();document.getElementById('ov-ts').textContent=fmtDateTime(n);if(gpsCurrent)document.getElementById('ov-gps').textContent='GPS: '+gpsCurrent;}
 
 // ── History ───────────────────────────────────────────────────────
@@ -1934,6 +1911,159 @@ async function pkgSubmitManualPart() {
   }
 }
 
+// ── REMARKS (v1.12) ──────────────────────────────────────────────
+// Lets the tech attach a free-text remark (typed or dictated via the
+// browser's Web Speech API, pt-BR) to the jobline they're actively
+// working on, from the active-timer screen (s4). Timer keeps running
+// in the background while the panel is open. On save: appends a row
+// to the backend Remarks tab AND uploads a standalone .txt file to
+// the same Dropbox folder used for that jobline's photos/videos.
+let remarkRecognition = null;
+let remarkMicOn = false;
+let remarkCountByJobline = {}; // jobline_id -> count, local session cache
+
+function openRemarkPanel() {
+  if (!activeTask) return;
+  document.getElementById('remark-sub').textContent =
+    'RO #' + activeTask.ro_number + ' — ' + activeTask.job_description;
+  document.getElementById('remark-text').value = '';
+  stopRemarkMic();
+  document.getElementById('remark-backdrop').style.display = 'flex';
+}
+
+function closeRemarkPanel() {
+  stopRemarkMic();
+  document.getElementById('remark-backdrop').style.display = 'none';
+}
+
+function getRemarkRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  if (!remarkRecognition) {
+    remarkRecognition = new SR();
+    remarkRecognition.lang = 'pt-BR';
+    remarkRecognition.continuous = true;
+    remarkRecognition.interimResults = false;
+    remarkRecognition.onresult = function(event) {
+      let finalText = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
+      }
+      if (finalText.trim()) {
+        const ta = document.getElementById('remark-text');
+        ta.value = (ta.value.trim() ? ta.value.trim() + ' ' : '') + finalText.trim();
+      }
+    };
+    remarkRecognition.onerror = function(event) {
+      console.warn('SpeechRecognition error', event.error);
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        showToast('Permissão de microfone negada.');
+      }
+      stopRemarkMic();
+    };
+    remarkRecognition.onend = function() { stopRemarkMic(); };
+  }
+  return remarkRecognition;
+}
+
+function toggleRemarkMic() {
+  if (remarkMicOn) { stopRemarkMic(); return; }
+  const rec = getRemarkRecognition();
+  if (!rec) { showToast('Reconhecimento de voz não disponível neste navegador.'); return; }
+  try {
+    rec.start();
+    remarkMicOn = true;
+    document.getElementById('remark-mic-btn').textContent = '⏹ Parar de falar';
+    document.getElementById('remark-mic-status').style.display = 'block';
+  } catch(e) { console.warn('mic start failed', e); }
+}
+
+function stopRemarkMic() {
+  if (remarkRecognition && remarkMicOn) {
+    try { remarkRecognition.stop(); } catch(e) {}
+  }
+  remarkMicOn = false;
+  const btn = document.getElementById('remark-mic-btn');
+  if (btn) btn.textContent = '🎤 Falar (PT-BR)';
+  const st = document.getElementById('remark-mic-status');
+  if (st) st.style.display = 'none';
+}
+
+async function saveRemarkNow() {
+  if (!activeTask) { closeRemarkPanel(); return; }
+  const text = document.getElementById('remark-text').value.trim();
+  if (!text) { showToast('Escreva ou dite uma observação primeiro.'); return; }
+  stopRemarkMic();
+
+  const task = activeTask; // snapshot — task could change before async work finishes
+  const saveBtn = document.getElementById('remark-save-btn');
+  saveBtn.disabled = true;
+  showToast('A guardar observação...');
+
+  // 1) Structured row in the Remarks tab (fire-and-forget, consistent
+  //    with the rest of the codebase's no-cors POST pattern).
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({
+      action: 'saveRemark',
+      ro_number: task.ro_number,
+      jobline_id: task.jobline_id,
+      job_description: task.job_description,
+      tech: currentTech,
+      remark_text: text,
+    }),
+  });
+
+  // 2) Standalone .txt file in the same Dropbox folder as photos/videos.
+  try {
+    const tokenRes  = await fetch(API_URL+'?action=get_dropbox_token');
+    const tokenData = await tokenRes.json();
+    if (!tokenData.ok) throw new Error('Token fetch failed');
+    const n        = new Date();
+    const roNum    = String(task.ro_number);
+    const filename = 'PSR_REMARK_' + fmtFileDate(n) + '.txt';
+    const folder   = buildDropboxFolderPath(roNum, task.job_description);
+    const fileBody =
+      'Porsche Service Rio — Observação\n' +
+      'RO: #' + roNum + '\n' +
+      'Serviço: ' + task.job_description + '\n' +
+      'Técnico: ' + currentTech + '\n' +
+      'Data/hora: ' + fmtDateTime(n) + '\n' +
+      '\n' + text + '\n';
+    const blob     = new Blob([fileBody], { type: 'text/plain;charset=utf-8' });
+    const apiArgs  = JSON.stringify({ path: folder+filename, mode:'add', autorename:true, mute:false });
+    const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer '+tokenData.token,
+        'Dropbox-API-Arg': apiArgs,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: blob,
+    });
+    const result = await uploadRes.json();
+    if (result.error_summary) throw new Error(result.error_summary);
+    showToast('&#x2714; Observação guardada');
+  } catch(e) {
+    console.warn('remark dropbox upload failed', e);
+    showToast('Observação guardada (sem cópia em Dropbox — erro de ligação).');
+  }
+
+  remarkCountByJobline[task.jobline_id] = (remarkCountByJobline[task.jobline_id] || 0) + 1;
+  updateRemarkCountBadge(task.jobline_id);
+  saveBtn.disabled = false;
+  closeRemarkPanel();
+}
+
+function updateRemarkCountBadge(joblineId) {
+  if (!activeTask || activeTask.jobline_id !== joblineId) return;
+  const n = remarkCountByJobline[joblineId] || 0;
+  const el = document.getElementById('s4-remark-count');
+  if (!el) return;
+  if (n > 0) { el.style.display = 'inline'; el.textContent = ' (' + n + ')'; }
+  else { el.style.display = 'none'; }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 function pad(n){return String(n).padStart(2,'0');}
 function fmtTime(s){return pad(Math.floor(s/60))+':'+pad(s%60);}
@@ -1944,4 +2074,3 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 </script>
 </body>
 </html>
-
