@@ -103,7 +103,7 @@
   /* TEXT-BUILT WORDMARK */
   .wordmark {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 16px;
   }
   .wordmark-porsche {
@@ -116,19 +116,20 @@
     line-height: 1;
   }
   .wordmark-bar {
-    width: 3px;
-    height: 18px;
+    width: 4px;
+    height: 35px;
     background: #d5001c;
-    align-self: center;
   }
   .wordmark-rj {
     font-family: 'PorscheNextArabic', 'Arial Narrow', sans-serif;
     font-weight: 700;
-    font-size: 40px;
+    font-size: 30px;
     letter-spacing: 0.02em;
     color: #fff;
     text-transform: uppercase;
     line-height: 1;
+    position: relative;
+    top: 5px;
   }
 
   /* STATS BAR */
@@ -326,7 +327,7 @@
   <div class="header-left">
     <div class="title">
       Workshop floor — live status
-      <span class="version-badge">v1.2.2</span>
+      <span class="version-badge">v1.2.5</span>
     </div>
     <div class="subtitle" id="date-label"></div>
   </div>
