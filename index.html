@@ -1,5 +1,14 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.2.0 — Build: 22/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.3.0 — Build: 22/06/2026 -->
+<!-- v2.3.0: Agenda detail screen — new standalone Observação (remark)
+             field, free text, separate from the structured fields,
+             editable alongside them. Vehicle/customer fields
+             (Cliente/Modelo/Ano/VIN/Telefone) now auto-populate from
+             the Customers tab using the event's plate when the
+             detail screen opens, for any field not already filled
+             from the event itself — existing events that already
+             name the customer (e.g. in the title) are left untouched.
+             Paired with backend Code.gs v2.3.0. -->
 <!-- v2.2.0: Agenda Management — Descrição is now editable. RO,
              Cliente, Placa, Modelo, Ano, VIN, Telefone all editable
              individually in the event detail screen ("Salvar
@@ -257,7 +266,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.2.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.3.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -771,6 +780,10 @@ input:focus{outline:none;border-color:var(--black)}
           <span class="dlbl">Agendado por</span><span class="dval" id="agd-f-createdby">—</span>
         </div>
 
+        <div class="sec-lbl">Observação</div>
+        <textarea id="agd-f-remark" rows="3" placeholder="Comentário sobre este agendamento..."
+          style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:13px;color:var(--black);font-family:inherit;resize:vertical;margin-bottom:14px;-webkit-appearance:none"></textarea>
+
         <button class="bigbtn btn-ini" onclick="agdSaveFieldEdits()">&#x1F4BE; Salvar alterações</button>
 
         <div id="agd-reschedule-block" style="margin-top:18px">
@@ -793,7 +806,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2025,6 +2038,7 @@ function agdOpenEventDetail(ev) {
   document.getElementById('agd-f-year').value    = ev.year        || '';
   document.getElementById('agd-f-vin').value     = ev.vin         || '';
   document.getElementById('agd-f-mobile').value  = ev.mobile      || '';
+  document.getElementById('agd-f-remark').value  = ev.remark      || '';
   document.getElementById('agd-f-createdby').textContent = ev.created_by || '—';
 
   // Reset the reschedule picker to today's date by default
@@ -2047,6 +2061,7 @@ function agdSaveFieldEdits() {
     year:        document.getElementById('agd-f-year').value.trim(),
     vin:         document.getElementById('agd-f-vin').value.trim().toUpperCase(),
     mobile:      document.getElementById('agd-f-mobile').value.trim(),
+    remark:      document.getElementById('agd-f-remark').value.trim(),
   };
   // Optimistic local update so the list/title reflect the edit
   // immediately, consistent with the rest of the codebase's
