@@ -1,5 +1,35 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.3.1 — Build: 22/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.4.1 — Build: 22/06/2026 -->
+<!-- v2.4.1: ENTREGA→SERVICOS link health. ENTREGA's vehicle/customer
+             fields are now always shown freshly mirrored from the
+             linked SERVICOS event (matched by a permanent event-ID
+             pointer set at creation, not by re-checking RO numbers —
+             RO/plate are immutable by design). If that link is
+             broken (SERVICOS event deleted) or this is an older
+             ENTREGA event created before the linkage existed, a
+             warning banner appears in the detail screen, plus a
+             small ⚠ next to the RO number in the list view so it's
+             visible before opening. Paired with backend Code.gs
+             v2.4.1. -->
+<!-- v2.4.0: CRIAR AGENDAMENTO (Create New) — Phase 1 complete. New
+             "Criar Novo" flow alongside Management: SERVIÇOS/ENTREGA
+             choice → form → day/slot picker → create.
+             SERVIÇOS: Path A (RO already exists) — enter RO number,
+             "Buscar dados do RO" looks it up via ROs sheet + Customers
+             tab and auto-fills everything. Path B (no RO yet) — enter
+             plate and/or name manually, tap Buscar, searches the
+             Customers tab (fuzzy/partial); single match auto-fills,
+             multiple matches show a tappable list, no match lets the
+             tech proceed with manually-typed data.
+             ENTREGA: RO number required up front, hard-gated via
+             hasServicosEvent — blocks immediately with a message if
+             no SERVIÇOS event exists for that RO. Once verified, all
+             vehicle/customer fields are read-only (sourced from the
+             SERVIÇOS event), matching the same restriction as editing
+             ENTREGA events. Only Observação + day/slot are entered.
+             Both calendars converge on the same day-by-day free/busy
+             slot picker already used for reschedule. Paired with new
+             backend route getROPrefillData in Code.gs v2.4.0. -->
 <!-- v2.3.1: ENTREGA detail screen — RO/Cliente/Placa/Modelo/Ano/VIN/
              Telefone now show as read-only (greyed out, disabled
              inputs) for ENTREGA events, with a notice explaining why
@@ -276,7 +306,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.3.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.4.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -693,11 +723,11 @@ input:focus{outline:none;border-color:var(--black)}
             <span style="font-size:18px;color:#ccc">&#x276F;</span>
           </div>
         </div>
-        <div class="card" style="opacity:.45;pointer-events:none">
+        <div class="card" onclick="agdOpenCreate()" style="cursor:pointer">
           <div class="crow">
             <div>
               <div class="cro">&#x2795; Criar Novo</div>
-              <div class="cjob">Em construção...</div>
+              <div class="cjob">Agendar entrada (SERVIÇOS) ou entrega ao cliente</div>
             </div>
             <span style="font-size:18px;color:#ccc">&#x276F;</span>
           </div>
@@ -760,6 +790,7 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <div class="scroll">
         <div class="sec-lbl">Detalhes</div>
+        <div id="agd-entrega-link-warning" style="display:none;font-size:12px;color:#a33;background:#fdf0f0;border:1px solid #f0c9c9;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-weight:600"></div>
         <div id="agd-entrega-notice" style="display:none;font-size:12px;color:#888;background:#f7f7f7;border-radius:6px;padding:8px 10px;margin-bottom:12px">
           &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui.
         </div>
@@ -813,6 +844,123 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
     </div>
 
+    <!-- Step 2 (Create New): SERVICOS / ENTREGA choice -->
+    <div id="agd-create-step2" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="agdGoStep1()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title">Criar Novo</div>
+          <div class="tb-sub">Selecione o calendário</div>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="card" onclick="agdCreateOpenForm('servicos')" style="cursor:pointer">
+          <div class="crow">
+            <div>
+              <div class="cro">&#x1F697; SERVIÇOS</div>
+              <div class="cjob">Agendar entrada de veículo</div>
+            </div>
+            <span style="font-size:18px;color:#ccc">&#x276F;</span>
+          </div>
+        </div>
+        <div class="card" onclick="agdCreateOpenForm('entrega')" style="cursor:pointer">
+          <div class="crow">
+            <div>
+              <div class="cro">&#x1F6A9; ENTREGA</div>
+              <div class="cjob">Agendar entrega ao cliente</div>
+            </div>
+            <span style="font-size:18px;color:#ccc">&#x276F;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 (Create New): form — RO lookup / manual search / fields -->
+    <div id="agd-create-step3" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="agdCreateGoStep2()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title" id="agd-create-title">Criar Agendamento</div>
+          <div class="tb-sub" id="agd-create-sub"></div>
+        </div>
+      </div>
+      <div class="scroll">
+
+        <!-- ENTREGA: RO required up front, hard-gated -->
+        <div id="agd-create-entrega-gate">
+          <div class="sec-lbl">RO</div>
+          <label class="field-lbl" for="agd-c-ro-entrega">Número da RO</label>
+          <input type="text" id="agd-c-ro-entrega" class="agd-field-input" inputmode="numeric" placeholder="Ex: 29890">
+          <button class="bigbtn btn-ini" onclick="agdCheckEntregaGate()">&#x1F50D; Verificar</button>
+          <div id="agd-entrega-gate-msg" style="font-size:13px;color:#c00;margin-top:4px;margin-bottom:10px;display:none"></div>
+        </div>
+
+        <!-- SERVICOS: Path A (RO exists) or Path B (manual + search) -->
+        <div id="agd-create-servicos-lookup">
+          <div class="sec-lbl">RO (se já existir)</div>
+          <label class="field-lbl" for="agd-c-ro">Número da RO</label>
+          <input type="text" id="agd-c-ro" class="agd-field-input" inputmode="numeric" placeholder="Deixe em branco se ainda não existe">
+          <button class="bigbtn btn-sec" onclick="agdLookupByRO()">&#x1F50D; Buscar dados do RO</button>
+
+          <div class="sec-lbl" style="margin-top:18px">Ou busque manualmente</div>
+          <label class="field-lbl" for="agd-c-search-plate">Placa</label>
+          <input type="text" id="agd-c-search-plate" class="agd-field-input" style="text-transform:uppercase" placeholder="Ex: ABC1234">
+          <label class="field-lbl" for="agd-c-search-name">Nome do cliente</label>
+          <input type="text" id="agd-c-search-name" class="agd-field-input" placeholder="Ex: João Silva">
+          <button class="bigbtn btn-sec" onclick="agdSearchCustomersForCreate()">&#x1F50D; Buscar</button>
+          <div id="agd-create-search-results" style="margin-top:8px"></div>
+        </div>
+
+        <!-- Populated / editable fields (shared by both calendars,
+             ENTREGA fields become read-only after gate check passes) -->
+        <div id="agd-create-fields" style="display:none;margin-top:18px">
+          <div class="sec-lbl">Detalhes</div>
+          <div id="agd-c-entrega-notice" style="display:none;font-size:12px;color:#888;background:#f7f7f7;border-radius:6px;padding:8px 10px;margin-bottom:12px">
+            &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui.
+          </div>
+          <div id="agd-c-structural-fields">
+            <label class="field-lbl" for="agd-c-f-ro">RO</label>
+            <input type="text" id="agd-c-f-ro" class="agd-field-input" inputmode="numeric">
+
+            <label class="field-lbl" for="agd-c-f-client">Cliente</label>
+            <input type="text" id="agd-c-f-client" class="agd-field-input">
+
+            <label class="field-lbl" for="agd-c-f-plate">Placa</label>
+            <input type="text" id="agd-c-f-plate" class="agd-field-input" style="text-transform:uppercase">
+
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+              <div>
+                <label class="field-lbl" for="agd-c-f-modelo">Modelo</label>
+                <input type="text" id="agd-c-f-modelo" class="agd-field-input">
+              </div>
+              <div>
+                <label class="field-lbl" for="agd-c-f-year">Ano</label>
+                <input type="text" id="agd-c-f-year" class="agd-field-input" inputmode="numeric">
+              </div>
+            </div>
+
+            <label class="field-lbl" for="agd-c-f-vin">VIN</label>
+            <input type="text" id="agd-c-f-vin" class="agd-field-input" style="text-transform:uppercase">
+
+            <label class="field-lbl" for="agd-c-f-mobile">Telefone</label>
+            <input type="text" id="agd-c-f-mobile" class="agd-field-input" inputmode="tel">
+          </div>
+
+          <div class="sec-lbl">Observação</div>
+          <textarea id="agd-c-f-remark" rows="3" placeholder="Comentário sobre este agendamento..."
+            style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:13px;color:var(--black);font-family:inherit;resize:vertical;margin-bottom:14px;-webkit-appearance:none"></textarea>
+
+          <div class="sec-lbl">Dia e horário</div>
+          <label class="field-lbl" for="agd-c-date">Dia</label>
+          <input type="date" id="agd-c-date" onchange="agdLoadSlotsForCreate()" class="agd-field-input">
+          <div id="agd-c-slots" style="margin-bottom:14px"></div>
+
+          <button class="bigbtn btn-ini" id="agd-c-confirm-btn" onclick="agdConfirmCreate()" disabled>&#x2714; Criar agendamento</button>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <div class="toast" id="toast"></div>
@@ -821,7 +969,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.3.1';
+const APP_VERSION = '2.4.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1962,15 +2110,27 @@ function closeAgendaPanel() {
 }
 
 function agdGoStep1() {
-  document.getElementById('agd-step1').style.display      = 'flex';
-  document.getElementById('agd-mgmt-step2').style.display  = 'none';
-  document.getElementById('agd-mgmt-step3').style.display  = 'none';
-  document.getElementById('agd-mgmt-step4').style.display  = 'none';
+  document.getElementById('agd-step1').style.display       = 'flex';
+  document.getElementById('agd-mgmt-step2').style.display   = 'none';
+  document.getElementById('agd-mgmt-step3').style.display   = 'none';
+  document.getElementById('agd-mgmt-step4').style.display   = 'none';
+  document.getElementById('agd-create-step2').style.display = 'none';
+  document.getElementById('agd-create-step3').style.display = 'none';
 }
 
 function agdOpenManagement() {
   document.getElementById('agd-step1').style.display      = 'none';
   document.getElementById('agd-mgmt-step2').style.display = 'flex';
+}
+
+function agdOpenCreate() {
+  document.getElementById('agd-step1').style.display       = 'none';
+  document.getElementById('agd-create-step2').style.display = 'flex';
+}
+
+function agdCreateGoStep2() {
+  document.getElementById('agd-create-step2').style.display = 'flex';
+  document.getElementById('agd-create-step3').style.display = 'none';
 }
 
 function agdMgmtGoStep2() {
@@ -2014,11 +2174,13 @@ function agdRenderList(events) {
     const d = new Date(ev.start);
     const dateLbl = pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear();
     const timeLbl = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    const linkWarning = (ev.servicos_link_status === 'broken' || ev.servicos_link_status === 'unlinked')
+      ? '<span style="color:#a33;font-weight:600;margin-left:6px">&#9888;</span>' : '';
     return (
       '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
         '<div class="crow">' +
           '<div>' +
-            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + '</div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + '</div>' +
             '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
             '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
           '</div>' +
@@ -2066,6 +2228,22 @@ function agdOpenEventDetail(ev) {
   document.querySelectorAll('#agd-structural-fields .agd-field-input').forEach(function(input) {
     input.disabled = isEntrega;
   });
+
+  // ENTREGA link health — the data above is a LIVE mirror of the
+  // linked SERVICOS event (re-fetched fresh every time this screen
+  // opens), not a stored copy. If that link is broken or this event
+  // predates the linkage system, warn the tech rather than silently
+  // showing stale/empty data.
+  const warnEl = document.getElementById('agd-entrega-link-warning');
+  if (isEntrega && ev.servicos_link_status === 'broken') {
+    warnEl.textContent = '⚠ O agendamento de SERVIÇOS vinculado não foi encontrado (pode ter sido excluído). Os dados abaixo podem estar desatualizados.';
+    warnEl.style.display = 'block';
+  } else if (isEntrega && ev.servicos_link_status === 'unlinked') {
+    warnEl.textContent = '⚠ Este agendamento foi criado antes do vínculo automático com SERVIÇOS — os dados podem não atualizar automaticamente.';
+    warnEl.style.display = 'block';
+  } else {
+    warnEl.style.display = 'none';
+  }
 
   // Reset the reschedule picker to today's date by default
   const todayStr = isoDateOnly(new Date());
@@ -2175,6 +2353,253 @@ function agdDeleteCurrentEvent() {
     agdMgmtGoStep3();
     agdMgmtRefreshList();
   }).catch(() => showToast('Erro ao cancelar.'));
+}
+
+// ── CREATE AGENDAMENTO (v2.4.0) ─────────────────────────────────────
+let agdCreateCalendar  = '';   // 'servicos' | 'entrega'
+let agdCreateSlot      = null; // { start, end } chosen in the create slot picker
+let agdEntregaGateRO   = '';   // RO number that has passed the ENTREGA gate check
+let agdEntregaSourceEvent = null; // the matching SERVICOS event, once gate passes
+
+function agdCreateOpenForm(which) {
+  agdCreateCalendar = which;
+  agdCreateSlot     = null;
+  agdEntregaGateRO  = '';
+  agdEntregaSourceEvent = null;
+
+  document.getElementById('agd-create-step2').style.display = 'none';
+  document.getElementById('agd-create-step3').style.display = 'flex';
+  document.getElementById('agd-create-title').textContent =
+    which === 'servicos' ? 'Criar — SERVIÇOS' : 'Criar — ENTREGA';
+  document.getElementById('agd-create-sub').textContent =
+    which === 'servicos' ? 'Agendar entrada de veículo' : 'Agendar entrega ao cliente';
+
+  // Reset all sub-sections to their starting state
+  document.getElementById('agd-create-entrega-gate').style.display   = which === 'entrega' ? 'block' : 'none';
+  document.getElementById('agd-create-servicos-lookup').style.display = which === 'servicos' ? 'block' : 'none';
+  document.getElementById('agd-create-fields').style.display = 'none';
+  document.getElementById('agd-c-confirm-btn').disabled = true;
+  document.getElementById('agd-entrega-gate-msg').style.display = 'none';
+  document.getElementById('agd-create-search-results').innerHTML = '';
+  document.getElementById('agd-c-ro-entrega').value = '';
+  document.getElementById('agd-c-ro').value = '';
+  document.getElementById('agd-c-search-plate').value = '';
+  document.getElementById('agd-c-search-name').value = '';
+  ['agd-c-f-ro','agd-c-f-client','agd-c-f-plate','agd-c-f-modelo','agd-c-f-year','agd-c-f-vin','agd-c-f-mobile','agd-c-f-remark','agd-c-date']
+    .forEach(id => document.getElementById(id).value = '');
+
+  const isEntrega = which === 'entrega';
+  document.getElementById('agd-c-entrega-notice').style.display = isEntrega ? 'block' : 'none';
+  document.querySelectorAll('#agd-c-structural-fields .agd-field-input').forEach(input => {
+    input.disabled = isEntrega;
+  });
+}
+
+// ── ENTREGA gate: RO required up front, must have a SERVICOS event ──
+function agdCheckEntregaGate() {
+  const ro = document.getElementById('agd-c-ro-entrega').value.trim();
+  const msgEl = document.getElementById('agd-entrega-gate-msg');
+  msgEl.style.display = 'none';
+  if (!ro) { msgEl.textContent = 'Informe o número da RO.'; msgEl.style.display = 'block'; return; }
+
+  fetch(API_URL + '?action=hasServicosEvent&ro_number=' + encodeURIComponent(ro))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { msgEl.textContent = 'Erro ao verificar. Tente novamente.'; msgEl.style.display = 'block'; return; }
+      if (!data.exists) {
+        msgEl.textContent = 'Nenhum agendamento de SERVIÇOS encontrado para esta RO. Crie o agendamento de SERVIÇOS primeiro.';
+        msgEl.style.display = 'block';
+        document.getElementById('agd-create-fields').style.display = 'none';
+        document.getElementById('agd-c-confirm-btn').disabled = true;
+        return;
+      }
+      // Gate passed — populate fields (read-only) from the SERVICOS event
+      agdEntregaGateRO = ro;
+      agdEntregaSourceEvent = data.event;
+      agdFillCreateFields(data.event);
+      document.getElementById('agd-create-fields').style.display = 'block';
+      showToast('RO encontrada — dados carregados do agendamento de SERVIÇOS.');
+    })
+    .catch(() => { msgEl.textContent = 'Erro ao verificar. Tente novamente.'; msgEl.style.display = 'block'; });
+}
+
+// ── SERVICOS Path A: RO already exists ──
+function agdLookupByRO() {
+  const ro = document.getElementById('agd-c-ro').value.trim();
+  if (!ro) { showToast('Informe o número da RO.'); return; }
+
+  fetch(API_URL + '?action=getROPrefillData&ro_number=' + encodeURIComponent(ro))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { showToast('Erro ao buscar RO.'); return; }
+      if (!data.found) { showToast('RO não encontrada. Verifique o número ou cadastre manualmente abaixo.'); return; }
+      agdFillCreateFields(data);
+      document.getElementById('agd-create-fields').style.display = 'block';
+      showToast('Dados carregados a partir da RO.');
+    })
+    .catch(() => showToast('Erro ao buscar RO.'));
+}
+
+// ── SERVICOS Path B: no RO yet, manual plate/name + search ──
+function agdSearchCustomersForCreate() {
+  const plate = document.getElementById('agd-c-search-plate').value.trim();
+  const name  = document.getElementById('agd-c-search-name').value.trim();
+  const query = plate || name;
+  if (!query) { showToast('Informe a placa ou o nome do cliente.'); return; }
+
+  const resultsEl = document.getElementById('agd-create-search-results');
+  resultsEl.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A buscar...</div></div>';
+
+  fetch(API_URL + '?action=searchCustomers&query=' + encodeURIComponent(query))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.results.length) {
+        resultsEl.innerHTML = '<div style="text-align:center;color:#aaa;font-size:12px;padding:12px 0">Nenhum resultado encontrado. Pode preencher manualmente abaixo.</div>';
+        // No match — let the tech proceed with whatever they typed manually
+        agdFillCreateFields({ plate: plate, client_name: name, modelo:'', year:'', vin:'', mobile:'' });
+        document.getElementById('agd-create-fields').style.display = 'block';
+        return;
+      }
+      if (data.results.length === 1) {
+        resultsEl.innerHTML = '';
+        agdFillCreateFields(agdCustomerRowToFields(data.results[0]));
+        document.getElementById('agd-create-fields').style.display = 'block';
+        showToast('Dados encontrados.');
+        return;
+      }
+      // Multiple matches — show a list to pick from
+      resultsEl.innerHTML = '<div class="sec-lbl" style="margin-top:8px">Vários resultados — selecione:</div>' +
+        data.results.map((c, i) =>
+          '<div class="card" data-idx="' + i + '" style="cursor:pointer">' +
+            '<div class="crow"><div>' +
+              '<div class="cro">' + escapeHtml(c['Client Name'] || '(sem nome)') + '</div>' +
+              '<div class="cjob">' + escapeHtml(c['License'] || '') + ' — ' + escapeHtml(c['Modelo'] || '') + ' ' + escapeHtml(String(c['Year'] || '')) + '</div>' +
+            '</div><span style="font-size:18px;color:#ccc">&#x276F;</span></div>' +
+          '</div>'
+        ).join('');
+      resultsEl.querySelectorAll('[data-idx]').forEach(card => {
+        card.addEventListener('click', () => {
+          const c = data.results[Number(card.dataset.idx)];
+          resultsEl.innerHTML = '';
+          agdFillCreateFields(agdCustomerRowToFields(c));
+          document.getElementById('agd-create-fields').style.display = 'block';
+        });
+      });
+    })
+    .catch(() => { resultsEl.innerHTML = '<div class="err-box">&#x26A0; Erro na busca.</div>'; });
+}
+
+// Converts a raw Customers-tab row (sheet column names) into the
+// same field shape used by getROPrefillData/event objects.
+function agdCustomerRowToFields(c) {
+  return {
+    ro_number: '', // Path B has no RO yet
+    client_name: c['Client Name'] || '',
+    plate: c['License'] || '',
+    modelo: c['Modelo'] || '',
+    year: c['Year'] ? String(c['Year']) : '',
+    vin: c['VIN'] || '',
+    mobile: c['Mobile'] || '',
+  };
+}
+
+function agdFillCreateFields(data) {
+  document.getElementById('agd-c-f-ro').value      = data.ro_number   || '';
+  document.getElementById('agd-c-f-client').value  = data.client_name || '';
+  document.getElementById('agd-c-f-plate').value   = data.plate       || '';
+  document.getElementById('agd-c-f-modelo').value  = data.modelo      || '';
+  document.getElementById('agd-c-f-year').value    = data.year        || '';
+  document.getElementById('agd-c-f-vin').value     = data.vin         || '';
+  document.getElementById('agd-c-f-mobile').value  = data.mobile      || '';
+  document.getElementById('agd-c-f-remark').value  = data.remark      || '';
+  const todayStr = isoDateOnly(new Date());
+  document.getElementById('agd-c-date').value = todayStr;
+  agdLoadSlotsForCreate();
+}
+
+function agdLoadSlotsForCreate() {
+  const dateStr = document.getElementById('agd-c-date').value;
+  const slotsEl = document.getElementById('agd-c-slots');
+  if (!dateStr) { slotsEl.innerHTML = ''; return; }
+  agdCreateSlot = null;
+  document.getElementById('agd-c-confirm-btn').disabled = true;
+  slotsEl.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A verificar horários...</div></div>';
+
+  fetch(API_URL + '?action=getFreeSlots&calendar=' + agdCreateCalendar + '&date=' + dateStr)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { slotsEl.innerHTML = '<div class="err-box">&#x26A0; Erro ao verificar horários.</div>'; return; }
+      if (!data.slots.length) {
+        slotsEl.innerHTML = '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px 0">' +
+          (data.reason === 'weekend' ? 'Fim de semana — sem expediente.' : 'Nenhum horário disponível neste dia.') + '</div>';
+        return;
+      }
+      slotsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+        data.slots.map(s =>
+          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectCreateSlot(this)">' + s.label + '</button>'
+        ).join('') +
+      '</div>';
+    })
+    .catch(() => { slotsEl.innerHTML = '<div class="err-box">&#x26A0; Erro ao verificar horários.</div>'; });
+}
+
+function agdSelectCreateSlot(btn) {
+  document.querySelectorAll('#agd-c-slots [data-slot-start]').forEach(b => {
+    b.classList.remove('btn-ini'); b.classList.add('btn-sec');
+  });
+  btn.classList.remove('btn-sec'); btn.classList.add('btn-ini');
+  agdCreateSlot = { start: btn.dataset.slotStart, end: btn.dataset.slotEnd };
+  document.getElementById('agd-c-confirm-btn').disabled = false;
+}
+
+function agdConfirmCreate() {
+  if (!agdCreateSlot) { showToast('Selecione um horário primeiro.'); return; }
+
+  const body = {
+    action:   'createAgendamento',
+    calendar: agdCreateCalendar,
+    tech:     currentTech,
+    start:    agdCreateSlot.start,
+    end:      agdCreateSlot.end,
+    remark:   document.getElementById('agd-c-f-remark').value.trim(),
+  };
+
+  if (agdCreateCalendar === 'entrega') {
+    // ENTREGA: all structural data comes from the verified SERVICOS
+    // event, not from the (disabled) fields, matching the same
+    // server-side restriction used when editing ENTREGA events.
+    body.ro_number   = agdEntregaGateRO;
+    body.client_name = agdEntregaSourceEvent ? agdEntregaSourceEvent.client_name : '';
+    body.plate       = agdEntregaSourceEvent ? agdEntregaSourceEvent.plate       : '';
+    body.modelo      = agdEntregaSourceEvent ? agdEntregaSourceEvent.modelo      : '';
+    body.year        = agdEntregaSourceEvent ? agdEntregaSourceEvent.year        : '';
+    body.vin         = agdEntregaSourceEvent ? agdEntregaSourceEvent.vin         : '';
+    body.mobile      = agdEntregaSourceEvent ? agdEntregaSourceEvent.mobile      : '';
+    body.cpf         = agdEntregaSourceEvent ? agdEntregaSourceEvent.cpf         : '';
+  } else {
+    body.ro_number   = document.getElementById('agd-c-f-ro').value.trim();
+    body.client_name = document.getElementById('agd-c-f-client').value.trim();
+    body.plate       = document.getElementById('agd-c-f-plate').value.trim().toUpperCase();
+    body.modelo      = document.getElementById('agd-c-f-modelo').value.trim();
+    body.year         = document.getElementById('agd-c-f-year').value.trim();
+    body.vin          = document.getElementById('agd-c-f-vin').value.trim().toUpperCase();
+    body.mobile       = document.getElementById('agd-c-f-mobile').value.trim();
+  }
+
+  // Disable the button immediately to prevent double-submission —
+  // this is a create action (unlike edits), so an accidental double
+  // tap would create two separate calendar events for the same slot.
+  document.getElementById('agd-c-confirm-btn').disabled = true;
+
+  fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(body) })
+    .then(() => {
+      showToast('Agendamento criado.');
+      agdGoStep1();
+    })
+    .catch(() => {
+      showToast('Erro ao criar agendamento.');
+      document.getElementById('agd-c-confirm-btn').disabled = false;
+    });
 }
 
 function pkgGoStep1() {
