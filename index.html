@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v1.14 — Build: 21/06/2026 -->
-<!-- v1.14: confirmation step added before a jobline is marked 100%
-             complete ("Confirmar 100% concluído para a jobline X?").
-             A jobline marked complete can't be reopened, so this
-             guards against accidental taps. Pausing at 25/50/75% is
-             always resumable and is NOT gated — it proceeds straight
-             through as before. -->
+<!-- Porsche Service Rio PWA — v2.0.0 — Build: 21/06/2026 -->
+<!-- v2.0.0: PRODUCTION RELEASE. No functional changes from v1.14 —
+             version bumped to mark go-live with real technicians.
+             Covers all v1.x work to date: live timer/lock workflow,
+             jobline approvals, Parts Requests, GANTT/SI integration,
+             text + audio Remarks, and the 100%-completion confirm
+             step. Paired with backend Code.gs v2.0.0. -->
 <!-- v1.13: AUDIO REMARKS — new "Gravar áudio" button alongside the
              text remark button on the active-timer screen. Records up
              to 60s of audio (e.g. engine noise); tech can tap "Marcar
@@ -240,7 +240,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>1.14</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.0.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -394,7 +394,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v1.14</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff">v2.0.0</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -639,7 +639,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '1.14';
+const APP_VERSION = '2.0.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
