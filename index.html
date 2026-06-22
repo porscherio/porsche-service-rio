@@ -1,5 +1,14 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.3.0 — Build: 22/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.3.1 — Build: 22/06/2026 -->
+<!-- v2.3.1: ENTREGA detail screen — RO/Cliente/Placa/Modelo/Ano/VIN/
+             Telefone now show as read-only (greyed out, disabled
+             inputs) for ENTREGA events, with a notice explaining why
+             (data belongs to the linked SERVICOS event). Only the
+             Observação remark and the reschedule date remain
+             editable for ENTREGA. SERVICOS events are unaffected —
+             all fields stay fully editable there. Paired with
+             backend Code.gs v2.3.1, which enforces this server-side
+             too. -->
 <!-- v2.3.0: Agenda detail screen — new standalone Observação (remark)
              field, free text, separate from the structured fields,
              editable alongside them. Vehicle/customer fields
@@ -177,6 +186,7 @@ select.pct-sel{flex:1;width:auto}
 .field-wrap{margin-bottom:14px}
 .field-lbl{font-size:11px;color:#888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;display:block}
 .agd-field-input{width:100%;padding:11px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:14px;color:var(--black);margin-bottom:12px;-webkit-appearance:none}
+.agd-field-input:disabled{color:#999;background:#f2f2f2;border-color:#e5e5e5}
 input[type=password]{width:100%;padding:12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:18px;letter-spacing:6px;text-align:center;color:var(--black);-webkit-appearance:none}
 input:focus{outline:none;border-color:var(--black)}
 .btn-login{width:100%;padding:14px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--black);color:#fff;text-transform:uppercase;letter-spacing:.06em;transition:opacity .15s}
@@ -266,7 +276,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.3.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.3.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -750,31 +760,36 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <div class="scroll">
         <div class="sec-lbl">Detalhes</div>
-        <label class="field-lbl" for="agd-f-ro">RO</label>
-        <input type="text" id="agd-f-ro" class="agd-field-input" inputmode="numeric">
-
-        <label class="field-lbl" for="agd-f-client">Cliente</label>
-        <input type="text" id="agd-f-client" class="agd-field-input">
-
-        <label class="field-lbl" for="agd-f-plate">Placa</label>
-        <input type="text" id="agd-f-plate" class="agd-field-input" style="text-transform:uppercase">
-
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
-          <div>
-            <label class="field-lbl" for="agd-f-modelo">Modelo</label>
-            <input type="text" id="agd-f-modelo" class="agd-field-input">
-          </div>
-          <div>
-            <label class="field-lbl" for="agd-f-year">Ano</label>
-            <input type="text" id="agd-f-year" class="agd-field-input" inputmode="numeric">
-          </div>
+        <div id="agd-entrega-notice" style="display:none;font-size:12px;color:#888;background:#f7f7f7;border-radius:6px;padding:8px 10px;margin-bottom:12px">
+          &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui.
         </div>
+        <div id="agd-structural-fields">
+          <label class="field-lbl" for="agd-f-ro">RO</label>
+          <input type="text" id="agd-f-ro" class="agd-field-input" inputmode="numeric">
 
-        <label class="field-lbl" for="agd-f-vin">VIN</label>
-        <input type="text" id="agd-f-vin" class="agd-field-input" style="text-transform:uppercase">
+          <label class="field-lbl" for="agd-f-client">Cliente</label>
+          <input type="text" id="agd-f-client" class="agd-field-input">
 
-        <label class="field-lbl" for="agd-f-mobile">Telefone</label>
-        <input type="text" id="agd-f-mobile" class="agd-field-input" inputmode="tel">
+          <label class="field-lbl" for="agd-f-plate">Placa</label>
+          <input type="text" id="agd-f-plate" class="agd-field-input" style="text-transform:uppercase">
+
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+            <div>
+              <label class="field-lbl" for="agd-f-modelo">Modelo</label>
+              <input type="text" id="agd-f-modelo" class="agd-field-input">
+            </div>
+            <div>
+              <label class="field-lbl" for="agd-f-year">Ano</label>
+              <input type="text" id="agd-f-year" class="agd-field-input" inputmode="numeric">
+            </div>
+          </div>
+
+          <label class="field-lbl" for="agd-f-vin">VIN</label>
+          <input type="text" id="agd-f-vin" class="agd-field-input" style="text-transform:uppercase">
+
+          <label class="field-lbl" for="agd-f-mobile">Telefone</label>
+          <input type="text" id="agd-f-mobile" class="agd-field-input" inputmode="tel">
+        </div>
 
         <div id="agd-f-createdby-row" class="drow" style="margin-top:10px;margin-bottom:14px">
           <span class="dlbl">Agendado por</span><span class="dval" id="agd-f-createdby">—</span>
@@ -806,7 +821,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.3.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2041,6 +2056,17 @@ function agdOpenEventDetail(ev) {
   document.getElementById('agd-f-remark').value  = ev.remark      || '';
   document.getElementById('agd-f-createdby').textContent = ev.created_by || '—';
 
+  // ENTREGA: vehicle/customer data belongs to the linked SERVICOS
+  // event and can't be edited here — only the reschedule date and
+  // the Observação remark make sense to change at delivery time.
+  // Enforced server-side too (see updateAgendamento) — this is just
+  // the visual/UX side of that same rule.
+  const isEntrega = agdCurrentCalendar === 'entrega';
+  document.getElementById('agd-entrega-notice').style.display = isEntrega ? 'block' : 'none';
+  document.querySelectorAll('#agd-structural-fields .agd-field-input').forEach(function(input) {
+    input.disabled = isEntrega;
+  });
+
   // Reset the reschedule picker to today's date by default
   const todayStr = isoDateOnly(new Date());
   document.getElementById('agd-detail-date').value = todayStr;
@@ -2049,25 +2075,28 @@ function agdOpenEventDetail(ev) {
 
 function agdSaveFieldEdits() {
   if (!agdCurrentEvent) return;
+  const isEntrega = agdCurrentCalendar === 'entrega';
   const body = {
     action:      'updateAgendamento',
     calendar:    agdCurrentCalendar,
     event_id:    agdCurrentEvent.id,
     tech:        currentTech,
-    ro_number:   document.getElementById('agd-f-ro').value.trim(),
-    client_name: document.getElementById('agd-f-client').value.trim(),
-    plate:       document.getElementById('agd-f-plate').value.trim().toUpperCase(),
-    modelo:      document.getElementById('agd-f-modelo').value.trim(),
-    year:        document.getElementById('agd-f-year').value.trim(),
-    vin:         document.getElementById('agd-f-vin').value.trim().toUpperCase(),
-    mobile:      document.getElementById('agd-f-mobile').value.trim(),
     remark:      document.getElementById('agd-f-remark').value.trim(),
   };
+  if (!isEntrega) {
+    body.ro_number   = document.getElementById('agd-f-ro').value.trim();
+    body.client_name = document.getElementById('agd-f-client').value.trim();
+    body.plate       = document.getElementById('agd-f-plate').value.trim().toUpperCase();
+    body.modelo      = document.getElementById('agd-f-modelo').value.trim();
+    body.year        = document.getElementById('agd-f-year').value.trim();
+    body.vin         = document.getElementById('agd-f-vin').value.trim().toUpperCase();
+    body.mobile      = document.getElementById('agd-f-mobile').value.trim();
+  }
   // Optimistic local update so the list/title reflect the edit
   // immediately, consistent with the rest of the codebase's
   // fire-and-forget pattern.
   Object.assign(agdCurrentEvent, body);
-  document.getElementById('agd-detail-title').textContent = 'RO #' + (body.ro_number || '----');
+  if (!isEntrega) document.getElementById('agd-detail-title').textContent = 'RO #' + (body.ro_number || '----');
 
   fetch(API_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(body) });
   showToast('Alterações salvas.');
