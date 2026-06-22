@@ -1,5 +1,13 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.1.0 — Build: 22/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.2.0 — Build: 22/06/2026 -->
+<!-- v2.2.0: Agenda Management — Descrição is now editable. RO,
+             Cliente, Placa, Modelo, Ano, VIN, Telefone all editable
+             individually in the event detail screen ("Salvar
+             alterações"), rebuilt server-side into the calendar
+             event's title + description on save (same format as
+             event creation), instead of the previous read-only
+             dump of the raw description text. Paired with backend
+             Code.gs v2.2.0. -->
 <!-- v2.1.0: AGENDAMENTO (SCHEDULING) — Phase 1, Management flow.
              New 📅 topbar icon (Aprovadores-gated, same as ✅/📦).
              Opens a panel: Gerir Agendamentos → SERVIÇOS/ENTREGA →
@@ -159,6 +167,7 @@ select.pct-sel{flex:1;width:auto}
 .ver-badge b{color:var(--black);font-weight:600}
 .field-wrap{margin-bottom:14px}
 .field-lbl{font-size:11px;color:#888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;display:block}
+.agd-field-input{width:100%;padding:11px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:14px;color:var(--black);margin-bottom:12px;-webkit-appearance:none}
 input[type=password]{width:100%;padding:12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:18px;letter-spacing:6px;text-align:center;color:var(--black);-webkit-appearance:none}
 input:focus{outline:none;border-color:var(--black)}
 .btn-login{width:100%;padding:14px;border-radius:4px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--black);color:#fff;text-transform:uppercase;letter-spacing:.06em;transition:opacity .15s}
@@ -248,7 +257,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.1.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.2.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -731,13 +740,43 @@ input:focus{outline:none;border-color:var(--black)}
         </div>
       </div>
       <div class="scroll">
-        <div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:14px" id="agd-detail-info"></div>
+        <div class="sec-lbl">Detalhes</div>
+        <label class="field-lbl" for="agd-f-ro">RO</label>
+        <input type="text" id="agd-f-ro" class="agd-field-input" inputmode="numeric">
 
-        <div id="agd-reschedule-block">
+        <label class="field-lbl" for="agd-f-client">Cliente</label>
+        <input type="text" id="agd-f-client" class="agd-field-input">
+
+        <label class="field-lbl" for="agd-f-plate">Placa</label>
+        <input type="text" id="agd-f-plate" class="agd-field-input" style="text-transform:uppercase">
+
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div>
+            <label class="field-lbl" for="agd-f-modelo">Modelo</label>
+            <input type="text" id="agd-f-modelo" class="agd-field-input">
+          </div>
+          <div>
+            <label class="field-lbl" for="agd-f-year">Ano</label>
+            <input type="text" id="agd-f-year" class="agd-field-input" inputmode="numeric">
+          </div>
+        </div>
+
+        <label class="field-lbl" for="agd-f-vin">VIN</label>
+        <input type="text" id="agd-f-vin" class="agd-field-input" style="text-transform:uppercase">
+
+        <label class="field-lbl" for="agd-f-mobile">Telefone</label>
+        <input type="text" id="agd-f-mobile" class="agd-field-input" inputmode="tel">
+
+        <div id="agd-f-createdby-row" class="drow" style="margin-top:10px;margin-bottom:14px">
+          <span class="dlbl">Agendado por</span><span class="dval" id="agd-f-createdby">—</span>
+        </div>
+
+        <button class="bigbtn btn-ini" onclick="agdSaveFieldEdits()">&#x1F4BE; Salvar alterações</button>
+
+        <div id="agd-reschedule-block" style="margin-top:18px">
           <div class="sec-lbl">Reagendar</div>
           <label class="field-lbl" for="agd-detail-date">Novo dia</label>
-          <input type="date" id="agd-detail-date" onchange="agdLoadSlotsForDetail()"
-            style="width:100%;padding:11px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:14px;color:var(--black);margin-bottom:12px;-webkit-appearance:none">
+          <input type="date" id="agd-detail-date" onchange="agdLoadSlotsForDetail()" class="agd-field-input">
           <div id="agd-detail-slots" style="margin-bottom:14px"></div>
         </div>
 
@@ -754,7 +793,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1979,16 +2018,44 @@ function agdOpenEventDetail(ev) {
   document.getElementById('agd-detail-sub').textContent   =
     pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' às '+pad(d.getHours())+':'+pad(d.getMinutes());
 
-  document.getElementById('agd-detail-info').innerHTML =
-    '<div class="drow"><span class="dlbl">Título</span><span class="dval">' + escapeHtml(ev.title) + '</span></div>' +
-    '<div class="drow"><span class="dlbl">Placa</span><span class="dval">' + escapeHtml(ev.plate || '—') + '</span></div>' +
-    '<div class="drow"><span class="dlbl">Descrição</span><span class="dval" style="text-align:left;white-space:pre-line;font-weight:400;font-size:12px;color:#666">' +
-      escapeHtml(ev.description || '') + '</span></div>';
+  document.getElementById('agd-f-ro').value      = ev.ro_number   || '';
+  document.getElementById('agd-f-client').value  = ev.client_name || '';
+  document.getElementById('agd-f-plate').value   = ev.plate       || '';
+  document.getElementById('agd-f-modelo').value  = ev.modelo      || '';
+  document.getElementById('agd-f-year').value    = ev.year        || '';
+  document.getElementById('agd-f-vin').value     = ev.vin         || '';
+  document.getElementById('agd-f-mobile').value  = ev.mobile      || '';
+  document.getElementById('agd-f-createdby').textContent = ev.created_by || '—';
 
   // Reset the reschedule picker to today's date by default
   const todayStr = isoDateOnly(new Date());
   document.getElementById('agd-detail-date').value = todayStr;
   agdLoadSlotsForDetail();
+}
+
+function agdSaveFieldEdits() {
+  if (!agdCurrentEvent) return;
+  const body = {
+    action:      'updateAgendamento',
+    calendar:    agdCurrentCalendar,
+    event_id:    agdCurrentEvent.id,
+    tech:        currentTech,
+    ro_number:   document.getElementById('agd-f-ro').value.trim(),
+    client_name: document.getElementById('agd-f-client').value.trim(),
+    plate:       document.getElementById('agd-f-plate').value.trim().toUpperCase(),
+    modelo:      document.getElementById('agd-f-modelo').value.trim(),
+    year:        document.getElementById('agd-f-year').value.trim(),
+    vin:         document.getElementById('agd-f-vin').value.trim().toUpperCase(),
+    mobile:      document.getElementById('agd-f-mobile').value.trim(),
+  };
+  // Optimistic local update so the list/title reflect the edit
+  // immediately, consistent with the rest of the codebase's
+  // fire-and-forget pattern.
+  Object.assign(agdCurrentEvent, body);
+  document.getElementById('agd-detail-title').textContent = 'RO #' + (body.ro_number || '----');
+
+  fetch(API_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(body) });
+  showToast('Alterações salvas.');
 }
 
 function isoDateOnly(d) {
