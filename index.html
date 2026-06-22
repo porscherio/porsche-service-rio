@@ -1,5 +1,13 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.0.0 — Build: 21/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.1.0 — Build: 22/06/2026 -->
+<!-- v2.1.0: AGENDAMENTO (SCHEDULING) — Phase 1, Management flow.
+             New 📅 topbar icon (Aprovadores-gated, same as ✅/📦).
+             Opens a panel: Gerir Agendamentos → SERVIÇOS/ENTREGA →
+             event list (live from Google Calendar) → detail view
+             with reschedule (day + free/busy slot picker) and
+             cancel. "Criar Novo" (Create New) flow not yet built —
+             placeholder shown, disabled. Paired with backend
+             Code.gs v2.1.0. -->
 <!-- v2.0.0: PRODUCTION RELEASE. No functional changes from v1.14 —
              version bumped to mark go-live with real technicians.
              Covers all v1.x work to date: live timer/lock workflow,
@@ -240,7 +248,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.0.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.1.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -395,7 +403,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
           <div style="color:#bbb">Técnico: <span id="ov-tech" style="color:#fff"></span></div>
           <div>RO: <span class="ov-ro" id="ov-ro"></span> &mdash; <span id="ov-vehicle" style="color:#fff"></span></div>
-          <div style="color:#bbb">App: <span style="color:#fff">v2.0.0</span></div>
+          <div style="color:#bbb">App: <span style="color:#fff" id="ov-app-version">v2.0.0</span></div>
         </div>
       </div>
       <button class="bigbtn btn-ini" id="btn-open-cam">&#x1F4F7; Abrir câmera</button>
@@ -746,7 +754,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1469,7 +1477,7 @@ function buildDropboxFolderPath(roNum, jobDescription) {
   return '/CTPRJ_NEW/vag ros/'+rangeL1+'/'+rangeL2+'/#'+roNum+'/fotos/'+roNum+'_'+jobDesc+'/';
 }
 
-function updateOverlay(){const n=new Date();document.getElementById('ov-ts').textContent=fmtDateTime(n);if(gpsCurrent)document.getElementById('ov-gps').textContent='GPS: '+gpsCurrent;}
+function updateOverlay(){const n=new Date();document.getElementById('ov-ts').textContent=fmtDateTime(n);if(gpsCurrent)document.getElementById('ov-gps').textContent='GPS: '+gpsCurrent;document.getElementById('ov-app-version').textContent='v'+APP_VERSION;}
 
 // ── History ───────────────────────────────────────────────────────
 function renderHistory() {
