@@ -268,6 +268,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button style="background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="loadROs()" title="Actualizar">&#x21BB;</button>
       <button id="btn-approval" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openApprovalPanel()" title="Aprovar Joblines">&#x2705;</button>
       <button id="btn-parts-admin" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openPartsAdminPanel()" title="Gerir Peças">&#x1F4E6;</button>
+      <button id="btn-agenda" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openAgendaPanel()" title="Agendamentos">&#x1F4C5;</button>
     </div>
     <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
       <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0 10px;gap:8px">
@@ -634,6 +635,20 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
+  <!-- AGENDA PANEL (v2.1.0 — Aprovadores only) — shell only, screens added next -->
+  <div class="apv-panel" id="agenda-panel" style="display:none">
+    <div class="topbar">
+      <button class="back" onclick="closeAgendaPanel()">&#8592;</button>
+      <div style="flex:1">
+        <div class="tb-title">Agendamentos</div>
+        <div class="tb-sub">Em construção...</div>
+      </div>
+    </div>
+    <div class="scroll" style="display:flex;align-items:center;justify-content:center">
+      <div style="text-align:center;color:#aaa;font-size:13px">&#x1F4C5;<br><br>Painel de agendamentos<br>(em construção)</div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -746,6 +761,7 @@ function doLogout() {
   document.getElementById('ro-search-clear').style.display='none';
   document.getElementById('btn-approval').style.display='none';
   document.getElementById('btn-parts-admin').style.display='none';
+  document.getElementById('btn-agenda').style.display='none';
   goTo('s0');
 }
 
@@ -1476,8 +1492,10 @@ function vehicleWithYear(vehicle, vin) {
 async function checkAndShowApprovalButton() {
   const btnApv = document.getElementById('btn-approval');
   const btnPkg = document.getElementById('btn-parts-admin');
+  const btnAgd = document.getElementById('btn-agenda');
   if (btnApv) btnApv.style.display = 'none';
   if (btnPkg) btnPkg.style.display = 'none';
+  if (btnAgd) btnAgd.style.display = 'none';
   isApproverTech = false;
   try {
     const res  = await fetch(API_URL + '?action=isApprover&tech=' + encodeURIComponent(currentTech));
@@ -1486,6 +1504,7 @@ async function checkAndShowApprovalButton() {
       isApproverTech = true;
       if (btnApv) btnApv.style.display = 'flex';
       if (btnPkg) btnPkg.style.display = 'flex';
+      if (btnAgd) btnAgd.style.display = 'flex';
     }
   } catch(e) { console.warn('isApprover check failed', e); }
 }
@@ -1758,6 +1777,16 @@ function openPartsAdminPanel() {
 
 function closePartsAdminPanel() {
   document.getElementById('pkg-panel').style.display = 'none';
+}
+
+// ── AGENDA PANEL (v2.1.0) ──────────────────────────────────────────
+function openAgendaPanel() {
+  if (!isApproverTech) return;
+  document.getElementById('agenda-panel').style.display = 'flex';
+}
+
+function closeAgendaPanel() {
+  document.getElementById('agenda-panel').style.display = 'none';
 }
 
 function pkgGoStep1() {
