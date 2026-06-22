@@ -635,21 +635,113 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
-  <!-- AGENDA PANEL (v2.1.0 — Aprovadores only) — shell only, screens added next -->
+  <!-- AGENDA PANEL (v2.1.0 — Aprovadores only) -->
   <div class="apv-panel" id="agenda-panel" style="display:none">
-    <div class="topbar">
-      <button class="back" onclick="closeAgendaPanel()">&#8592;</button>
-      <div style="flex:1">
-        <div class="tb-title">Agendamentos</div>
-        <div class="tb-sub">Em construção...</div>
+
+    <!-- Step 1: top-level choice -->
+    <div id="agd-step1" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="closeAgendaPanel()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title">Agendamentos</div>
+          <div class="tb-sub">O que deseja fazer?</div>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="card" onclick="agdOpenManagement()" style="cursor:pointer">
+          <div class="crow">
+            <div>
+              <div class="cro">&#x1F4CB; Gerir Agendamentos</div>
+              <div class="cjob">Ver, reagendar ou cancelar agendamentos existentes</div>
+            </div>
+            <span style="font-size:18px;color:#ccc">&#x276F;</span>
+          </div>
+        </div>
+        <div class="card" style="opacity:.45;pointer-events:none">
+          <div class="crow">
+            <div>
+              <div class="cro">&#x2795; Criar Novo</div>
+              <div class="cjob">Em construção...</div>
+            </div>
+            <span style="font-size:18px;color:#ccc">&#x276F;</span>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="scroll" style="display:flex;align-items:center;justify-content:center">
-      <div style="text-align:center;color:#aaa;font-size:13px">&#x1F4C5;<br><br>Painel de agendamentos<br>(em construção)</div>
+
+    <!-- Step 2 (Management): SERVICOS / ENTREGA choice -->
+    <div id="agd-mgmt-step2" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="agdGoStep1()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title">Gerir Agendamentos</div>
+          <div class="tb-sub">Selecione o calendário</div>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="card" onclick="agdMgmtOpenList('servicos')" style="cursor:pointer">
+          <div class="crow">
+            <div>
+              <div class="cro">&#x1F697; SERVIÇOS</div>
+              <div class="cjob">Agendamentos de entrada de veículos</div>
+            </div>
+            <span style="font-size:18px;color:#ccc">&#x276F;</span>
+          </div>
+        </div>
+        <div class="card" onclick="agdMgmtOpenList('entrega')" style="cursor:pointer">
+          <div class="crow">
+            <div>
+              <div class="cro">&#x1F6A9; ENTREGA</div>
+              <div class="cjob">Agendamentos de entrega ao cliente</div>
+            </div>
+            <span style="font-size:18px;color:#ccc">&#x276F;</span>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Step 3 (Management): event list -->
+    <div id="agd-mgmt-step3" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="agdMgmtGoStep2()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title" id="agd-mgmt-list-title">Agendamentos</div>
+          <div class="tb-sub">Próximos 60 dias</div>
+        </div>
+        <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="agdMgmtRefreshList()" title="Actualizar">&#x21BB;</button>
+      </div>
+      <div class="scroll" id="agd-mgmt-list"></div>
+    </div>
+
+    <!-- Step 4 (Management): event detail / reschedule / delete -->
+    <div id="agd-mgmt-step4" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="agdMgmtGoStep3()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title" id="agd-detail-title">RO #----</div>
+          <div class="tb-sub" id="agd-detail-sub"></div>
+        </div>
+      </div>
+      <div class="scroll">
+        <div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:14px" id="agd-detail-info"></div>
+
+        <div id="agd-reschedule-block">
+          <div class="sec-lbl">Reagendar</div>
+          <label class="field-lbl" for="agd-detail-date">Novo dia</label>
+          <input type="date" id="agd-detail-date" onchange="agdLoadSlotsForDetail()"
+            style="width:100%;padding:11px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg);font-size:14px;color:var(--black);margin-bottom:12px;-webkit-appearance:none">
+          <div id="agd-detail-slots" style="margin-bottom:14px"></div>
+        </div>
+
+        <button class="bigbtn btn-stop" onclick="agdDeleteCurrentEvent()">&#x1F5D1; Cancelar agendamento</button>
+        <button class="bigbtn btn-sec" onclick="agdMgmtGoStep3()">&#8592; Voltar à lista</button>
+      </div>
+    </div>
+
   </div>
 
   <div class="toast" id="toast"></div>
+
 </div>
 
 <script>
@@ -1780,13 +1872,190 @@ function closePartsAdminPanel() {
 }
 
 // ── AGENDA PANEL (v2.1.0) ──────────────────────────────────────────
+let agdCurrentCalendar = '';   // 'servicos' | 'entrega'
+let agdCurrentEvent     = null; // currently-open event object (step 4)
+let agdSelectedSlot     = null; // { start, end } chosen in reschedule picker
+
 function openAgendaPanel() {
   if (!isApproverTech) return;
   document.getElementById('agenda-panel').style.display = 'flex';
+  agdGoStep1();
 }
 
 function closeAgendaPanel() {
   document.getElementById('agenda-panel').style.display = 'none';
+}
+
+function agdGoStep1() {
+  document.getElementById('agd-step1').style.display      = 'flex';
+  document.getElementById('agd-mgmt-step2').style.display  = 'none';
+  document.getElementById('agd-mgmt-step3').style.display  = 'none';
+  document.getElementById('agd-mgmt-step4').style.display  = 'none';
+}
+
+function agdOpenManagement() {
+  document.getElementById('agd-step1').style.display      = 'none';
+  document.getElementById('agd-mgmt-step2').style.display = 'flex';
+}
+
+function agdMgmtGoStep2() {
+  document.getElementById('agd-mgmt-step2').style.display = 'flex';
+  document.getElementById('agd-mgmt-step3').style.display = 'none';
+}
+
+function agdMgmtGoStep3() {
+  document.getElementById('agd-mgmt-step3').style.display = 'flex';
+  document.getElementById('agd-mgmt-step4').style.display = 'none';
+}
+
+function agdMgmtOpenList(which) {
+  agdCurrentCalendar = which;
+  document.getElementById('agd-mgmt-step2').style.display = 'none';
+  document.getElementById('agd-mgmt-step3').style.display = 'flex';
+  document.getElementById('agd-mgmt-list-title').textContent =
+    which === 'servicos' ? 'SERVIÇOS — Agendamentos' : 'ENTREGA — Agendamentos';
+  agdMgmtRefreshList();
+}
+
+function agdMgmtRefreshList() {
+  const el = document.getElementById('agd-mgmt-list');
+  el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
+  fetch(API_URL + '?action=getAgendamentos&calendar=' + agdCurrentCalendar)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar agendamentos.</div>'; return; }
+      agdRenderList(data.events || []);
+    })
+    .catch(() => { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar agendamentos.</div>'; });
+}
+
+function agdRenderList(events) {
+  const el = document.getElementById('agd-mgmt-list');
+  if (!events.length) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhum agendamento encontrado.</div>';
+    return;
+  }
+  el.innerHTML = events.map(ev => {
+    const d = new Date(ev.start);
+    const dateLbl = pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear();
+    const timeLbl = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return (
+      '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
+        '<div class="crow">' +
+          '<div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + '</div>' +
+            '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
+            '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
+          '</div>' +
+          '<span style="font-size:18px;color:#ccc">&#x276F;</span>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+  el.querySelectorAll('[data-evt-id]').forEach(card => {
+    card.addEventListener('click', () => {
+      const ev = events.find(e => e.id === card.dataset.evtId);
+      if (ev) agdOpenEventDetail(ev);
+    });
+  });
+}
+
+function agdOpenEventDetail(ev) {
+  agdCurrentEvent = ev;
+  agdSelectedSlot  = null;
+  document.getElementById('agd-mgmt-step3').style.display = 'none';
+  document.getElementById('agd-mgmt-step4').style.display = 'flex';
+
+  const d = new Date(ev.start);
+  document.getElementById('agd-detail-title').textContent = 'RO #' + ev.ro_number;
+  document.getElementById('agd-detail-sub').textContent   =
+    pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' às '+pad(d.getHours())+':'+pad(d.getMinutes());
+
+  document.getElementById('agd-detail-info').innerHTML =
+    '<div class="drow"><span class="dlbl">Título</span><span class="dval">' + escapeHtml(ev.title) + '</span></div>' +
+    '<div class="drow"><span class="dlbl">Placa</span><span class="dval">' + escapeHtml(ev.plate || '—') + '</span></div>' +
+    '<div class="drow"><span class="dlbl">Descrição</span><span class="dval" style="text-align:left;white-space:pre-line;font-weight:400;font-size:12px;color:#666">' +
+      escapeHtml(ev.description || '') + '</span></div>';
+
+  // Reset the reschedule picker to today's date by default
+  const todayStr = isoDateOnly(new Date());
+  document.getElementById('agd-detail-date').value = todayStr;
+  agdLoadSlotsForDetail();
+}
+
+function isoDateOnly(d) {
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
+
+function agdLoadSlotsForDetail() {
+  const dateStr = document.getElementById('agd-detail-date').value;
+  const slotsEl = document.getElementById('agd-detail-slots');
+  if (!dateStr) { slotsEl.innerHTML = ''; return; }
+  agdSelectedSlot = null;
+  slotsEl.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A verificar horários...</div></div>';
+
+  fetch(API_URL + '?action=getFreeSlots&calendar=' + agdCurrentCalendar + '&date=' + dateStr)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { slotsEl.innerHTML = '<div class="err-box">&#x26A0; Erro ao verificar horários.</div>'; return; }
+      if (!data.slots.length) {
+        slotsEl.innerHTML = '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px 0">' +
+          (data.reason === 'weekend' ? 'Fim de semana — sem expediente.' : 'Nenhum horário disponível neste dia.') + '</div>';
+        return;
+      }
+      slotsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+        data.slots.map(s =>
+          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectSlot(this)">' + s.label + '</button>'
+        ).join('') +
+      '</div>' +
+      '<button class="bigbtn btn-ini" style="margin-top:12px" onclick="agdConfirmReschedule()">&#x2714; Confirmar novo horário</button>';
+    })
+    .catch(() => { slotsEl.innerHTML = '<div class="err-box">&#x26A0; Erro ao verificar horários.</div>'; });
+}
+
+function agdSelectSlot(btn) {
+  document.querySelectorAll('#agd-detail-slots [data-slot-start]').forEach(b => {
+    b.classList.remove('btn-ini'); b.classList.add('btn-sec');
+  });
+  btn.classList.remove('btn-sec'); btn.classList.add('btn-ini');
+  agdSelectedSlot = { start: btn.dataset.slotStart, end: btn.dataset.slotEnd };
+}
+
+function agdConfirmReschedule() {
+  if (!agdSelectedSlot || !agdCurrentEvent) { showToast('Selecione um horário primeiro.'); return; }
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({
+      action: 'updateAgendamento',
+      calendar: agdCurrentCalendar,
+      event_id: agdCurrentEvent.id,
+      start: agdSelectedSlot.start,
+      end: agdSelectedSlot.end,
+      tech: currentTech,
+    }),
+  }).then(() => {
+    showToast('Agendamento reagendado.');
+    agdMgmtGoStep3();
+    agdMgmtRefreshList();
+  }).catch(() => showToast('Erro ao reagendar.'));
+}
+
+function agdDeleteCurrentEvent() {
+  if (!agdCurrentEvent) return;
+  if (!confirm('Cancelar este agendamento? Esta acção não pode ser desfeita.')) return;
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({
+      action: 'deleteAgendamento',
+      calendar: agdCurrentCalendar,
+      event_id: agdCurrentEvent.id,
+      tech: currentTech,
+    }),
+  }).then(() => {
+    showToast('Agendamento cancelado.');
+    agdMgmtGoStep3();
+    agdMgmtRefreshList();
+  }).catch(() => showToast('Erro ao cancelar.'));
 }
 
 function pkgGoStep1() {
