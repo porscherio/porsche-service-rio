@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.4.1 — Build: 22/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.5.2 — Build: 23/06/2026 -->
+<!-- v2.5.2: Version bump only, no functional changes to this file —
+             kept in sync with Code.gs v2.5.2 (WhatsApp/WABA backend
+             messaging: text confirmations/reminders live, image_url
+             now wired into every trigger). All Agendamento backend
+             work in v2.5.0–v2.5.2 is server-side only and has no
+             PWA-side surface. -->
 <!-- v2.4.1: ENTREGA→SERVICOS link health. ENTREGA's vehicle/customer
              fields are now always shown freshly mirrored from the
              linked SERVICOS event (matched by a permanent event-ID
@@ -306,7 +312,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.4.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.5.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -969,7 +975,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.5.2';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
