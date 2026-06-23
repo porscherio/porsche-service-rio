@@ -1,5 +1,16 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.5.2 — Build: 23/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.5.3 — Build: 23/06/2026 -->
+<!-- v2.5.3: PICKUP LOCATION dropdown for Create SERVICOS (Porsche
+             Service Rio default, or Porsche Pre-Owned Rio), and now
+             also editable on existing SERVICOS events in the
+             Management detail screen. Options fetched once from the
+             new getAgendaLocations backend route — never hardcoded
+             here, so a 3rd location later needs only a Code.gs
+             change. ENTREGA has no dropdown of its own; the field is
+             shown read-only (same disabled styling as its other
+             mirrored fields) since location is always inherited live
+             from the linked SERVICOS event. Paired with backend
+             Code.gs v2.5.3. -->
 <!-- v2.5.2: Version bump only, no functional changes to this file —
              kept in sync with Code.gs v2.5.2 (WhatsApp/WABA backend
              messaging: text confirmations/reminders live, image_url
@@ -312,7 +323,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.5.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.5.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -826,6 +837,11 @@ input:focus{outline:none;border-color:var(--black)}
 
           <label class="field-lbl" for="agd-f-mobile">Telefone</label>
           <input type="text" id="agd-f-mobile" class="agd-field-input" inputmode="tel">
+
+          <label class="field-lbl" for="agd-f-location">Local de retirada</label>
+          <select id="agd-f-location" class="agd-field-input">
+            <option value="">A carregar...</option>
+          </select>
         </div>
 
         <div id="agd-f-createdby-row" class="drow" style="margin-top:10px;margin-bottom:14px">
@@ -950,6 +966,11 @@ input:focus{outline:none;border-color:var(--black)}
 
             <label class="field-lbl" for="agd-c-f-mobile">Telefone</label>
             <input type="text" id="agd-c-f-mobile" class="agd-field-input" inputmode="tel">
+
+            <label class="field-lbl" for="agd-c-f-location">Local de retirada</label>
+            <select id="agd-c-f-location" class="agd-field-input">
+              <option value="">A carregar...</option>
+            </select>
           </div>
 
           <div class="sec-lbl">Observação</div>
@@ -975,7 +996,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.5.2';
+const APP_VERSION = '2.5.3';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2223,6 +2244,9 @@ function agdOpenEventDetail(ev) {
   document.getElementById('agd-f-mobile').value  = ev.mobile      || '';
   document.getElementById('agd-f-remark').value  = ev.remark      || '';
   document.getElementById('agd-f-createdby').textContent = ev.created_by || '—';
+  agdEnsureLocationOptions('agd-f-location').then(() => {
+    document.getElementById('agd-f-location').value = ev.location_key || agdDefaultLocationKey || '';
+  });
 
   // ENTREGA: vehicle/customer data belongs to the linked SERVICOS
   // event and can't be edited here — only the reschedule date and
@@ -2275,6 +2299,7 @@ function agdSaveFieldEdits() {
     body.year        = document.getElementById('agd-f-year').value.trim();
     body.vin         = document.getElementById('agd-f-vin').value.trim().toUpperCase();
     body.mobile      = document.getElementById('agd-f-mobile').value.trim();
+    body.location_key = document.getElementById('agd-f-location').value;
   }
   // Optimistic local update so the list/title reflect the edit
   // immediately, consistent with the rest of the codebase's
@@ -2394,12 +2419,55 @@ function agdCreateOpenForm(which) {
   ['agd-c-f-ro','agd-c-f-client','agd-c-f-plate','agd-c-f-modelo','agd-c-f-year','agd-c-f-vin','agd-c-f-mobile','agd-c-f-remark','agd-c-date']
     .forEach(id => document.getElementById(id).value = '');
 
+  agdEnsureLocationOptions('agd-c-f-location').then(() => {
+    document.getElementById('agd-c-f-location').value = agdDefaultLocationKey || '';
+  });
+
   const isEntrega = which === 'entrega';
   document.getElementById('agd-c-entrega-notice').style.display = isEntrega ? 'block' : 'none';
   document.querySelectorAll('#agd-c-structural-fields .agd-field-input').forEach(input => {
     input.disabled = isEntrega;
   });
 }
+
+// Pickup-location options are fetched ONCE from getAgendaLocations
+// and cached in agdLocationOptionsCache — both the Create form's
+// dropdown (agd-c-f-location) and the Edit/detail screen's dropdown
+// (agd-f-location) call this with their own element ID, so either
+// screen can be opened first without re-fetching, and a 3rd location
+// added later only needs a Code.gs change, no PWA redeploy.
+let agdLocationOptionsCache  = null; // null = not yet fetched
+let agdDefaultLocationKey    = '';
+
+function agdEnsureLocationOptions(targetSelectId) {
+  const sel = document.getElementById(targetSelectId);
+  if (agdLocationOptionsCache) {
+    agdPopulateLocationSelect(sel, agdLocationOptionsCache);
+    return Promise.resolve();
+  }
+  return fetch(API_URL + '?action=getAgendaLocations')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.locations.length) {
+        sel.innerHTML = '<option value="">Erro ao carregar locais</option>';
+        return;
+      }
+      agdDefaultLocationKey  = data.default_key || data.locations[0].key;
+      agdLocationOptionsCache = data.locations;
+      agdPopulateLocationSelect(sel, data.locations);
+    })
+    .catch(() => {
+      sel.innerHTML = '<option value="">Erro ao carregar locais</option>';
+    });
+}
+
+function agdPopulateLocationSelect(selectEl, locations) {
+  selectEl.innerHTML = locations.map(loc =>
+    '<option value="' + loc.key + '">' + loc.label + '</option>'
+  ).join('');
+}
+
+
 
 // ── ENTREGA gate: RO required up front, must have a SERVICOS event ──
 function agdCheckEntregaGate() {
@@ -2518,6 +2586,11 @@ function agdFillCreateFields(data) {
   document.getElementById('agd-c-f-vin').value     = data.vin         || '';
   document.getElementById('agd-c-f-mobile').value  = data.mobile      || '';
   document.getElementById('agd-c-f-remark').value  = data.remark      || '';
+  // Path A/B prefill data has no location of its own (it's a fresh
+  // choice for each new appointment, not pulled from the RO or
+  // Customers tab) — only set it if explicitly provided, otherwise
+  // leave whatever agdCreateOpenForm already defaulted it to.
+  if (data.location_key) document.getElementById('agd-c-f-location').value = data.location_key;
   const todayStr = isoDateOnly(new Date());
   document.getElementById('agd-c-date').value = todayStr;
   agdLoadSlotsForCreate();
@@ -2590,6 +2663,7 @@ function agdConfirmCreate() {
     body.year         = document.getElementById('agd-c-f-year').value.trim();
     body.vin          = document.getElementById('agd-c-f-vin').value.trim().toUpperCase();
     body.mobile       = document.getElementById('agd-c-f-mobile').value.trim();
+    body.location_key = document.getElementById('agd-c-f-location').value;
   }
 
   // Disable the button immediately to prevent double-submission —
