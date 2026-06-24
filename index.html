@@ -1,5 +1,18 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.5.3 — Build: 23/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.6.0 — Build: 24/06/2026 -->
+<!-- v2.6.0: CONFIRMAR CHEGADA — customer arrival confirmation, in the
+             Management → SERVIÇOS list. Each SERVICOS card now shows
+             a tappable chip next to the RO title: a neutral
+             "Confirmar Chegada" chip (tap → marks arrival instantly,
+             no confirm) or, once arrived, an acid-green "✅ NO PÁTIO"
+             pill (tap → asks "Cancelar chegada?" before un-marking,
+             same friction as cancelling an agendamento). ENTREGA rows
+             show the green pill read-only (no tap target) — chegada
+             is owned by SERVICOS and always mirrors live, same
+             pattern as client_name/modelo/location. Backend: new
+             toggleChegada action (Aprovadores-gated) flips the
+             EVT_PROP_CHEGADA tag and fires a Zapier webhook on every
+             toggle. Paired with backend Code.gs v2.6.0. -->
 <!-- v2.5.3: PICKUP LOCATION dropdown for Create SERVICOS (Porsche
              Service Rio default, or Porsche Pre-Owned Rio), and now
              also editable on existing SERVICOS events in the
@@ -259,6 +272,9 @@ input:focus{outline:none;border-color:var(--black)}
 .apr-no{background:var(--red);color:#fff}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
+.chegada-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#9EFF00;color:#1a1a1a}
+.chegada-pill.clickable{cursor:pointer}
+.chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
 /* ── Approval panel ──────────────────────────────────────── */
 .apv-panel{position:absolute;inset:0;background:#fff;z-index:300;display:flex;flex-direction:column;overflow:hidden}
 .apv-jl-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0f0f0}
@@ -323,7 +339,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.5.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.6.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -996,7 +1012,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.5.3';
+const APP_VERSION = '2.6.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2203,11 +2219,27 @@ function agdRenderList(events) {
     const timeLbl = pad(d.getHours()) + ':' + pad(d.getMinutes());
     const linkWarning = (ev.servicos_link_status === 'broken' || ev.servicos_link_status === 'unlinked')
       ? '<span style="color:#a33;font-weight:600;margin-left:6px">&#9888;</span>' : '';
+
+    // Chegada chip: SERVICOS rows always show ONE of the two states
+    // and both are tappable — green "NO PÁTIO" (tap → confirm → off)
+    // or neutral "Confirmar Chegada" (tap → instant on, no confirm).
+    // ENTREGA rows only ever show the read-only green pill, and only
+    // when true — arrival isn't something to confirm from ENTREGA,
+    // it's a live mirror of the linked SERVICOS event (v2.6.0).
+    let chegadaChip = '';
+    if (agdCurrentCalendar === 'servicos') {
+      chegadaChip = ev.chegada
+        ? '<span class="chegada-pill clickable" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="on">&#x2705; NO P&#xC1;TIO</span>'
+        : '<span class="chegada-chip-off" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="off">Confirmar Chegada</span>';
+    } else if (ev.chegada) {
+      chegadaChip = '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>';
+    }
+
     return (
       '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
         '<div class="crow">' +
           '<div>' +
-            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + '</div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + '</div>' +
             '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
             '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
           '</div>' +
@@ -2217,11 +2249,33 @@ function agdRenderList(events) {
     );
   }).join('');
   el.querySelectorAll('[data-evt-id]').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (clickEvent) => {
+      if (clickEvent.target.closest('[data-chegada-evt-id]')) return; // chip handles its own click
       const ev = events.find(e => e.id === card.dataset.evtId);
       if (ev) agdOpenEventDetail(ev);
     });
   });
+  el.querySelectorAll('[data-chegada-evt-id]').forEach(chip => {
+    chip.addEventListener('click', (clickEvent) => {
+      clickEvent.stopPropagation();
+      agdToggleChegadaFromList(chip.dataset.chegadaEvtId, chip.dataset.chegadaState === 'on');
+    });
+  });
+}
+
+// Toggle handler for the chegada chip in the Management list.
+// currentlyOn === true  → un-marking, asks for confirmation first.
+// currentlyOn === false → marking arrival, applies instantly.
+function agdToggleChegadaFromList(eventId, currentlyOn) {
+  if (currentlyOn && !confirm('Cancelar chegada? O veículo será marcado como ainda não chegou.')) return;
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'toggleChegada', event_id: eventId, tech: currentTech }),
+  }).then(() => {
+    showToast(currentlyOn ? 'Chegada cancelada.' : '&#x2705; Chegada confirmada — NO PÁTIO');
+    agdMgmtRefreshList();
+  }).catch(() => showToast('Erro ao atualizar chegada.'));
 }
 
 function agdOpenEventDetail(ev) {
