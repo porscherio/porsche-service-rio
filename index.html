@@ -1,5 +1,23 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.6.0 — Build: 24/06/2026 -->
+<!-- Porsche Service Rio PWA — v2.7.0 — Build: 24/06/2026 -->
+<!-- v2.7.0: CONFIRMAR ENTREGA + chegada visible on the RO workflow.
+             Management → ENTREGA list now shows the same chip
+             pattern as SERVIÇOS/chegada: neutral "Confirmar Entrega"
+             chip, or — once confirmed — an acid-yellow "ENTREGUE"
+             pill. Unlike chegada, BOTH directions of this toggle ask
+             for confirmation, since marking entregue also clears the
+             linked SERVICOS event's "NO PÁTIO" status as a one-way
+             side effect (handled server-side; undoing entregue does
+             NOT restore chegada). Separately: the acid-green "NO
+             PÁTIO" pill is now also shown — read-only, no tap target
+             — on the technician's normal RO list (s1) and RO detail
+             screen (s2), next to the RO number, so a tech opening an
+             RO can immediately see if the vehicle has already
+             arrived. Matched server-side by PLATE (not RO number,
+             since an Agendamento can exist before an RO does) against
+             the closest SERVICOS Agendamento event for that plate —
+             see Code.gs v2.7.0's getChegadaByPlateMap(). Paired with
+             backend Code.gs v2.7.0. -->
 <!-- v2.6.0: CONFIRMAR CHEGADA — customer arrival confirmation, in the
              Management → SERVIÇOS list. Each SERVICOS card now shows
              a tappable chip next to the RO title: a neutral
@@ -275,6 +293,8 @@ input:focus{outline:none;border-color:var(--black)}
 .chegada-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#9EFF00;color:#1a1a1a}
 .chegada-pill.clickable{cursor:pointer}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
+.entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#F5D300;color:#1a1a1a}
+.entregue-pill.clickable{cursor:pointer}
 /* ── Approval panel ──────────────────────────────────────── */
 .apv-panel{position:absolute;inset:0;background:#fff;z-index:300;display:flex;flex-direction:column;overflow:hidden}
 .apv-jl-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0f0f0}
@@ -339,7 +359,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.6.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -1012,7 +1032,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1319,6 +1339,12 @@ function roCard(r) {
     ? '<div class="cjob">&#x1F464; ' + r.cust_name + '</div>'
     : '';
   const partsBadge = partsBadgeHtml(r.ro_number);
+  // Chegada pill (v2.7.0) — read-only here, matched server-side by
+  // plate against the closest SERVICOS Agendamento event (see
+  // getROs()/getChegadaByPlateMap in Code.gs). Toggling only happens
+  // inside Agendamento Management, never from this list, so there's
+  // only ever one place controlling the flag.
+  const chegadaPill = r.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
   return (
     '<div class="card' +
       (isLocked ? ' locked' : '') +
@@ -1326,7 +1352,7 @@ function roCard(r) {
       (r.suggested === currentTech ? ' sugerida' : '') +
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
+        '<div class="cro">RO #' + r.ro_number + chegadaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
         '<div class="cjob">Placa: ' + r.plate + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
@@ -1343,7 +1369,11 @@ function openRO(roNumber) {
   const ro = liveROs.find(r => String(r.ro_number)===String(roNumber));
   if (!ro) return;
   activeRO = ro;
-  document.getElementById('s2-ro-title').textContent = 'RO #'+ro.ro_number;
+  // Chegada pill (v2.7.0) — same read-only, plate-matched value as
+  // the s1 list card. Switched to innerHTML (was textContent) only
+  // for this one element, specifically to allow the pill's markup.
+  const chegadaPillS2 = ro.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
+  document.getElementById('s2-ro-title').innerHTML = 'RO #'+escapeHtml(String(ro.ro_number))+chegadaPillS2;
   document.getElementById('s2-ro-vehicle').textContent = vehicleWithYear(ro.vehicle, ro.vin)+' · '+ro.plate;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
@@ -2235,11 +2265,23 @@ function agdRenderList(events) {
       chegadaChip = '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>';
     }
 
+    // Entregue chip: ENTREGA rows only (v2.7.0) — same two-state
+    // pattern as chegada, but BOTH directions ask for confirmation
+    // here, since marking entregue has the side effect of clearing
+    // chegada on the linked SERVICOS event (the tech should know
+    // that's about to happen, in both directions of the toggle).
+    let entregueChip = '';
+    if (agdCurrentCalendar === 'entrega') {
+      entregueChip = ev.entregue
+        ? '<span class="entregue-pill clickable" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="on">&#x1F7E1; ENTREGUE</span>'
+        : '<span class="chegada-chip-off" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="off">Confirmar Entrega</span>';
+    }
+
     return (
       '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
         '<div class="crow">' +
           '<div>' +
-            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + '</div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + entregueChip + '</div>' +
             '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
             '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
           '</div>' +
@@ -2250,7 +2292,8 @@ function agdRenderList(events) {
   }).join('');
   el.querySelectorAll('[data-evt-id]').forEach(card => {
     card.addEventListener('click', (clickEvent) => {
-      if (clickEvent.target.closest('[data-chegada-evt-id]')) return; // chip handles its own click
+      if (clickEvent.target.closest('[data-chegada-evt-id]')) return;  // chegada chip handles its own click
+      if (clickEvent.target.closest('[data-entrega-evt-id]')) return;  // entregue chip handles its own click
       const ev = events.find(e => e.id === card.dataset.evtId);
       if (ev) agdOpenEventDetail(ev);
     });
@@ -2259,6 +2302,12 @@ function agdRenderList(events) {
     chip.addEventListener('click', (clickEvent) => {
       clickEvent.stopPropagation();
       agdToggleChegadaFromList(chip.dataset.chegadaEvtId, chip.dataset.chegadaState === 'on');
+    });
+  });
+  el.querySelectorAll('[data-entrega-evt-id]').forEach(chip => {
+    chip.addEventListener('click', (clickEvent) => {
+      clickEvent.stopPropagation();
+      agdToggleEntregaFromList(chip.dataset.entregaEvtId, chip.dataset.entregaState === 'on');
     });
   });
 }
@@ -2276,6 +2325,26 @@ function agdToggleChegadaFromList(eventId, currentlyOn) {
     showToast(currentlyOn ? 'Chegada cancelada.' : '&#x2705; Chegada confirmada — NO PÁTIO');
     agdMgmtRefreshList();
   }).catch(() => showToast('Erro ao atualizar chegada.'));
+}
+
+// Toggle handler for the entregue chip in the Management ENTREGA
+// list. Unlike chegada, BOTH directions ask for confirmation here —
+// marking entregue clears the linked SERVICOS event's "NO PÁTIO"
+// status as a side effect (one-way, per spec), so the tech should
+// see that consequence spelled out before confirming either way.
+function agdToggleEntregaFromList(eventId, currentlyOn) {
+  const msg = currentlyOn
+    ? 'Cancelar entrega? O status ficará como ainda não entregue.'
+    : 'Confirmar entrega ao cliente? Isso também removerá o status "NO PÁTIO" do agendamento de SERVIÇOS vinculado.';
+  if (!confirm(msg)) return;
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'toggleEntrega', event_id: eventId, tech: currentTech }),
+  }).then(() => {
+    showToast(currentlyOn ? 'Entrega cancelada.' : '&#x1F7E1; Entrega confirmada — ENTREGUE');
+    agdMgmtRefreshList();
+  }).catch(() => showToast('Erro ao atualizar entrega.'));
 }
 
 function agdOpenEventDetail(ev) {
