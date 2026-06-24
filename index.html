@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.1 — Build: 24/06/2026 -->
+<!-- v2.7.1: Management list now also looks 7 days BACK (was "today
+             onward" only), so a missed/no-show appointment from
+             yesterday can still be found and caught up on (e.g.
+             retroactively tapping Confirmar Chegada). New "Mostrar
+             entregues" switch in the ENTREGA list header — OFF by
+             default, which hides already-delivered (ENTREGUE)
+             events so the wider date window doesn't clutter the
+             list with completed deliveries; flip it on to see them
+             again. SERVIÇOS list is unaffected by this switch — it
+             always shows every event in range regardless of chegada
+             state. Paired with backend Code.gs v2.7.1. -->
 <!-- Porsche Service Rio PWA — v2.7.0 — Build: 24/06/2026 -->
 <!-- v2.7.0: CONFIRMAR ENTREGA + chegada visible on the RO workflow.
              Management → ENTREGA list now shows the same chip
@@ -359,7 +371,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.0</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -825,9 +837,15 @@ input:focus{outline:none;border-color:var(--black)}
         <button class="back" onclick="agdMgmtGoStep2()">&#8592;</button>
         <div style="flex:1">
           <div class="tb-title" id="agd-mgmt-list-title">Agendamentos</div>
-          <div class="tb-sub">Próximos 60 dias</div>
+          <div class="tb-sub">Últimos 7 dias e próximos 60 dias</div>
         </div>
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="agdMgmtRefreshList()" title="Actualizar">&#x21BB;</button>
+      </div>
+      <div id="agd-mgmt-show-delivered-row" style="display:none;padding:10px 16px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0;align-items:center;justify-content:space-between">
+        <label for="agd-mgmt-show-delivered" style="font-size:12.5px;color:var(--black);display:flex;align-items:center;gap:8px;cursor:pointer">
+          Mostrar entregues
+          <input type="checkbox" id="agd-mgmt-show-delivered" onchange="agdMgmtRefreshList()" style="width:18px;height:18px;accent-color:var(--black);cursor:pointer">
+        </label>
       </div>
       <div class="scroll" id="agd-mgmt-list"></div>
     </div>
@@ -1032,7 +1050,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.7.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2222,13 +2240,27 @@ function agdMgmtOpenList(which) {
   document.getElementById('agd-mgmt-step3').style.display = 'flex';
   document.getElementById('agd-mgmt-list-title').textContent =
     which === 'servicos' ? 'SERVIÇOS — Agendamentos' : 'ENTREGA — Agendamentos';
+  // "Mostrar entregues" switch only makes sense for ENTREGA — SERVICOS
+  // never filters by status. Reset to unchecked (hidden by default)
+  // each time the list is opened, so a stale checked state from a
+  // previous ENTREGA visit doesn't silently carry over.
+  const showDeliveredRow = document.getElementById('agd-mgmt-show-delivered-row');
+  const showDeliveredCb  = document.getElementById('agd-mgmt-show-delivered');
+  if (which === 'entrega') {
+    showDeliveredRow.style.display = 'flex';
+    showDeliveredCb.checked = false;
+  } else {
+    showDeliveredRow.style.display = 'none';
+  }
   agdMgmtRefreshList();
 }
 
 function agdMgmtRefreshList() {
   const el = document.getElementById('agd-mgmt-list');
   el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
-  fetch(API_URL + '?action=getAgendamentos&calendar=' + agdCurrentCalendar)
+  const showDeliveredCb = document.getElementById('agd-mgmt-show-delivered');
+  const includeDelivered = (agdCurrentCalendar === 'entrega' && showDeliveredCb && showDeliveredCb.checked) ? '1' : '0';
+  fetch(API_URL + '?action=getAgendamentos&calendar=' + agdCurrentCalendar + '&include_delivered=' + includeDelivered)
     .then(r => r.json())
     .then(data => {
       if (!data.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar agendamentos.</div>'; return; }
