@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.2 — Build: 24/06/2026 -->
+<!-- v2.7.2: BUGFIX — Approval panel served stale, keyword-filtered
+             joblines. apvSelectRO() previously reused liveJoblines[ro]
+             if already cached — but that cache may have been
+             populated by the regular RO screen's &tech=<currentTech>
+             fetch, which getJoblines() filters by Default Assignments
+             keywords. An Aprovador opening Approvals for an RO already
+             opened (by anyone, in the same session) would silently see
+             that filtered list instead of every jobline — surfaced by
+             an Agendamento RO-number collision, but the root cause was
+             unrelated to Agendamento. Fix: the Approval panel now
+             ALWAYS fetches fresh, with no &tech param at all (so
+             getJoblines() returns the full, unfiltered list), and
+             never writes into or reads from liveJoblines. renderApv
+             Joblines() now takes the jobline list as a parameter
+             instead of reading the shared cache.
+             ALSO: login screen's tech dropdown is now sorted
+             alphabetically (was insertion order from the USERS
+             object) — easier to find a name in a long roster. -->
 <!-- Porsche Service Rio PWA — v2.7.1 — Build: 24/06/2026 -->
 <!-- v2.7.1: Management list now also looks 7 days BACK (was "today
              onward" only), so a missed/no-show appointment from
@@ -371,7 +390,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.1</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -1050,7 +1069,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.1';
+const APP_VERSION = '2.7.2';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1112,7 +1131,7 @@ const MAX_REC_SECONDS = 30;
 const _n = new Date();
 document.getElementById('build-date').textContent = pad(_n.getDate())+'/'+pad(_n.getMonth()+1)+'/'+_n.getFullYear();
 document.getElementById('logo-img').src = 'https://dastek.com.br/logo/porsche_rj_logo.jpg';
-Object.keys(USERS).forEach(n => {
+Object.keys(USERS).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(n => {
   const o = document.createElement('option'); o.value = n; o.textContent = n;
   document.getElementById('sel-tech').appendChild(o);
 });
@@ -1976,31 +1995,45 @@ async function apvSelectRO(roNumber) {
     '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
 
   try {
-    const fetches = [fetch(API_URL+'?action=getApprovals&ro_number='+roNumber).then(r=>r.json())];
-    if (!liveJoblines[roNumber])
-      fetches.push(fetch(API_URL+'?action=joblines&ro_number='+roNumber+'&tech='+encodeURIComponent(currentTech)).then(r=>r.json()));
-
-    const results = await Promise.allSettled(fetches);
+    // ALWAYS fetch fresh here — never reuse liveJoblines[roNumber].
+    // That cache may have been populated earlier by the regular RO
+    // screen (loadJoblines), which fetches with &tech=<currentTech>
+    // and gets a Default-Assignments-keyword-FILTERED list back from
+    // getJoblines(). An Aprovador reviewing approvals needs to see
+    // EVERY jobline regardless of keyword assignment — so this fetch
+    // omits the tech param entirely (getJoblines treats a missing
+    // tech as "no filtering", per its own isAllowedForTech check).
+    // Without this, a RO opened earlier by any tech (including the
+    // Aprovador's own keyword-filtered view) would silently leak its
+    // filtered jobline list into the Approval panel.
+    const apvJoblinesPromise = fetch(API_URL+'?action=joblines&ro_number='+roNumber).then(r=>r.json());
+    const results = await Promise.allSettled([
+      fetch(API_URL+'?action=getApprovals&ro_number='+roNumber).then(r=>r.json()),
+      apvJoblinesPromise,
+    ]);
 
     if (results[0].status==='fulfilled' && Array.isArray(results[0].value)) {
       approvalCache[roNumber] = {};
       results[0].value.forEach(a => { approvalCache[roNumber][a.jobline] = a.approved; });
     }
-    if (results[1] && results[1].status==='fulfilled' && Array.isArray(results[1].value))
-      liveJoblines[roNumber] = results[1].value;
 
-    if (!liveJoblines[roNumber]) {
+    let apvJoblines = null;
+    if (results[1].status==='fulfilled' && Array.isArray(results[1].value)) {
+      apvJoblines = results[1].value;
+    }
+
+    if (!apvJoblines) {
       document.getElementById('apv-jl-list').innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar joblines.</div>';
       return;
     }
-    renderApvJoblines(roNumber);
+    renderApvJoblines(roNumber, apvJoblines);
   } catch(e) {
     document.getElementById('apv-jl-list').innerHTML = '<div class="err-box">&#x26A0; Erro de ligação.</div>';
   }
 }
 
-function renderApvJoblines(roNumber) {
-  const joblines = liveJoblines[roNumber] || [];
+function renderApvJoblines(roNumber, joblines) {
+  joblines = joblines || [];
   const cache    = approvalCache[roNumber] || {};
   apvCheckboxes  = {};
   joblines.forEach(j => {
