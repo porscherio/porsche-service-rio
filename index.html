@@ -1,4 +1,24 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.6 — Build: 24/06/2026 -->
+<!-- v2.7.6: MILEAGE CHECK. RO cards (s1 list) and the RO detail
+             header (s2) now show a blinking amber "Confirmar
+             quilometragem" pill whenever a RO's mileage is missing
+             or still the OI placeholder value (1) — meaning an
+             Approver never checked the real odometer reading when
+             opening the RO. ANY tech can tap it (not Aprovador-
+             gated) and type the current km in a small modal;
+             submission is validated client-side (whole number > 1)
+             and again server-side. Once a real mileage exists, the
+             pill is replaced by plain "· N km" text next to the
+             plate. Backend: new updateMileage action writes to both
+             the PWA's own ROs tab (mileage + mileage_source='pwa',
+             so the separate sync_all.gs project never overwrites it
+             again) AND the OI source spreadsheet's column J
+             directly (best-effort — a source-write failure is
+             logged but doesn't block the PWA-visible update).
+             Paired with backend Code.gs v2.7.6 and sync_all.gs
+             v1.10.0/v1.10.1 (new ROs-tab columns + backfill tool
+             for ROs that already existed before this update). -->
 <!-- Porsche Service Rio PWA — v2.7.4 — Build: 24/06/2026 -->
 <!-- v2.7.4: RELIABLE RELEASE. 'release' (and 'complete_default', when
              applicable) on the pause/complete screens were pure
@@ -362,6 +382,8 @@ input:focus{outline:none;border-color:var(--black)}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
 .entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#F5D300;color:#1a1a1a}
 .entregue-pill.clickable{cursor:pointer}
+.mileage-pill-blink{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--amber);color:#fff;cursor:pointer;animation:mileage-blink 1.4s ease-in-out infinite}
+@keyframes mileage-blink{0%,100%{opacity:1}50%{opacity:.45}}
 /* ── Approval panel ──────────────────────────────────────── */
 .apv-panel{position:absolute;inset:0;background:#fff;z-index:300;display:flex;flex-direction:column;overflow:hidden}
 .apv-jl-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0f0f0}
@@ -426,7 +448,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.4</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.6</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -677,6 +699,23 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <button class="bigbtn btn-ini" id="save-retry-btn" style="margin-bottom:8px" onclick="saveRetryProceed()">&#x21BB; Tentar novamente</button>
       <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="saveRetryCancel()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- MILEAGE INPUT MODAL (v2.7.6) — opened by tapping the blinking
+       "Confirmar quilometragem" pill (s1 card or s2 header). Any
+       tech can submit; validated as a whole-number integer > 1 both
+       here and again server-side (updateMileage in Code.gs). -->
+  <div class="parts-pop-backdrop" id="mileage-modal-backdrop" style="display:none">
+    <div class="parts-pop">
+      <div class="parts-pop-title">&#x26A0; Confirmar quilometragem</div>
+      <div class="parts-pop-sub" id="mileage-modal-ro">RO #----</div>
+      <label class="field-lbl" for="mileage-modal-input" style="margin-top:10px;display:block">Quilometragem atual (km)</label>
+      <input type="number" id="mileage-modal-input" class="agd-field-input" inputmode="numeric" placeholder="Ex: 45000" min="2" step="1"
+        onkeydown="if(event.key==='Enter')submitMileage()">
+      <div id="mileage-modal-err" style="display:none;font-size:12px;color:#c00;margin-bottom:10px"></div>
+      <button class="bigbtn btn-ini" id="mileage-modal-save-btn" style="margin-bottom:8px" onclick="submitMileage()">&#x2714; Salvar</button>
+      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="closeMileageModal()">Cancelar</button>
     </div>
   </div>
 
@@ -1124,7 +1163,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.4';
+const APP_VERSION = '2.7.6';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1407,11 +1446,16 @@ function renderROList(ros) {
   el.innerHTML = html;
   el.querySelectorAll('.card:not(.locked)').forEach(c => c.addEventListener('click', (ev)=>{
     if (ev.target.closest('.parts-badge')) return; // badge handles its own click
+    if (ev.target.closest('.mileage-pill-blink')) return; // mileage pill handles its own click
     openRO(c.dataset.ro);
   }));
   el.querySelectorAll('.parts-badge').forEach(b => b.addEventListener('click', (ev)=>{
     ev.stopPropagation();
     openPartsPopover(b.dataset.ro);
+  }));
+  el.querySelectorAll('.mileage-pill-blink').forEach(p => p.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    openMileageModal(p.dataset.mileageRo);
   }));
   const count = sug.length + free.length + paused.length;
   document.getElementById('t1-sub').textContent = count+' ordem(ns) disponível(is)';
@@ -1444,6 +1488,13 @@ function roCard(r) {
   // inside Agendamento Management, never from this list, so there's
   // only ever one place controlling the flag.
   const chegadaPill = r.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
+  // Mileage check (v2.7.6) — blinking pill when missing/placeholder
+  // (blank or exactly 1, meaning an Approver never checked the real
+  // odometer reading when opening the RO); plain text next to the
+  // plate otherwise. ANY tech can tap the pill — see openMileageModal.
+  const mileageHtml = mileageIsMissing(r.mileage)
+    ? '<span class="mileage-pill-blink" data-mileage-ro="' + r.ro_number + '">&#x26A0; Confirmar quilometragem</span>'
+    : ' &middot; ' + Number(r.mileage).toLocaleString('pt-BR') + ' km';
   return (
     '<div class="card' +
       (isLocked ? ' locked' : '') +
@@ -1452,7 +1503,7 @@ function roCard(r) {
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
         '<div class="cro">RO #' + r.ro_number + chegadaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
-        '<div class="cjob">Placa: ' + r.plate + '</div>' +
+        '<div class="cjob">Placa: ' + r.plate + mileageHtml + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
       '</div><span class="badge ' + bc + '">' + bt + '</span></div>' +
@@ -1473,13 +1524,20 @@ function openRO(roNumber) {
   // for this one element, specifically to allow the pill's markup.
   const chegadaPillS2 = ro.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
   document.getElementById('s2-ro-title').innerHTML = 'RO #'+escapeHtml(String(ro.ro_number))+chegadaPillS2;
-  document.getElementById('s2-ro-vehicle').textContent = vehicleWithYear(ro.vehicle, ro.vin)+' · '+ro.plate;
+  // Mileage check (v2.7.6) — same blinking-pill / plain-text rule as
+  // the s1 list card. s2-ro-vehicle switched to innerHTML (was
+  // textContent) for the same reason s2-ro-title was in v2.7.0.
+  const mileageHtmlS2 = mileageIsMissing(ro.mileage)
+    ? '<span class="mileage-pill-blink" data-mileage-ro="' + escapeHtml(String(ro.ro_number)) + '">&#x26A0; Confirmar quilometragem</span>'
+    : ' &middot; ' + Number(ro.mileage).toLocaleString('pt-BR') + ' km';
+  document.getElementById('s2-ro-vehicle').innerHTML = escapeHtml(vehicleWithYear(ro.vehicle, ro.vin))+' &middot; '+escapeHtml(String(ro.plate))+mileageHtmlS2;
   document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
   document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
   goTo('s2');
   loadJoblines(roNumber);
+  attachMileagePillHandlers();
 }
 
 // ── Jobline rendering ─────────────────────────────────────────────
@@ -2352,6 +2410,89 @@ function fmtDateDisplay(isoDateStr) {
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, function(c) {
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+// ── MILEAGE CHECK (v2.7.6) ────────────────────────────────────────
+// Blank or exactly 1 (the OI system's placeholder value) means an
+// Approver never checked the real odometer reading when opening the
+// RO. ANY tech can catch and fix this — not Aprovador-gated — since
+// the whole point is that a tech working on the vehicle can easily
+// glance at the dash, while Approvers opening ROs remotely can't.
+function mileageIsMissing(mileage) {
+  if (mileage === '' || mileage === null || mileage === undefined) return true;
+  const n = Number(mileage);
+  return !Number.isFinite(n) || n <= 1;
+}
+
+let _mileageModalRO = null; // RO number currently open in the modal
+
+function openMileageModal(roNumber) {
+  _mileageModalRO = roNumber;
+  document.getElementById('mileage-modal-ro').textContent = 'RO #' + roNumber;
+  document.getElementById('mileage-modal-input').value = '';
+  document.getElementById('mileage-modal-err').style.display = 'none';
+  document.getElementById('mileage-modal-backdrop').style.display = 'flex';
+  setTimeout(() => document.getElementById('mileage-modal-input').focus(), 150);
+}
+
+function closeMileageModal() {
+  document.getElementById('mileage-modal-backdrop').style.display = 'none';
+  _mileageModalRO = null;
+}
+
+async function submitMileage() {
+  if (!_mileageModalRO) return;
+  const raw = document.getElementById('mileage-modal-input').value.trim();
+  const errEl = document.getElementById('mileage-modal-err');
+  const n = Number(raw);
+
+  if (!raw || !Number.isFinite(n) || !Number.isInteger(n) || n <= 1) {
+    errEl.textContent = '⚠ Informe a quilometragem atual (número inteiro maior que 1).';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('mileage-modal-save-btn');
+  btn.disabled = true; btn.style.opacity = '0.6';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'updateMileage', ro_number: _mileageModalRO, mileage: n, tech: currentTech }),
+    }).then(r => r.json());
+
+    if (!res || res.ok !== true) {
+      errEl.textContent = '⚠ Não foi possível salvar. Verifique a conexão e tente novamente.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.style.opacity = '1';
+      return;
+    }
+
+    // Optimistic local update — same pattern as updateLocalROProgress.
+    const ro = liveROs.find(r => String(r.ro_number) === String(_mileageModalRO));
+    if (ro) { ro.mileage = n; ro.mileage_source = 'pwa'; }
+    if (activeRO && String(activeRO.ro_number) === String(_mileageModalRO)) {
+      activeRO.mileage = n; activeRO.mileage_source = 'pwa';
+      openRO(_mileageModalRO); // re-render s2 header with the new value
+    }
+    renderROList(liveROs);
+    showToast('&#x2714; Quilometragem atualizada: ' + n.toLocaleString('pt-BR') + ' km');
+    closeMileageModal();
+  } catch (e) {
+    errEl.textContent = '⚠ Erro de ligação. Tente novamente.';
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false; btn.style.opacity = '1';
+}
+
+// s2's mileage pill is rendered via innerHTML on a static element
+// (not re-created by a list-render loop like s1's cards), so it
+// needs its own listener attachment after each openRO() call — s1's
+// equivalent listener is attached once per renderROList() call.
+function attachMileagePillHandlers() {
+  document.querySelectorAll('#s2-ro-vehicle .mileage-pill-blink').forEach(p => {
+    p.onclick = (ev) => { ev.stopPropagation(); openMileageModal(p.dataset.mileageRo); };
   });
 }
 
