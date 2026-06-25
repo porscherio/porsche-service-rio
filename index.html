@@ -428,8 +428,23 @@ input:focus{outline:none;border-color:var(--black)}
 .pkg-save-btn{font-size:10.5px;font-weight:700;padding:6px 14px;border-radius:4px;border:none;background:var(--black);color:#fff;cursor:pointer;letter-spacing:.03em}
 .pkg-add-form{background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:10px}
 .pkg-add-form input[type=text]{width:100%;padding:9px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;margin-bottom:8px;-webkit-appearance:none}
+
+/* ── DOCUMENTOS DE ENTREGA (v2.7.7) ───────────────────────────── */
+.edoc-icon-row{display:flex;gap:10px;margin-top:4px}
+.edoc-icon-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 8px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer;transition:opacity .15s}
+.edoc-icon-btn:active{opacity:.75}
+.edoc-icon-btn.done{border-color:var(--green);background:var(--green-bg)}
+.edoc-icon-emoji{font-size:30px}
+.edoc-icon-label{font-size:11.5px;font-weight:600;color:var(--black);text-align:center;line-height:1.3}
+.edoc-icon-status{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#999}
+.edoc-icon-btn.done .edoc-icon-status{color:var(--green-text)}
+.edoc-page-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0}
+.edoc-page-thumb{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border);aspect-ratio:3/4}
+.edoc-page-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.edoc-page-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;border:none;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 </style>
 </head>
+
 <body>
 <div id="app">
   <div class="sbar">
@@ -716,6 +731,68 @@ input:focus{outline:none;border-color:var(--black)}
       <div id="mileage-modal-err" style="display:none;font-size:12px;color:#c00;margin-bottom:10px"></div>
       <button class="bigbtn btn-ini" id="mileage-modal-save-btn" style="margin-bottom:8px" onclick="submitMileage()">&#x2714; Salvar</button>
       <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="closeMileageModal()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- DOCUMENTOS DE ENTREGA — CHOOSER MODAL (v2.7.7) — pops
+       automatically right after a tech confirms ENTREGUE (Management
+       ENTREGA list, toggling ON only — see agdToggleEntregaFromList).
+       Also reachable manually any time via edocOpenChooser(ro), since
+       OS de Saída and Pagamento are often scanned at different times
+       by different people. Each icon shows live ✅/pending state from
+       getEntregaDocsStatus; tapping either opens the scan-capture
+       modal below for that doc_type. -->
+  <div class="parts-pop-backdrop" id="edoc-chooser-backdrop" style="display:none">
+    <div class="parts-pop" style="text-align:center">
+      <div class="parts-pop-title" style="font-size:15px">&#x1F4C4; Documentos de Entrega</div>
+      <div class="parts-pop-sub" id="edoc-chooser-ro">RO #----</div>
+      <div class="edoc-icon-row">
+        <button class="edoc-icon-btn" id="edoc-btn-os_saida" onclick="edocOpenScan('os_saida')">
+          <span class="edoc-icon-emoji">&#x1F4C4;</span>
+          <span class="edoc-icon-label">OS de Saída</span>
+          <span class="edoc-icon-status" id="edoc-status-os_saida">Pendente</span>
+        </button>
+        <button class="edoc-icon-btn" id="edoc-btn-pagamento" onclick="edocOpenScan('pagamento')">
+          <span class="edoc-icon-emoji">&#x1F4B3;</span>
+          <span class="edoc-icon-label">Pagamento</span>
+          <span class="edoc-icon-status" id="edoc-status-pagamento">Pendente</span>
+        </button>
+      </div>
+      <div style="font-size:11px;color:#999;margin:12px 0 4px;line-height:1.4">Pode digitalizar um agora e o outro depois — o progresso fica guardado.</div>
+      <button class="bigbtn btn-sec" style="margin-top:10px;margin-bottom:0" onclick="edocCloseChooser()">Fechar</button>
+    </div>
+  </div>
+
+  <!-- DOCUMENTOS DE ENTREGA — SCAN CAPTURE MODAL (v2.7.7). Reuses the
+       same getUserMedia camera pattern as screen s5, but captures
+       MULTIPLE pages (snap → review thumbnail grid → add another or
+       finalize) bundled client-side into ONE PDF via jsPDF, then
+       uploaded DIRECTLY to Dropbox (get_dropbox_token pattern, same
+       as video/remarks/audio uploads) — never through Apps Script. -->
+  <div class="parts-pop-backdrop" id="edoc-scan-backdrop" style="display:none;z-index:410">
+    <div class="parts-pop" style="max-height:88vh">
+      <div class="parts-pop-title" id="edoc-scan-title">&#x1F4F7; Digitalizar documento</div>
+      <div class="parts-pop-sub" id="edoc-scan-sub">RO #---- — página <span id="edoc-page-count">0</span> capturada(s)</div>
+
+      <div class="camera-section" style="margin-bottom:10px">
+        <video id="edoc-video-preview" autoplay playsinline muted style="display:none"></video>
+        <div class="cam-placeholder" id="edoc-cam-placeholder">
+          <span style="font-size:32px">&#x1F4F7;</span>
+          <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.06em">Câmera ao vivo</span>
+          <span style="font-size:10px;color:#444;margin-top:4px">Toque em "Abrir câmera"</span>
+        </div>
+        <canvas id="edoc-photo-canvas" style="display:none"></canvas>
+      </div>
+
+      <button class="bigbtn btn-ini" id="edoc-btn-open-cam" onclick="edocOpenCamera()">&#x1F4F7; Abrir câmera</button>
+      <button class="bigbtn btn-cam" id="edoc-btn-capture" style="display:none" onclick="edocCapturePage()">&#x23FA; Capturar página</button>
+
+      <div class="edoc-page-grid" id="edoc-page-grid"></div>
+
+      <div id="edoc-scan-err" style="display:none;font-size:12px;color:#c00;margin-bottom:10px;text-align:center"></div>
+
+      <button class="bigbtn btn-ini" id="edoc-btn-finalize" style="display:none" onclick="edocFinalizePdf()">&#x2714; Finalizar e enviar (<span id="edoc-finalize-count">0</span> pág.)</button>
+      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="edocCancelScan()">Cancelar</button>
     </div>
   </div>
 
@@ -1161,9 +1238,14 @@ input:focus{outline:none;border-color:var(--black)}
 
 </div>
 
+<!-- jsPDF (v2.7.7) — multi-page document scan bundling for
+     Documentos de Entrega (OS de Saída / Pagamento). No other CDN
+     dependency exists yet in this file, so loaded fresh here. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.6';
+const APP_VERSION = '2.7.7';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2013,6 +2095,29 @@ function buildDropboxFolderPath(roNum, jobDescription) {
   return '/CTPRJ_NEW/vag ros/'+rangeL1+'/'+rangeL2+'/#'+roNum+'/fotos/'+roNum+'_'+jobDesc+'/';
 }
 
+// DOCUMENTOS DE ENTREGA (v2.7.7) — same #thousand/#hundred range
+// bucketing as buildDropboxFolderPath above, but under the RO's own
+// os_assinada/ or pagamento/ subfolder instead of fotos/RO_jobdesc/.
+// NOTE: uses the same lowercase "vag ros" casing as every other path
+// in this file (buildDropboxFolderPath, uploadMedia in Code.gs) for
+// consistency — Dropbox paths are case-insensitive for matching an
+// existing folder either way.
+// docType must be exactly 'os_saida' or 'pagamento'.
+function buildEntregaDocFolderPath(roNum, docType) {
+  const roInt     = parseInt(roNum);
+  const floor1000 = Math.floor(roInt/1000)*1000, floor100 = Math.floor(roInt/100)*100;
+  const rangeL1   = '#'+floor1000+' a #'+(floor1000+999);
+  const rangeL2   = '#'+floor100+' a #'+(floor100+99);
+  const subfolder = docType === 'pagamento' ? 'pagamento' : 'os_assinada';
+  return '/CTPRJ_NEW/vag ros/'+rangeL1+'/'+rangeL2+'/#'+roNum+'/'+subfolder+'/';
+}
+
+// yyyyMMdd_HHmmss timestamp suffix for entrega-doc filenames — re-scans
+// are never overwritten, so each upload needs a unique filename.
+function fmtEntregaDocTimestamp(d) {
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+}
+
 function updateOverlay(){const n=new Date();document.getElementById('ov-ts').textContent=fmtDateTime(n);if(gpsCurrent)document.getElementById('ov-gps').textContent='GPS: '+gpsCurrent;document.getElementById('ov-app-version').textContent='v'+APP_VERSION;}
 
 // ── History ───────────────────────────────────────────────────────
@@ -2496,6 +2601,241 @@ function attachMileagePillHandlers() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ── DOCUMENTOS DE ENTREGA (v2.7.7) ────────────────────────────
+// Chooser modal (OS de Saída / Pagamento icons) + scan-capture
+// modal (multi-page camera → jsPDF → direct Dropbox upload). See
+// Code.gs v2.7.7 changelog for the full path/route spec.
+// ═══════════════════════════════════════════════════════════════
+
+let _edocRO          = null;  // RO number currently open in the chooser
+let _edocDocType     = null;  // 'os_saida' | 'pagamento' — currently being scanned
+let _edocStream      = null;  // active getUserMedia stream for the scan modal
+let _edocPages       = [];    // array of dataURLs (jpeg) — pages captured this session, in order
+
+const EDOC_LABELS = { os_saida: 'OS de Saída', pagamento: 'Pagamento' };
+
+// ── Chooser modal ──────────────────────────────────────────────────
+async function edocOpenChooser(roNumber) {
+  if (!roNumber) return;
+  _edocRO = String(roNumber);
+  document.getElementById('edoc-chooser-ro').textContent = 'RO #' + _edocRO;
+  document.getElementById('edoc-chooser-backdrop').style.display = 'flex';
+  edocResetIconState('os_saida');
+  edocResetIconState('pagamento');
+  edocRefreshChooserStatus();
+}
+
+function edocCloseChooser() {
+  document.getElementById('edoc-chooser-backdrop').style.display = 'none';
+  _edocRO = null;
+}
+
+function edocResetIconState(docType) {
+  const btn = document.getElementById('edoc-btn-' + docType);
+  const status = document.getElementById('edoc-status-' + docType);
+  btn.classList.remove('done');
+  status.textContent = 'Pendente';
+}
+
+// Pulls current status from the backend (getEntregaDocsStatus) so the
+// chooser correctly shows ✅ even if this RO's docs were already
+// scanned earlier — by this tech or another one — in a previous visit.
+async function edocRefreshChooserStatus() {
+  if (!_edocRO) return;
+  try {
+    const res = await fetch(API_URL + '?action=getEntregaDocsStatus&ro_number=' + encodeURIComponent(_edocRO)).then(r => r.json());
+    if (!res) return;
+    ['os_saida', 'pagamento'].forEach(docType => {
+      const info = res[docType];
+      const btn = document.getElementById('edoc-btn-' + docType);
+      const status = document.getElementById('edoc-status-' + docType);
+      if (info) {
+        btn.classList.add('done');
+        status.textContent = '\u2705 Enviado';
+      } else {
+        btn.classList.remove('done');
+        status.textContent = 'Pendente';
+      }
+    });
+  } catch (e) {
+    // Silent — chooser still works for scanning even if the status
+    // check fails; it just won't show prior ✅ state this time.
+  }
+}
+
+// ── Scan capture modal ──────────────────────────────────────────────
+function edocOpenScan(docType) {
+  _edocDocType = docType;
+  _edocPages = [];
+  document.getElementById('edoc-scan-title').innerHTML = '&#x1F4F7; Digitalizar — ' + EDOC_LABELS[docType];
+  document.getElementById('edoc-scan-sub').innerHTML = 'RO #' + escapeHtml(_edocRO) + ' — página <span id="edoc-page-count">0</span> capturada(s)';
+  document.getElementById('edoc-scan-err').style.display = 'none';
+  document.getElementById('edoc-page-grid').innerHTML = '';
+  document.getElementById('edoc-btn-finalize').style.display = 'none';
+  document.getElementById('edoc-btn-open-cam').style.display = 'flex';
+  document.getElementById('edoc-btn-capture').style.display = 'none';
+  document.getElementById('edoc-cam-placeholder').style.display = 'flex';
+  document.getElementById('edoc-video-preview').style.display = 'none';
+  document.getElementById('edoc-scan-backdrop').style.display = 'flex';
+}
+
+async function edocOpenCamera() {
+  try {
+    _edocStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const v = document.getElementById('edoc-video-preview');
+    v.srcObject = _edocStream;
+    v.style.display = 'block';
+    document.getElementById('edoc-cam-placeholder').style.display = 'none';
+    document.getElementById('edoc-btn-open-cam').style.display = 'none';
+    document.getElementById('edoc-btn-capture').style.display = 'flex';
+  } catch (e) {
+    showToast('Câmera: ' + e.message);
+  }
+}
+
+function edocStopCamera() {
+  if (_edocStream) { _edocStream.getTracks().forEach(t => t.stop()); _edocStream = null; }
+  const v = document.getElementById('edoc-video-preview');
+  v.style.display = 'none';
+  document.getElementById('edoc-cam-placeholder').style.display = 'flex';
+  document.getElementById('edoc-btn-open-cam').style.display = 'flex';
+  document.getElementById('edoc-btn-capture').style.display = 'none';
+}
+
+function edocCapturePage() {
+  const video = document.getElementById('edoc-video-preview');
+  const canvas = document.getElementById('edoc-photo-canvas');
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 1600;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  _edocPages.push(dataUrl);
+  edocRenderPageGrid();
+  showToast('Página ' + _edocPages.length + ' capturada.');
+}
+
+function edocRenderPageGrid() {
+  const grid = document.getElementById('edoc-page-grid');
+  grid.innerHTML = _edocPages.map((dataUrl, i) =>
+    '<div class="edoc-page-thumb">' +
+      '<img src="' + dataUrl + '">' +
+      '<button class="edoc-page-del" onclick="edocDeletePage(' + i + ')">&#x2715;</button>' +
+    '</div>'
+  ).join('');
+  document.getElementById('edoc-page-count').textContent = String(_edocPages.length);
+  const finalizeBtn = document.getElementById('edoc-btn-finalize');
+  document.getElementById('edoc-finalize-count').textContent = String(_edocPages.length);
+  finalizeBtn.style.display = _edocPages.length > 0 ? 'flex' : 'none';
+}
+
+function edocDeletePage(index) {
+  _edocPages.splice(index, 1);
+  edocRenderPageGrid();
+}
+
+function edocCancelScan() {
+  if (_edocPages.length && !confirm('Cancelar? As páginas capturadas serão perdidas.')) return;
+  edocStopCamera();
+  _edocPages = [];
+  _edocDocType = null;
+  document.getElementById('edoc-scan-backdrop').style.display = 'none';
+}
+
+// Bundles all captured pages into ONE PDF (jsPDF), uploads it DIRECTLY
+// to Dropbox (get_dropbox_token pattern — same as video/remarks/audio,
+// never server-mediated), then logs it via saveEntregaDocStatus.
+// Filename always carries a timestamp suffix so re-scans are NEVER
+// overwritten — every scan ever taken is preserved in Dropbox and in
+// the append-only EntregaDocs tab.
+async function edocFinalizePdf() {
+  if (!_edocPages.length || !_edocRO || !_edocDocType) return;
+  const errEl = document.getElementById('edoc-scan-err');
+  errEl.style.display = 'none';
+  const finalizeBtn = document.getElementById('edoc-btn-finalize');
+  finalizeBtn.disabled = true; finalizeBtn.style.opacity = '0.6';
+  showToast('A montar PDF...');
+
+  try {
+    // 1) Bundle pages into one PDF, one page per captured photo.
+    const { jsPDF } = window.jspdf;
+    let pdf = null;
+    for (let i = 0; i < _edocPages.length; i++) {
+      const dataUrl = _edocPages[i];
+      const img = await edocLoadImage(dataUrl);
+      const isLandscape = img.width > img.height;
+      const pageOpts = { orientation: isLandscape ? 'landscape' : 'portrait', unit: 'pt', format: 'a4' };
+      if (i === 0) pdf = new jsPDF(pageOpts); else pdf.addPage('a4', pageOpts.orientation);
+      const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
+      // Fit image within the page, preserving aspect ratio, centered.
+      const scale = Math.min(pageW / img.width, pageH / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      const x = (pageW - w) / 2, y = (pageH - h) / 2;
+      pdf.addImage(dataUrl, 'JPEG', x, y, w, h);
+    }
+    const pdfBlob = pdf.output('blob');
+
+    // 2) Build the destination path — timestamp suffix means re-scans
+    // are NEVER overwritten (Code.gs v2.7.7 / buildEntregaDocFolderPath).
+    const now = new Date();
+    const ts = fmtEntregaDocTimestamp(now);
+    const prefix = _edocDocType === 'pagamento' ? 'PAG' : 'SAI';
+    const filename = prefix + '_' + _edocRO + '_' + ts + '.pdf';
+    const folder = buildEntregaDocFolderPath(_edocRO, _edocDocType);
+    const dropboxPath = folder + filename;
+
+    showToast('A enviar para Dropbox...');
+
+    // 3) Direct-to-Dropbox upload — same get_dropbox_token + raw fetch
+    // pattern as video/remarks/audio uploads above.
+    const tokenRes = await fetch(API_URL + '?action=get_dropbox_token').then(r => r.json());
+    if (!tokenRes || !tokenRes.ok) throw new Error('Falha ao obter token Dropbox');
+    const apiArgs = JSON.stringify({ path: dropboxPath, mode: 'add', autorename: true, mute: false });
+    const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + tokenRes.token,
+        'Dropbox-API-Arg': apiArgs,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: pdfBlob,
+    }).then(r => r.json());
+    if (uploadRes.error_summary) throw new Error(uploadRes.error_summary);
+
+    // 4) Log the upload in EntregaDocs (Code.gs saveEntregaDocStatus).
+    await fetch(API_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({
+        action: 'saveEntregaDocStatus',
+        ro_number: _edocRO,
+        doc_type: _edocDocType,
+        dropbox_path: uploadRes.path_display || dropboxPath,
+        tech: currentTech,
+      }),
+    });
+
+    showToast('\u2705 ' + EDOC_LABELS[_edocDocType] + ' enviado para Dropbox.');
+    edocStopCamera();
+    _edocPages = [];
+    document.getElementById('edoc-scan-backdrop').style.display = 'none';
+    edocRefreshChooserStatus(); // updates the ✅/pending icon back on the chooser
+  } catch (e) {
+    errEl.textContent = '\u26A0 Erro ao enviar: ' + e.message + '. As páginas NÃO foram perdidas — tente novamente.';
+    errEl.style.display = 'block';
+  }
+  finalizeBtn.disabled = false; finalizeBtn.style.opacity = '1';
+}
+
+function edocLoadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 // ── Aprovador-only edit panel (📦) ───────────────────────────────────
 function openPartsAdminPanel() {
   if (!isApproverTech) return;
@@ -2629,11 +2969,14 @@ function agdRenderList(events) {
     // here, since marking entregue has the side effect of clearing
     // chegada on the linked SERVICOS event (the tech should know
     // that's about to happen, in both directions of the toggle).
+    // data-ro-number (v2.7.7) lets agdToggleEntregaFromList open the
+    // Documentos de Entrega modal afterward without needing access
+    // to the full `events` array (which is local to this render call).
     let entregueChip = '';
     if (agdCurrentCalendar === 'entrega') {
       entregueChip = ev.entregue
-        ? '<span class="entregue-pill clickable" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="on">&#x1F7E1; ENTREGUE</span>'
-        : '<span class="chegada-chip-off" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="off">Confirmar Entrega</span>';
+        ? '<span class="entregue-pill clickable" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="on" data-ro-number="' + escapeHtml(ev.ro_number) + '">&#x1F7E1; ENTREGUE</span>'
+        : '<span class="chegada-chip-off" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="off" data-ro-number="' + escapeHtml(ev.ro_number) + '">Confirmar Entrega</span>';
     }
 
     return (
@@ -2666,7 +3009,7 @@ function agdRenderList(events) {
   el.querySelectorAll('[data-entrega-evt-id]').forEach(chip => {
     chip.addEventListener('click', (clickEvent) => {
       clickEvent.stopPropagation();
-      agdToggleEntregaFromList(chip.dataset.entregaEvtId, chip.dataset.entregaState === 'on');
+      agdToggleEntregaFromList(chip.dataset.entregaEvtId, chip.dataset.entregaState === 'on', chip.dataset.roNumber);
     });
   });
 }
@@ -2691,7 +3034,13 @@ function agdToggleChegadaFromList(eventId, currentlyOn) {
 // marking entregue clears the linked SERVICOS event's "NO PÁTIO"
 // status as a side effect (one-way, per spec), so the tech should
 // see that consequence spelled out before confirming either way.
-function agdToggleEntregaFromList(eventId, currentlyOn) {
+//
+// v2.7.7: roNumber param added — when confirming ON (currentlyOn was
+// false), opens the Documentos de Entrega chooser modal right after
+// the toggle succeeds, prompting OS de Saída / Pagamento scans.
+// Never opens on the un-marking (ON→OFF) path — undoing a delivery
+// confirmation isn't itself a delivery event.
+function agdToggleEntregaFromList(eventId, currentlyOn, roNumber) {
   const msg = currentlyOn
     ? 'Cancelar entrega? O status ficará como ainda não entregue.'
     : 'Confirmar entrega ao cliente? Isso também removerá o status "NO PÁTIO" do agendamento de SERVIÇOS vinculado.';
@@ -2703,6 +3052,7 @@ function agdToggleEntregaFromList(eventId, currentlyOn) {
   }).then(() => {
     showToast(currentlyOn ? 'Entrega cancelada.' : '&#x1F7E1; Entrega confirmada — ENTREGUE');
     agdMgmtRefreshList();
+    if (!currentlyOn) edocOpenChooser(roNumber); // was OFF, now confirming ON — prompt for scans
   }).catch(() => showToast('Erro ao atualizar entrega.'));
 }
 
