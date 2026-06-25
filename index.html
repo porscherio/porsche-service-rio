@@ -382,6 +382,7 @@ input:focus{outline:none;border-color:var(--black)}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
 .entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#F5D300;color:#1a1a1a}
 .entregue-pill.clickable{cursor:pointer}
+.edoc-reentry-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:12px;margin-left:5px;vertical-align:middle;cursor:pointer;border-radius:5px;background:var(--bg);border:1px solid var(--border)}
 .mileage-pill-blink{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--amber);color:#fff;cursor:pointer;animation:mileage-blink 1.4s ease-in-out infinite}
 @keyframes mileage-blink{0%,100%{opacity:1}50%{opacity:.45}}
 /* ── Approval panel ──────────────────────────────────────── */
@@ -442,6 +443,15 @@ input:focus{outline:none;border-color:var(--black)}
 .edoc-page-thumb{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border);aspect-ratio:3/4}
 .edoc-page-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .edoc-page-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;border:none;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+/* v2.7.8 — scan modal needs its own sticky-footer layout: the
+   shared .parts-pop scrolls its ENTIRE content (incl. buttons) once
+   it exceeds max-height, which buried "Finalizar" below the fold as
+   soon as 2-3 page thumbnails were added. .edoc-scan-pop overrides
+   that: fixed height, flex column, only .edoc-scan-scroll scrolls —
+   the finalize/cancel buttons stay pinned and visible always. */
+.edoc-scan-pop{display:flex;flex-direction:column;max-height:85vh;overflow:hidden}
+.edoc-scan-scroll{overflow-y:auto;flex:1;min-height:0}
+.edoc-scan-footer{flex-shrink:0;padding-top:8px}
 </style>
 </head>
 
@@ -463,7 +473,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.7</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.6</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -763,36 +773,35 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
-  <!-- DOCUMENTOS DE ENTREGA — SCAN CAPTURE MODAL (v2.7.7). Reuses the
-       same getUserMedia camera pattern as screen s5, but captures
-       MULTIPLE pages (snap → review thumbnail grid → add another or
-       finalize) bundled client-side into ONE PDF via jsPDF, then
-       uploaded DIRECTLY to Dropbox (get_dropbox_token pattern, same
-       as video/remarks/audio uploads) — never through Apps Script. -->
+  <!-- DOCUMENTOS DE ENTREGA — SCAN CAPTURE MODAL (v2.7.8). Uses the
+       browser-native <input type=file capture> picker instead of a
+       custom getUserMedia feed — this hands framing/focus/cropping
+       off to the PHONE'S OWN camera/scanner UI (which on most Android
+       devices already includes auto edge-detection), instead of our
+       own un-cropped live-video snapshot, which produced consistently
+       poorly-framed scans. Multiple files can be picked/captured in
+       one go OR added one at a time across repeated taps — both feed
+       the same _edocPages array, bundled into one PDF by jsPDF same
+       as before. Sticky footer (.edoc-scan-pop / .edoc-scan-footer,
+       v2.7.8) keeps Finalizar/Cancelar always visible regardless of
+       how many page thumbnails are in the scrolling grid above. -->
   <div class="parts-pop-backdrop" id="edoc-scan-backdrop" style="display:none;z-index:410">
-    <div class="parts-pop" style="max-height:88vh">
+    <div class="parts-pop edoc-scan-pop">
       <div class="parts-pop-title" id="edoc-scan-title">&#x1F4F7; Digitalizar documento</div>
       <div class="parts-pop-sub" id="edoc-scan-sub">RO #---- — página <span id="edoc-page-count">0</span> capturada(s)</div>
 
-      <div class="camera-section" style="margin-bottom:10px">
-        <video id="edoc-video-preview" autoplay playsinline muted style="display:none"></video>
-        <div class="cam-placeholder" id="edoc-cam-placeholder">
-          <span style="font-size:32px">&#x1F4F7;</span>
-          <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.06em">Câmera ao vivo</span>
-          <span style="font-size:10px;color:#444;margin-top:4px">Toque em "Abrir câmera"</span>
-        </div>
-        <canvas id="edoc-photo-canvas" style="display:none"></canvas>
+      <div class="edoc-scan-scroll">
+        <div class="edoc-page-grid" id="edoc-page-grid"></div>
+        <div id="edoc-scan-err" style="display:none;font-size:12px;color:#c00;margin-bottom:10px;text-align:center"></div>
       </div>
 
-      <button class="bigbtn btn-ini" id="edoc-btn-open-cam" onclick="edocOpenCamera()">&#x1F4F7; Abrir câmera</button>
-      <button class="bigbtn btn-cam" id="edoc-btn-capture" style="display:none" onclick="edocCapturePage()">&#x23FA; Capturar página</button>
-
-      <div class="edoc-page-grid" id="edoc-page-grid"></div>
-
-      <div id="edoc-scan-err" style="display:none;font-size:12px;color:#c00;margin-bottom:10px;text-align:center"></div>
-
-      <button class="bigbtn btn-ini" id="edoc-btn-finalize" style="display:none" onclick="edocFinalizePdf()">&#x2714; Finalizar e enviar (<span id="edoc-finalize-count">0</span> pág.)</button>
-      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="edocCancelScan()">Cancelar</button>
+      <div class="edoc-scan-footer">
+        <input type="file" id="edoc-file-input" accept="image/*,application/pdf" capture="environment" multiple
+          style="display:none" onchange="edocHandleFiles(this.files)">
+        <button class="bigbtn btn-ini" id="edoc-btn-capture" onclick="document.getElementById('edoc-file-input').click()">&#x1F4F7; Adicionar página</button>
+        <button class="bigbtn btn-ini" id="edoc-btn-finalize" style="display:none" onclick="edocFinalizePdf()">&#x2714; Finalizar e enviar (<span id="edoc-finalize-count">0</span> pág.)</button>
+        <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="edocCancelScan()">Cancelar</button>
+      </div>
     </div>
   </div>
 
@@ -1245,7 +1254,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.7';
+const APP_VERSION = '2.7.8';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2610,8 +2619,7 @@ function attachMileagePillHandlers() {
 
 let _edocRO          = null;  // RO number currently open in the chooser
 let _edocDocType     = null;  // 'os_saida' | 'pagamento' — currently being scanned
-let _edocStream      = null;  // active getUserMedia stream for the scan modal
-let _edocPages       = [];    // array of dataURLs (jpeg) — pages captured this session, in order
+let _edocPages       = [];    // array of { type:'image', dataUrl } | { type:'pdf', blob, label } — v2.7.8
 
 const EDOC_LABELS = { os_saida: 'OS de Saída', pagamento: 'Pagamento' };
 
@@ -2664,7 +2672,7 @@ async function edocRefreshChooserStatus() {
   }
 }
 
-// ── Scan capture modal ──────────────────────────────────────────────
+// ── Scan capture modal (v2.7.8 — native file/camera picker) ────────
 function edocOpenScan(docType) {
   _edocDocType = docType;
   _edocPages = [];
@@ -2673,54 +2681,52 @@ function edocOpenScan(docType) {
   document.getElementById('edoc-scan-err').style.display = 'none';
   document.getElementById('edoc-page-grid').innerHTML = '';
   document.getElementById('edoc-btn-finalize').style.display = 'none';
-  document.getElementById('edoc-btn-open-cam').style.display = 'flex';
-  document.getElementById('edoc-btn-capture').style.display = 'none';
-  document.getElementById('edoc-cam-placeholder').style.display = 'flex';
-  document.getElementById('edoc-video-preview').style.display = 'none';
+  document.getElementById('edoc-file-input').value = ''; // clear any prior selection
   document.getElementById('edoc-scan-backdrop').style.display = 'flex';
 }
 
-async function edocOpenCamera() {
-  try {
-    _edocStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    const v = document.getElementById('edoc-video-preview');
-    v.srcObject = _edocStream;
-    v.style.display = 'block';
-    document.getElementById('edoc-cam-placeholder').style.display = 'none';
-    document.getElementById('edoc-btn-open-cam').style.display = 'none';
-    document.getElementById('edoc-btn-capture').style.display = 'flex';
-  } catch (e) {
-    showToast('Câmera: ' + e.message);
+// Fires on <input type=file onchange> — handles BOTH a fresh "Adicionar
+// página" tap (native camera/scanner UI, or gallery/Files picker — the
+// OS decides, this app has no control over and no need to control
+// which app opens) and any case where the picked result is already a
+// PDF (some scanner flows, e.g. Google Drive's built-in scan-to-PDF,
+// hand back a finished PDF instead of a raw photo). Each entry in
+// _edocPages is typed so edocFinalizePdf can treat the two cases
+// correctly: { type:'image', dataUrl } gets composited by jsPDF below;
+// { type:'pdf', blob } is uploaded as-is, no recompression/recompositing
+// (recompositing an already-finished PDF into raster images and back
+// into a new PDF would only degrade quality for no benefit).
+async function edocHandleFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  for (const file of files) {
+    if (file.type === 'application/pdf') {
+      _edocPages.push({ type: 'pdf', blob: file, label: file.name || 'documento.pdf' });
+    } else if (file.type.startsWith('image/')) {
+      const dataUrl = await edocFileToDataUrl(file);
+      _edocPages.push({ type: 'image', dataUrl });
+    } // silently ignore any other type — accept= already restricts the picker
   }
-}
-
-function edocStopCamera() {
-  if (_edocStream) { _edocStream.getTracks().forEach(t => t.stop()); _edocStream = null; }
-  const v = document.getElementById('edoc-video-preview');
-  v.style.display = 'none';
-  document.getElementById('edoc-cam-placeholder').style.display = 'flex';
-  document.getElementById('edoc-btn-open-cam').style.display = 'flex';
-  document.getElementById('edoc-btn-capture').style.display = 'none';
-}
-
-function edocCapturePage() {
-  const video = document.getElementById('edoc-video-preview');
-  const canvas = document.getElementById('edoc-photo-canvas');
-  canvas.width = video.videoWidth || 1280;
-  canvas.height = video.videoHeight || 1600;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-  _edocPages.push(dataUrl);
   edocRenderPageGrid();
-  showToast('Página ' + _edocPages.length + ' capturada.');
+  showToast(files.length > 1 ? files.length + ' páginas adicionadas.' : 'Página adicionada.');
+}
+
+function edocFileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function edocRenderPageGrid() {
   const grid = document.getElementById('edoc-page-grid');
-  grid.innerHTML = _edocPages.map((dataUrl, i) =>
+  grid.innerHTML = _edocPages.map((page, i) =>
     '<div class="edoc-page-thumb">' +
-      '<img src="' + dataUrl + '">' +
+      (page.type === 'pdf'
+        ? '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--bg)"><span style="font-size:22px">&#x1F4D1;</span><span style="font-size:8px;color:#777;padding:0 4px;text-align:center;word-break:break-all">' + escapeHtml(page.label) + '</span></div>'
+        : '<img src="' + page.dataUrl + '">') +
       '<button class="edoc-page-del" onclick="edocDeletePage(' + i + ')">&#x2715;</button>' +
     '</div>'
   ).join('');
@@ -2736,87 +2742,98 @@ function edocDeletePage(index) {
 }
 
 function edocCancelScan() {
-  if (_edocPages.length && !confirm('Cancelar? As páginas capturadas serão perdidas.')) return;
-  edocStopCamera();
+  if (_edocPages.length && !confirm('Cancelar? As páginas adicionadas serão perdidas.')) return;
   _edocPages = [];
   _edocDocType = null;
   document.getElementById('edoc-scan-backdrop').style.display = 'none';
 }
 
-// Bundles all captured pages into ONE PDF (jsPDF), uploads it DIRECTLY
-// to Dropbox (get_dropbox_token pattern — same as video/remarks/audio,
-// never server-mediated), then logs it via saveEntregaDocStatus.
-// Filename always carries a timestamp suffix so re-scans are NEVER
-// overwritten — every scan ever taken is preserved in Dropbox and in
-// the append-only EntregaDocs tab.
+// Builds the final upload blob: if everything captured is images,
+// bundles them into ONE PDF via jsPDF (same fit/center math as
+// before). If exactly one PDF was picked and nothing else, uploads
+// it as-is. Mixed image+PDF selections are rare (a tech would have
+// to deliberately pick a PDF then also add photos) but are still
+// handled by rendering the PDF's page(s) is NOT attempted — instead
+// images are bundled and the PDF, if present, is uploaded as its own
+// separate Dropbox file with a "_2" suffix, since merging foreign
+// PDF bytes into a new jsPDF document isn't something jsPDF supports
+// (Code.gs / Dropbox just needs *a* PDF at the path; multiple files
+// for one doc_type is fine — getEntregaDocsStatus only reads the
+// latest one as "current" anyway).
 async function edocFinalizePdf() {
   if (!_edocPages.length || !_edocRO || !_edocDocType) return;
   const errEl = document.getElementById('edoc-scan-err');
   errEl.style.display = 'none';
   const finalizeBtn = document.getElementById('edoc-btn-finalize');
   finalizeBtn.disabled = true; finalizeBtn.style.opacity = '0.6';
-  showToast('A montar PDF...');
+  showToast('A preparar envio...');
 
   try {
-    // 1) Bundle pages into one PDF, one page per captured photo.
-    const { jsPDF } = window.jspdf;
-    let pdf = null;
-    for (let i = 0; i < _edocPages.length; i++) {
-      const dataUrl = _edocPages[i];
-      const img = await edocLoadImage(dataUrl);
-      const isLandscape = img.width > img.height;
-      const pageOpts = { orientation: isLandscape ? 'landscape' : 'portrait', unit: 'pt', format: 'a4' };
-      if (i === 0) pdf = new jsPDF(pageOpts); else pdf.addPage('a4', pageOpts.orientation);
-      const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
-      // Fit image within the page, preserving aspect ratio, centered.
-      const scale = Math.min(pageW / img.width, pageH / img.height);
-      const w = img.width * scale, h = img.height * scale;
-      const x = (pageW - w) / 2, y = (pageH - h) / 2;
-      pdf.addImage(dataUrl, 'JPEG', x, y, w, h);
-    }
-    const pdfBlob = pdf.output('blob');
+    const imagePages = _edocPages.filter(p => p.type === 'image');
+    const pdfPages   = _edocPages.filter(p => p.type === 'pdf');
+    const blobsToUpload = []; // [{ blob, suffix }] — suffix distinguishes multiple files for the same doc_type
 
-    // 2) Build the destination path — timestamp suffix means re-scans
-    // are NEVER overwritten (Code.gs v2.7.7 / buildEntregaDocFolderPath).
+    if (imagePages.length) {
+      const { jsPDF } = window.jspdf;
+      let pdf = null;
+      for (let i = 0; i < imagePages.length; i++) {
+        const dataUrl = imagePages[i].dataUrl;
+        const img = await edocLoadImage(dataUrl);
+        const isLandscape = img.width > img.height;
+        const pageOpts = { orientation: isLandscape ? 'landscape' : 'portrait', unit: 'pt', format: 'a4' };
+        if (i === 0) pdf = new jsPDF(pageOpts); else pdf.addPage('a4', pageOpts.orientation);
+        const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
+        const scale = Math.min(pageW / img.width, pageH / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        const x = (pageW - w) / 2, y = (pageH - h) / 2;
+        pdf.addImage(dataUrl, 'JPEG', x, y, w, h);
+      }
+      blobsToUpload.push({ blob: pdf.output('blob'), suffix: '' });
+    }
+    pdfPages.forEach((p, i) => blobsToUpload.push({ blob: p.blob, suffix: blobsToUpload.length || i ? '_' + (i + 2) : '' }));
+
+    showToast('A enviar para Dropbox...');
     const now = new Date();
     const ts = fmtEntregaDocTimestamp(now);
     const prefix = _edocDocType === 'pagamento' ? 'PAG' : 'SAI';
-    const filename = prefix + '_' + _edocRO + '_' + ts + '.pdf';
     const folder = buildEntregaDocFolderPath(_edocRO, _edocDocType);
-    const dropboxPath = folder + filename;
 
-    showToast('A enviar para Dropbox...');
-
-    // 3) Direct-to-Dropbox upload — same get_dropbox_token + raw fetch
-    // pattern as video/remarks/audio uploads above.
     const tokenRes = await fetch(API_URL + '?action=get_dropbox_token').then(r => r.json());
     if (!tokenRes || !tokenRes.ok) throw new Error('Falha ao obter token Dropbox');
-    const apiArgs = JSON.stringify({ path: dropboxPath, mode: 'add', autorename: true, mute: false });
-    const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + tokenRes.token,
-        'Dropbox-API-Arg': apiArgs,
-        'Content-Type': 'application/octet-stream',
-      },
-      body: pdfBlob,
-    }).then(r => r.json());
-    if (uploadRes.error_summary) throw new Error(uploadRes.error_summary);
 
-    // 4) Log the upload in EntregaDocs (Code.gs saveEntregaDocStatus).
+    let lastPath = null;
+    for (const item of blobsToUpload) {
+      const filename = prefix + '_' + _edocRO + '_' + ts + item.suffix + '.pdf';
+      const dropboxPath = folder + filename;
+      const apiArgs = JSON.stringify({ path: dropboxPath, mode: 'add', autorename: true, mute: false });
+      const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + tokenRes.token,
+          'Dropbox-API-Arg': apiArgs,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: item.blob,
+      }).then(r => r.json());
+      if (uploadRes.error_summary) throw new Error(uploadRes.error_summary);
+      lastPath = uploadRes.path_display || dropboxPath;
+    }
+
+    // Log the upload in EntregaDocs (Code.gs saveEntregaDocStatus) —
+    // one row pointing at the LAST uploaded file (getEntregaDocsStatus
+    // always reads the most recent row as "current" for this RO/doc_type).
     await fetch(API_URL, {
       method: 'POST', mode: 'no-cors',
       body: JSON.stringify({
         action: 'saveEntregaDocStatus',
         ro_number: _edocRO,
         doc_type: _edocDocType,
-        dropbox_path: uploadRes.path_display || dropboxPath,
+        dropbox_path: lastPath,
         tech: currentTech,
       }),
     });
 
     showToast('\u2705 ' + EDOC_LABELS[_edocDocType] + ' enviado para Dropbox.');
-    edocStopCamera();
     _edocPages = [];
     document.getElementById('edoc-scan-backdrop').style.display = 'none';
     edocRefreshChooserStatus(); // updates the ✅/pending icon back on the chooser
@@ -2973,17 +2990,27 @@ function agdRenderList(events) {
     // Documentos de Entrega modal afterward without needing access
     // to the full `events` array (which is local to this render call).
     let entregueChip = '';
+    let edocReentryIcon = '';
     if (agdCurrentCalendar === 'entrega') {
       entregueChip = ev.entregue
         ? '<span class="entregue-pill clickable" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="on" data-ro-number="' + escapeHtml(ev.ro_number) + '">&#x1F7E1; ENTREGUE</span>'
         : '<span class="chegada-chip-off" data-entrega-evt-id="' + escapeHtml(ev.id) + '" data-entrega-state="off" data-ro-number="' + escapeHtml(ev.ro_number) + '">Confirmar Entrega</span>';
+      // PERSISTENT re-entry icon (v2.7.8) — visible any time the RO is
+      // already ENTREGUE, completely independent of the toggle chip
+      // above. Lets a tech reopen the Documentos de Entrega chooser
+      // later (e.g. Pagamento was scanned at delivery but OS de Saída
+      // wasn't ready yet) WITHOUT touching the entregue state at all —
+      // un-marking/re-marking delivery is never required for this.
+      if (ev.entregue) {
+        edocReentryIcon = '<span class="edoc-reentry-icon clickable" data-edoc-reentry-ro="' + escapeHtml(ev.ro_number) + '" title="Documentos de Entrega">&#x1F4C4;</span>';
+      }
     }
 
     return (
       '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
         '<div class="crow">' +
           '<div>' +
-            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + entregueChip + '</div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + entregueChip + edocReentryIcon + '</div>' +
             '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
             '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
           '</div>' +
@@ -2996,6 +3023,7 @@ function agdRenderList(events) {
     card.addEventListener('click', (clickEvent) => {
       if (clickEvent.target.closest('[data-chegada-evt-id]')) return;  // chegada chip handles its own click
       if (clickEvent.target.closest('[data-entrega-evt-id]')) return;  // entregue chip handles its own click
+      if (clickEvent.target.closest('[data-edoc-reentry-ro]')) return; // re-entry icon handles its own click
       const ev = events.find(e => e.id === card.dataset.evtId);
       if (ev) agdOpenEventDetail(ev);
     });
@@ -3010,6 +3038,15 @@ function agdRenderList(events) {
     chip.addEventListener('click', (clickEvent) => {
       clickEvent.stopPropagation();
       agdToggleEntregaFromList(chip.dataset.entregaEvtId, chip.dataset.entregaState === 'on', chip.dataset.roNumber);
+    });
+  });
+  // PERSISTENT re-entry icon (v2.7.8) — always reachable once entregue,
+  // completely independent of the toggle above; never touches entregue
+  // state, just reopens the Documentos de Entrega chooser for this RO.
+  el.querySelectorAll('[data-edoc-reentry-ro]').forEach(icon => {
+    icon.addEventListener('click', (clickEvent) => {
+      clickEvent.stopPropagation();
+      edocOpenChooser(icon.dataset.edocReentryRo);
     });
   });
 }
