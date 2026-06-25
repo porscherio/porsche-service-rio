@@ -1,4 +1,25 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.4 — Build: 24/06/2026 -->
+<!-- v2.7.4: RELIABLE RELEASE. 'release' (and 'complete_default', when
+             applicable) on the pause/complete screens were pure
+             fire-and-forget (mode:'no-cors') — the PWA had NO way to
+             know if the server-side write actually succeeded.
+             Confirmed real case: 'log_work' succeeded while 'release'
+             → updateCompletion() silently failed server-side, leaving
+             Work Log correct but the Joblines sheet's own
+             completion_pct blank (RO 29912, jobline 003 — repaired
+             manually via Code.gs's reconcileCompletionFromWorkLog).
+             Fix: new releaseJoblineReliably() helper makes both calls
+             AWAITED and readable (no no-cors) — confirms a real
+             { ok: true } from the server before doing any local UI
+             update or navigation. The Confirmar pausa / Confirmar e
+             concluir buttons now disable + dim while the request is
+             in flight (also fixes accidental double-taps). On
+             failure (network error or non-ok response), a new modal
+             appears — "Tentar novamente" / "Cancelar" — and the tech
+             stays exactly where they were, task still locked, nothing
+             lost, free to retry whenever ready. Paired with backend
+             Code.gs v2.7.4 (reconcileCompletionFromWorkLog rename). -->
 <!-- Porsche Service Rio PWA — v2.7.3 — Build: 24/06/2026 -->
 <!-- v2.7.3: Aprovadores now see ALL joblines on the REGULAR RO screen
              too (s1 → s2), not just in the Approval panel. Previously
@@ -405,7 +426,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.4</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -600,7 +621,7 @@ input:focus{outline:none;border-color:var(--black)}
         </select>
       </div>
       <div class="pct-note">Bloqueio libertado. Sessão registada no log de auditoria.</div>
-      <button class="bigbtn btn-pau" onclick="confirmarPausa()">&#x23F8; Confirmar pausa e libertar</button>
+      <button class="bigbtn btn-pau" id="btn-confirmar-pausa" onclick="confirmarPausa()">&#x23F8; Confirmar pausa e libertar</button>
       <button class="bigbtn btn-sec" onclick="goTo('s4')">Cancelar — continuar a trabalhar</button>
     </div>
   </div>
@@ -623,7 +644,7 @@ input:focus{outline:none;border-color:var(--black)}
         </select>
       </div>
       <div class="pct-note" id="pct-note">100% — tarefa concluída. Bloqueio libertado.</div>
-      <button class="bigbtn btn-ini" onclick="handleConcluirClick()">&#x2714; Confirmar e libertar bloqueio</button>
+      <button class="bigbtn btn-ini" id="btn-confirmar-conclusao" onclick="handleConcluirClick()">&#x2714; Confirmar e libertar bloqueio</button>
       <button class="bigbtn btn-sec" onclick="goTo('s4')">Cancelar — continuar a trabalhar</button>
     </div>
   </div>
@@ -637,6 +658,25 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="confirm100Proceed()">&#x2714; OK — confirmar conclusão</button>
       <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="confirm100Cancel()">&#8592; Voltar</button>
+    </div>
+  </div>
+
+  <!-- SAVE-FAILURE RETRY MODAL (v2.7.4) — shown when the reliable
+       'release' POST (see releaseJoblineReliably) doesn't get a
+       confirmed { ok: true } back from the server, whether due to a
+       network failure or a server-side error. Tech stays on the
+       same pause/complete screen either way; "Tentar novamente"
+       re-fires the exact same release attempt, "Cancelar" just
+       dismisses this modal — nothing is lost, the lock/jobline state
+       is unchanged, they can retry whenever ready. -->
+  <div class="parts-pop-backdrop" id="save-retry-backdrop" style="display:none">
+    <div class="parts-pop" style="text-align:center">
+      <div class="parts-pop-title" style="font-size:15px;margin-bottom:10px">&#x26A0; Não foi possível salvar</div>
+      <div style="font-size:13px;color:var(--black);line-height:1.5;margin-bottom:18px">
+        Verifique a conexão com a internet e tente novamente. A tarefa ainda está bloqueada e nada foi perdido.
+      </div>
+      <button class="bigbtn btn-ini" id="save-retry-btn" style="margin-bottom:8px" onclick="saveRetryProceed()">&#x21BB; Tentar novamente</button>
+      <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="saveRetryCancel()">Cancelar</button>
     </div>
   </div>
 
@@ -1084,7 +1124,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.3';
+const APP_VERSION = '2.7.4';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1597,13 +1637,96 @@ function startTask(j) {
   goTo('s4');
 }
 
+// ── RELIABLE RELEASE (v2.7.4) ─────────────────────────────────────
+// 'release' (and, when applicable, 'complete_default') used to be
+// pure fire-and-forget (mode:'no-cors') — the PWA had NO way to know
+// if the server-side write actually succeeded, since no-cors makes
+// the response body/status completely unreadable. Confirmed real-
+// world failure: 'log_work' (a fast, simple appendRow) would
+// succeed while 'release' → updateCompletion() (a slower full-sheet
+// scan) silently failed, leaving Work Log correct but the Joblines
+// sheet's own completion_pct blank — see reconcileCompletionFrom
+// WorkLog in Code.gs for the repair tool built for that gap.
+//
+// This function makes 'release' (and 'complete_default') AWAITED,
+// readable (no no-cors), and retryable. It returns true only once
+// the server has CONFIRMED { ok: true } for every request involved
+// — if anything fails (network error, non-ok JSON, or any kind of
+// exception), it shows the save-retry modal and returns false
+// without performing any local optimistic UI update, so the caller
+// can simply stop and leave the tech exactly where they were: still
+// on the pause/complete screen, task still locked, nothing lost.
+//
+// State for the retry modal is kept in _pendingReleaseResolve so
+// saveRetryProceed()/saveRetryCancel() can resolve the suspended
+// promise, letting the original async call's while-loop either
+// retry the exact same attempt or stop cleanly.
+let _pendingReleaseResolve = null; // resolves the modal's promise with true/false
+
+async function releaseJoblineReliably(args) {
+  while (true) {
+    try {
+      const releaseRes = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'release', ro_number: args.roNumber, jobline_id: args.joblineId,
+          tech: args.tech, pct: args.pct, elapsed_seconds: args.elapsedSeconds,
+          is_default: args.isDefault,
+        }),
+      }).then(r => r.json());
+
+      if (!releaseRes || releaseRes.ok !== true) throw new Error('release not ok');
+
+      if (args.isDefault && args.pct >= 100) {
+        const compRes = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'complete_default', ro_number: args.roNumber, jobline_id: args.joblineId,
+            job_description: args.jobDescription, tech: args.tech, pct: args.pct,
+          }),
+        }).then(r => r.json());
+        if (!compRes || compRes.ok !== true) throw new Error('complete_default not ok');
+      }
+
+      return true; // confirmed success, both calls (if applicable)
+    } catch (e) {
+      const tryAgain = await showSaveRetryModal();
+      if (!tryAgain) return false; // tech cancelled — caller stops here, nothing changed
+      // else: loop and retry the exact same attempt
+    }
+  }
+}
+
+function showSaveRetryModal() {
+  document.getElementById('save-retry-backdrop').style.display = 'flex';
+  return new Promise(resolve => { _pendingReleaseResolve = resolve; });
+}
+
+function saveRetryProceed() {
+  document.getElementById('save-retry-backdrop').style.display = 'none';
+  if (_pendingReleaseResolve) _pendingReleaseResolve(true);
+}
+
+function saveRetryCancel() {
+  document.getElementById('save-retry-backdrop').style.display = 'none';
+  if (_pendingReleaseResolve) _pendingReleaseResolve(false);
+}
+
 async function confirmarPausa() {
   const pct = parseInt(document.getElementById('pct-pause').value);
+  const btn = document.getElementById('btn-confirmar-pausa');
+  btn.disabled = true; btn.style.opacity = '0.6';
+
   await logWork('paused', pct);
-  fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'release', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, tech:currentTech, pct:pct, elapsed_seconds:seconds, is_default:activeTask.is_default})});
-  if (activeTask.is_default && pct >= 100) {
-    fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'complete_default', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, job_description:activeTask.job_description, tech:currentTech, pct:pct})});
-  }
+  const succeeded = await releaseJoblineReliably({
+    roNumber: activeTask.ro_number, joblineId: activeTask.jobline_id, tech: currentTech,
+    pct: pct, elapsedSeconds: seconds, isDefault: activeTask.is_default,
+    jobDescription: activeTask.job_description,
+  });
+
+  btn.disabled = false; btn.style.opacity = '1';
+  if (!succeeded) return; // tech cancelled the retry — stay right here, nothing changed
+
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
   updateLocalROProgress(activeTask.ro_number);
   clearTimer();
@@ -1638,11 +1761,19 @@ function confirm100Cancel() {
 
 async function confirmarConclusao() {
   const pct = parseInt(document.getElementById('pct-done').value);
+  const btn = document.getElementById('btn-confirmar-conclusao');
+  btn.disabled = true; btn.style.opacity = '0.6';
+
   await logWork(pct>=100?'completed':'paused', pct);
-  fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'release', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, tech:currentTech, pct:pct, elapsed_seconds:seconds, is_default:activeTask.is_default})});
-  if (activeTask.is_default && pct >= 100) {
-    fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({action:'complete_default', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id, job_description:activeTask.job_description, tech:currentTech, pct:pct})});
-  }
+  const succeeded = await releaseJoblineReliably({
+    roNumber: activeTask.ro_number, joblineId: activeTask.jobline_id, tech: currentTech,
+    pct: pct, elapsedSeconds: seconds, isDefault: activeTask.is_default,
+    jobDescription: activeTask.job_description,
+  });
+
+  btn.disabled = false; btn.style.opacity = '1';
+  if (!succeeded) return; // tech cancelled the retry — stay right here, nothing changed
+
   updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
   updateLocalROProgress(activeTask.ro_number);
   if (pct>=100) {
