@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.3 — Build: 24/06/2026 -->
+<!-- v2.7.3: Aprovadores now see ALL joblines on the REGULAR RO screen
+             too (s1 → s2), not just in the Approval panel. Previously
+             loadJoblines() always sent &tech=<currentTech>, so an
+             Aprovador opening any RO from the normal list was still
+             subject to Default Assignments keyword filtering exactly
+             like any other tech — meaning an RO whose joblines were
+             all keyword-gated to OTHER techs would show up empty for
+             an Aprovador, even though v2.7.2 had already fixed this
+             for the dedicated Approval panel. Fix: loadJoblines() now
+             omits &tech entirely when isApproverTech is true, so
+             getJoblines() returns the complete, unfiltered list — same
+             mechanism already used by apvSelectRO() since v2.7.2.
+             Regular (non-Aprovador) techs are unaffected; their view
+             stays scoped to their assigned keywords as before. -->
 <!-- Porsche Service Rio PWA — v2.7.2 — Build: 24/06/2026 -->
 <!-- v2.7.2: BUGFIX — Approval panel served stale, keyword-filtered
              joblines. apvSelectRO() previously reused liveJoblines[ro]
@@ -390,7 +405,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.2</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.3</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -1069,7 +1084,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.2';
+const APP_VERSION = '2.7.3';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1239,8 +1254,15 @@ async function loadJoblines(roNumber) {
   document.getElementById('jobline-list-content').innerHTML =
     '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar joblines...</div></div>';
   try {
+    // Aprovadores see ALL joblines everywhere, not just on the
+    // Approval panel — same policy, same mechanism: omit &tech
+    // entirely so getJoblines() skips the Default Assignments
+    // keyword filter (a missing tech param means "no filtering",
+    // per isAllowedForTech in Code.gs). Regular techs keep the
+    // normal keyword-scoped fetch, unchanged.
+    const techParam = isApproverTech ? '' : '&tech='+encodeURIComponent(currentTech);
     const [jlResult, apvResult] = await Promise.allSettled([
-      fetch(API_URL+'?action=joblines&ro_number='+roNumber+'&tech='+encodeURIComponent(currentTech)).then(r=>r.json()),
+      fetch(API_URL+'?action=joblines&ro_number='+roNumber+techParam).then(r=>r.json()),
       fetch(API_URL+'?action=getApprovals&ro_number='+roNumber).then(r=>r.json()),
     ]);
     if (jlResult.status !== 'fulfilled' || !Array.isArray(jlResult.value)) {
