@@ -1,4 +1,20 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.14 — Build: 26/06/2026 -->
+<!-- v2.7.14: Fixed the Documentos de Entrega re-entry pill (📄 Docs,
+              next to the ENTREGUE pill, introduced v2.7.8) — it was
+              previously a tiny 20×20px icon-only box in near-
+              invisible light-gray-on-light-gray (#f7f7f7 on #e0e0e0),
+              which essentially disappeared next to the bold yellow
+              ENTREGUE pill right beside it. Rebuilt as a proper dark
+              pill (var(--black) bg, white text, "📄 Docs" label)
+              matching the size and visual weight of its pill
+              neighbors. NOTE on version numbering: this PWA's prior
+              shipped version was v2.7.10 ("NO PÁTIO QUICK-CHECK",
+              below) — v2.7.11/12/13 were used by a parallel Code.gs-
+              only line of work (chegada/entregue plate-matching
+              fixes, WhatsApp card redesign) that never touched this
+              file. Jumping straight to v2.7.14 here avoids re-using
+              any of those numbers for a second, different change. -->
 <!-- Porsche Service Rio PWA — v2.7.10 — Build: 25/06/2026 -->
 <!-- v2.7.10: NO PÁTIO QUICK-CHECK. New 🅿️ icon in the s1 topbar —
              visible to EVERY logged-in user, no Aprovador gate
@@ -419,7 +435,7 @@ input:focus{outline:none;border-color:var(--black)}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
 .entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#F5D300;color:#1a1a1a}
 .entregue-pill.clickable{cursor:pointer}
-.edoc-reentry-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:12px;margin-left:5px;vertical-align:middle;cursor:pointer;border-radius:5px;background:var(--bg);border:1px solid var(--border)}
+.edoc-reentry-icon{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.03em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--black);color:#fff;cursor:pointer}
 .mileage-pill-blink{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--amber);color:#fff;cursor:pointer;animation:mileage-blink 1.4s ease-in-out infinite}
 @keyframes mileage-blink{0%,100%{opacity:1}50%{opacity:.45}}
 /* ── Approval panel ──────────────────────────────────────── */
@@ -1313,7 +1329,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.10';
+const APP_VERSION = '2.7.14';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3117,7 +3133,7 @@ function agdRenderList(events) {
       // wasn't ready yet) WITHOUT touching the entregue state at all —
       // un-marking/re-marking delivery is never required for this.
       if (ev.entregue) {
-        edocReentryIcon = '<span class="edoc-reentry-icon clickable" data-edoc-reentry-ro="' + escapeHtml(ev.ro_number) + '" title="Documentos de Entrega">&#x1F4C4;</span>';
+        edocReentryIcon = '<span class="edoc-reentry-icon clickable" data-edoc-reentry-ro="' + escapeHtml(ev.ro_number) + '" title="Documentos de Entrega">&#x1F4C4; Docs</span>';
       }
     }
 
