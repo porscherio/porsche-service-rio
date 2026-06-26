@@ -597,6 +597,7 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <div class="drow"><span class="dlbl">RO</span><span class="dval" id="s4-ro"></span></div>
       <div class="drow"><span class="dlbl">Veículo</span><span class="dval" id="s4-vehicle"></span></div>
+      <div class="drow"><span class="dlbl">VIN</span><span class="dval" id="s4-vin" style="font-family:monospace;letter-spacing:.02em"></span></div>
       <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s4-job"></span></div>
       <div style="height:14px"></div>
       <button class="bigbtn btn-cam" onclick="goTo('s5')">&#x1F4F7; Registar foto / vídeo</button>
@@ -1254,7 +1255,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.8';
+const APP_VERSION = '2.7.9';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1772,6 +1773,7 @@ function startTask(j) {
   document.getElementById('media-grid').innerHTML='';
   document.getElementById('s4-ro').textContent='#'+j.ro_number;
   document.getElementById('s4-vehicle').textContent=activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
+  document.getElementById('s4-vin').textContent=(activeRO && activeRO.vin) ? activeRO.vin : '—';
   document.getElementById('s4-job').textContent=j.job_description;
   document.getElementById('s4-title').textContent='Em andamento — RO #'+j.ro_number;
   document.getElementById('s5-folder').textContent='Dropbox / #'+j.ro_number+' / '+j.job_description;
