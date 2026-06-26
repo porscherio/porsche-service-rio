@@ -1,4 +1,28 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.9 — Build: 25/06/2026 -->
+<!-- v2.7.9: DOCUMENTOS DE ENTREGA (introduced v2.7.7, fixed v2.7.8) +
+             VIN on active-timer screen (v2.7.9). Right after a tech
+             confirms ENTREGUE, a chooser modal now prompts scanning
+             "OS de Saída" and "Pagamento" — each captured via the
+             browser-native <input type=file capture> picker (hands
+             framing/crop off to the phone's own camera/scanner app,
+             fixing the poorly-framed custom-camera v2.7.7 attempt),
+             bundled into one PDF (jsPDF) when multiple image pages
+             are added, uploaded DIRECTLY to Dropbox (get_dropbox_token
+             pattern, same as video/remarks/audio), logged via new
+             Code.gs route saveEntregaDocStatus into append-only tab
+             EntregaDocs. A persistent 📄 icon next to the ENTREGUE
+             pill reopens the chooser any time afterward — un-marking/
+             re-marking delivery is never required to scan a missed
+             doc. Scan modal uses a sticky footer (.edoc-scan-pop) so
+             Finalizar/Cancelar stay visible regardless of page count.
+             Paths: .../#{RO}/os_assinada/SAI_{RO}_{ts}.pdf and
+             .../pagamento/PAG_{RO}_{ts}.pdf — re-scans never overwrite,
+             always a fresh timestamped file + fresh audit row.
+             Separately: VIN now always shown on screen s4 ("Em
+             andamento") for every jobline, every RO — was already in
+             activeRO.vin, just missing as its own display row.
+             Paired with backend Code.gs v2.7.9. -->
 <!-- Porsche Service Rio PWA — v2.7.6 — Build: 24/06/2026 -->
 <!-- v2.7.6: MILEAGE CHECK. RO cards (s1 list) and the RO detail
              header (s2) now show a blinking amber "Confirmar
@@ -473,7 +497,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="logo-line"></div>
         <div class="login-sub">Gestão de Tarefas de Serviço</div>
         <div style="display:flex;justify-content:center">
-          <div class="ver-badge">&#x1F3F7; Versão <b>2.7.6</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
+          <div class="ver-badge">&#x1F3F7; Versão <b id="ver-badge-num">--</b>&nbsp;·&nbsp;Build <b id="build-date">--</b></div>
         </div>
       </div>
       <div class="field-wrap">
@@ -1316,6 +1340,7 @@ const MAX_REC_SECONDS = 30;
 // ── Init ─────────────────────────────────────────────────────────
 const _n = new Date();
 document.getElementById('build-date').textContent = pad(_n.getDate())+'/'+pad(_n.getMonth()+1)+'/'+_n.getFullYear();
+document.getElementById('ver-badge-num').textContent = APP_VERSION;
 document.getElementById('logo-img').src = 'https://dastek.com.br/logo/porsche_rj_logo.jpg';
 Object.keys(USERS).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(n => {
   const o = document.createElement('option'); o.value = n; o.textContent = n;
