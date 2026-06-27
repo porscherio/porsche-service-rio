@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.18 — Build: 26/06/2026 -->
+<!-- v2.7.18: PARTS REQUESTS — when an Aprovador selects "Autorizada a
+             compra" (To Be Ordered), "Data pedido" now auto-fills with
+             today's date (same pattern already used for "Entregue em"
+             on Delivered), and the PO/dates fields block becomes
+             visible at that point instead of only from "Pedido feito"
+             onward. The date stays editable in case it needs
+             correcting. -->
+<!-- Porsche Service Rio PWA — v2.7.17 — Build: 26/06/2026 -->
+<!-- v2.7.17: PARTS REQUESTS — fix from v2.7.16: the status field was
+             being fully disabled once authorized, blocking the
+             Aprovador from progressing the part through the rest of
+             the purchase workflow (Pedido feito → Pedido confirmado →
+             Back order → Peça recebida). Corrected: the select stays
+             fully editable; only the "Autorizada a compra" option
+             itself becomes unselectable once a status has been set,
+             so the approval step can never be undone, while every
+             other status remains freely selectable in any order, any
+             number of times. -->
 <!-- Porsche Service Rio PWA — v2.7.16 — Build: 26/06/2026 -->
 <!-- v2.7.16: PARTS REQUESTS — relabeled status options (e.g. "A solicitar"
              → "Autorizada a compra", "Entregue" → "Peça recebida") to
@@ -506,7 +525,7 @@ input:focus{outline:none;border-color:var(--black)}
 .pkg-part-desc{font-size:12.5px;font-weight:600;color:var(--black);flex:1;line-height:1.4}
 .pkg-part-qty{font-size:10.5px;color:#999;margin-top:1px}
 .pkg-status-sel{margin-top:8px;width:100%}
-.pkg-status-sel:disabled,.pkg-status-locked{background:#f0f0f0;color:#777;border-color:var(--border);-webkit-text-fill-color:#777;opacity:1;cursor:not-allowed}
+.pkg-status-sel option:disabled{color:#bbb}
 .pkg-save-row{display:flex;justify-content:flex-end;margin-top:4px}
 .pkg-save-btn{font-size:10.5px;font-weight:700;padding:6px 14px;border-radius:4px;border:none;background:var(--black);color:#fff;cursor:pointer;letter-spacing:.03em}
 .pkg-add-form{background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:10px}
@@ -1369,7 +1388,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.16';
+const APP_VERSION = '2.7.18';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3870,14 +3889,17 @@ function pkgSafeId(partKey) {
 
 function pkgPartCardHtml(p) {
   const safeId   = pkgSafeId(p.part_key);
-  const isOrdered = (p.status === 'Ordered' || p.status === 'Confirmed' || p.status === 'Back Order' || p.status === 'Delivered');
-  // Once the Aprovador sets any status (purchase authorized or beyond), the
-  // status field itself is locked to prevent accidental re-authorization or
-  // reverting the approval. Other fields (PO, dates) stay editable to track
-  // the order as it progresses. Blank = no action taken yet = not locked.
-  const isLocked = !!p.status;
+  const isOrdered = (p.status === 'To Be Ordered' || p.status === 'Ordered' || p.status === 'Confirmed' || p.status === 'Back Order' || p.status === 'Delivered');
+  // Once the Aprovador has set any status (moved past blank), the part is
+  // considered authorized — "Autorizada a compra" (To Be Ordered) can no
+  // longer be selected again, preventing reverting the approval. The select
+  // itself stays fully editable so the workflow can keep moving forward
+  // through Pedido feito / Pedido confirmado / Back order / Peça recebida,
+  // in any order, as many times as needed.
+  const pastAuthorization = !!p.status;
   const opts = '<option value="">— Selecionar —</option>' + PARTS_STATUSES.map(function(s) {
-    return '<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+PARTS_STATUS_PT[s]+'</option>';
+    const lockOpt = (s === 'To Be Ordered' && pastAuthorization);
+    return '<option value="'+s+'"'+(p.status===s?' selected':'')+(lockOpt?' disabled':'')+'>'+PARTS_STATUS_PT[s]+(lockOpt?' (já autorizada)':'')+'</option>';
   }).join('');
   return (
     '<div class="pkg-part-card">' +
@@ -3887,8 +3909,7 @@ function pkgPartCardHtml(p) {
           '<div class="pkg-part-qty">Qtd: ' + p.quantity + (p.part_code ? ' · Cód: '+p.part_code : '') + '</div>' +
         '</div>' +
       '</div>' +
-      '<select class="pkg-status-sel'+(isLocked?' pkg-status-locked':'')+'" id="pkg-status-'+safeId+'"'+(isLocked?' disabled title="Compra já autorizada — status bloqueado"':'')+'>' + opts + '</select>' +
-      (isLocked ? '<input type="hidden" id="pkg-status-locked-val-'+safeId+'" value="'+p.status+'">' : '') +
+      '<select class="pkg-status-sel" id="pkg-status-'+safeId+'">' + opts + '</select>' +
       '<div class="pkg-panel-fields" id="pkg-fields-'+safeId+'" style="display:'+(isOrdered?'block':'none')+'">' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">Nº PO</span><input type="text" id="pkg-po-'+safeId+'" value="'+escapeHtml(p.po_number||'')+'" placeholder="ex: PO-12345"></div>' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">Data pedido</span><input type="date" id="pkg-date-'+safeId+'" value="'+(p.date_ordered||'')+'"></div>' +
@@ -3903,8 +3924,15 @@ function pkgPartCardHtml(p) {
 function pkgToggleOrderedFields(safeId, status) {
   const fieldsEl = document.getElementById('pkg-fields-' + safeId);
   if (!fieldsEl) return;
-  const show = (status === 'Ordered' || status === 'Confirmed' || status === 'Back Order' || status === 'Delivered');
+  const show = (status === 'To Be Ordered' || status === 'Ordered' || status === 'Confirmed' || status === 'Back Order' || status === 'Delivered');
   fieldsEl.style.display = show ? 'block' : 'none';
+
+  // Auto-fill today's date when authorizing the purchase, if not already set.
+  // Stays editable in case the Aprovador needs to correct it.
+  if (status === 'To Be Ordered') {
+    const dateEl = document.getElementById('pkg-date-' + safeId);
+    if (dateEl && !dateEl.value) dateEl.value = todayDateStr();
+  }
 
   // Auto-fill today's date when marking as Delivered, if not already set.
   // Stays editable in case the Aprovador needs to correct it.
@@ -3925,9 +3953,7 @@ async function pkgSavePart(roNumber, partKey) {
   const p      = parts.find(function(x) { return x.part_key === partKey; });
   if (!p) return;
 
-  const statusEl   = document.getElementById('pkg-status-' + safeId);
-  const lockedEl   = document.getElementById('pkg-status-locked-val-' + safeId);
-  const status     = lockedEl ? lockedEl.value : statusEl.value; // locked fields keep their authorized status
+  const status = document.getElementById('pkg-status-' + safeId).value;
   const poEl   = document.getElementById('pkg-po-' + safeId);
   const dateEl = document.getElementById('pkg-date-' + safeId);
   const etaEl  = document.getElementById('pkg-eta-' + safeId);
@@ -3954,7 +3980,7 @@ async function pkgSavePart(roNumber, partKey) {
     const data = await res.json();
     if (!data.ok) {
       const msg = data.error === 'status_locked'
-        ? 'Status já autorizado e não pode ser alterado.'
+        ? 'Compra já autorizada — não é possível voltar a este estado.'
         : (data.error || 'não foi possível guardar');
       showToast('Erro: ' + msg);
       return;
