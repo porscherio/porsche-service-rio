@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.16 — Build: 26/06/2026 -->
+<!-- v2.7.16: PARTS REQUESTS — relabeled status options (e.g. "A solicitar"
+             → "Autorizada a compra", "Entregue" → "Peça recebida") to
+             better match real-world terminology. New parts now start
+             with a BLANK status (no action taken yet) instead of
+             defaulting to "To Be Ordered" — this was previously
+             misleading, implying authorization had already happened.
+             Once an Aprovador sets a status, that status dropdown
+             locks (greyed out, read-only) to prevent accidental
+             re-authorization/reversal — PO number, dates, and ETA
+             remain editable to track the order as it progresses.
+             Lock is enforced server-side too (savePartStatus rejects
+             status changes once a part already has a non-blank
+             status), so it can't be bypassed via stale UI or a
+             direct API call. -->
 <!-- Porsche Service Rio PWA — v2.7.15 — Build: 26/06/2026 -->
 <!-- v2.7.15: Agendamento Management list (both SERVICOS and ENTREGA)
               now SORTS ASCENDING by RO number by default — previously
@@ -491,6 +506,7 @@ input:focus{outline:none;border-color:var(--black)}
 .pkg-part-desc{font-size:12.5px;font-weight:600;color:var(--black);flex:1;line-height:1.4}
 .pkg-part-qty{font-size:10.5px;color:#999;margin-top:1px}
 .pkg-status-sel{margin-top:8px;width:100%}
+.pkg-status-sel:disabled,.pkg-status-locked{background:#f0f0f0;color:#777;border-color:var(--border);-webkit-text-fill-color:#777;opacity:1;cursor:not-allowed}
 .pkg-save-row{display:flex;justify-content:flex-end;margin-top:4px}
 .pkg-save-btn{font-size:10.5px;font-weight:700;padding:6px 14px;border-radius:4px;border:none;background:var(--black);color:#fff;cursor:pointer;letter-spacing:.03em}
 .pkg-add-form{background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:10px}
@@ -1353,7 +1369,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.15';
+const APP_VERSION = '2.7.16';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1386,12 +1402,12 @@ const DEFAULT_JOBLINES = [
 
 const PARTS_STATUSES = ['On Stock', 'To Be Ordered', 'Ordered', 'Confirmed', 'Back Order', 'Delivered'];
 const PARTS_STATUS_PT = {
-  'On Stock':      'Em estoque',
-  'To Be Ordered': 'A solicitar',
-  'Ordered':       'Solicitada',
-  'Confirmed':     'Confirmada',
+  'On Stock':      'Disponível no estoque',
+  'To Be Ordered': 'Autorizada a compra',
+  'Ordered':       'Pedido feito',
+  'Confirmed':     'Pedido confirmado',
   'Back Order':    'Back order',
-  'Delivered':     'Entregue',
+  'Delivered':     'Peça recebida',
 };
 
 // ── State ────────────────────────────────────────────────────────
@@ -2592,7 +2608,7 @@ function partRowReadOnlyHtml(p) {
         '<div class="pp-qty">Qtd: ' + p.quantity + '</div>' +
         (meta ? '<div class="pp-meta">' + meta + '</div>' : '') +
       '</div>' +
-      '<span class="pp-st ' + stCls + '">' + (PARTS_STATUS_PT[p.status] || p.status) + '</span>' +
+      '<span class="pp-st ' + stCls + '">' + (PARTS_STATUS_PT[p.status] || (p.status ? p.status : 'Pendente')) + '</span>' +
     '</div>'
   );
 }
@@ -3855,7 +3871,12 @@ function pkgSafeId(partKey) {
 function pkgPartCardHtml(p) {
   const safeId   = pkgSafeId(p.part_key);
   const isOrdered = (p.status === 'Ordered' || p.status === 'Confirmed' || p.status === 'Back Order' || p.status === 'Delivered');
-  const opts = PARTS_STATUSES.map(function(s) {
+  // Once the Aprovador sets any status (purchase authorized or beyond), the
+  // status field itself is locked to prevent accidental re-authorization or
+  // reverting the approval. Other fields (PO, dates) stay editable to track
+  // the order as it progresses. Blank = no action taken yet = not locked.
+  const isLocked = !!p.status;
+  const opts = '<option value="">— Selecionar —</option>' + PARTS_STATUSES.map(function(s) {
     return '<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+PARTS_STATUS_PT[s]+'</option>';
   }).join('');
   return (
@@ -3866,7 +3887,8 @@ function pkgPartCardHtml(p) {
           '<div class="pkg-part-qty">Qtd: ' + p.quantity + (p.part_code ? ' · Cód: '+p.part_code : '') + '</div>' +
         '</div>' +
       '</div>' +
-      '<select class="pkg-status-sel" id="pkg-status-'+safeId+'">' + opts + '</select>' +
+      '<select class="pkg-status-sel'+(isLocked?' pkg-status-locked':'')+'" id="pkg-status-'+safeId+'"'+(isLocked?' disabled title="Compra já autorizada — status bloqueado"':'')+'>' + opts + '</select>' +
+      (isLocked ? '<input type="hidden" id="pkg-status-locked-val-'+safeId+'" value="'+p.status+'">' : '') +
       '<div class="pkg-panel-fields" id="pkg-fields-'+safeId+'" style="display:'+(isOrdered?'block':'none')+'">' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">Nº PO</span><input type="text" id="pkg-po-'+safeId+'" value="'+escapeHtml(p.po_number||'')+'" placeholder="ex: PO-12345"></div>' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">Data pedido</span><input type="date" id="pkg-date-'+safeId+'" value="'+(p.date_ordered||'')+'"></div>' +
@@ -3903,7 +3925,9 @@ async function pkgSavePart(roNumber, partKey) {
   const p      = parts.find(function(x) { return x.part_key === partKey; });
   if (!p) return;
 
-  const status = document.getElementById('pkg-status-' + safeId).value;
+  const statusEl   = document.getElementById('pkg-status-' + safeId);
+  const lockedEl   = document.getElementById('pkg-status-locked-val-' + safeId);
+  const status     = lockedEl ? lockedEl.value : statusEl.value; // locked fields keep their authorized status
   const poEl   = document.getElementById('pkg-po-' + safeId);
   const dateEl = document.getElementById('pkg-date-' + safeId);
   const etaEl  = document.getElementById('pkg-eta-' + safeId);
@@ -3928,7 +3952,13 @@ async function pkgSavePart(roNumber, partKey) {
   try {
     const res  = await fetch(API_URL, { method:'POST', body: JSON.stringify(body) });
     const data = await res.json();
-    if (!data.ok) { showToast('Erro: '+(data.error||'não foi possível guardar')); return; }
+    if (!data.ok) {
+      const msg = data.error === 'status_locked'
+        ? 'Status já autorizado e não pode ser alterado.'
+        : (data.error || 'não foi possível guardar');
+      showToast('Erro: ' + msg);
+      return;
+    }
     showToast('&#x2714; Peça atualizada');
     await pkgLoadParts(roNumber);          // refresh detail panel with new current-state
     loadPartsSummaries(liveROs.map(r => r.ro_number)); // refresh badges on RO list
@@ -3961,7 +3991,7 @@ async function pkgSubmitManualPart() {
         ro_number: pkgCurrentRO.ro_number,
         part_description: desc,
         quantity: qty,
-        status: 'To Be Ordered',
+        status: '',
         tech: currentTech,
       }),
     });
