@@ -1,4 +1,17 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.20 — Build: 27/06/2026 -->
+<!-- v2.7.20: PARTS REQUESTS — locked "Autorizada a compra" option now
+             shows the actual authorization date (e.g. "Autorizada a
+             compra em 27/06/2026"), read from the part's "Data
+             pedido" field, instead of the generic "(já autorizada)"
+             text. Falls back to the generic text only if no date was
+             ever recorded (e.g. parts authorized before this date
+             auto-fill existed). -->
+<!-- Porsche Service Rio PWA — v2.7.19 — Build: 26/06/2026 -->
+<!-- v2.7.19: App version number now shown in the persistent top status
+             bar (next to "PORSCHE SERVICE RIO", on every screen), not
+             just on the login screen badge. Helps confirm which build
+             is running without having to log out. -->
 <!-- Porsche Service Rio PWA — v2.7.18 — Build: 26/06/2026 -->
 <!-- v2.7.18: PARTS REQUESTS — when an Aprovador selects "Autorizada a
              compra" (To Be Ordered), "Data pedido" now auto-fills with
@@ -560,7 +573,7 @@ input:focus{outline:none;border-color:var(--black)}
 <div id="app">
   <div class="sbar">
     <span id="clk">--:--</span>
-    <span style="color:#bbb;font-size:10px;letter-spacing:.08em">PORSCHE SERVICE RIO</span>
+    <span style="color:#bbb;font-size:10px;letter-spacing:.08em">PORSCHE SERVICE RIO <span id="sbar-ver" style="color:#666;letter-spacing:0">·v--</span></span>
     <span id="sbar-tech" style="display:none;color:#fff;font-size:10px;font-weight:600;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px"></span>
     <span>&#x1F4F6;</span>
   </div>
@@ -1388,7 +1401,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.18';
+const APP_VERSION = '2.7.20';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1450,6 +1463,7 @@ const MAX_REC_SECONDS = 30;
 const _n = new Date();
 document.getElementById('build-date').textContent = pad(_n.getDate())+'/'+pad(_n.getMonth()+1)+'/'+_n.getFullYear();
 document.getElementById('ver-badge-num').textContent = APP_VERSION;
+document.getElementById('sbar-ver').textContent = '·v'+APP_VERSION;
 document.getElementById('logo-img').src = 'https://dastek.com.br/logo/porsche_rj_logo.jpg';
 Object.keys(USERS).sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(n => {
   const o = document.createElement('option'); o.value = n; o.textContent = n;
@@ -3897,9 +3911,11 @@ function pkgPartCardHtml(p) {
   // through Pedido feito / Pedido confirmado / Back order / Peça recebida,
   // in any order, as many times as needed.
   const pastAuthorization = !!p.status;
+  const authDate = fmtDateDisplay(p.date_ordered);
   const opts = '<option value="">— Selecionar —</option>' + PARTS_STATUSES.map(function(s) {
     const lockOpt = (s === 'To Be Ordered' && pastAuthorization);
-    return '<option value="'+s+'"'+(p.status===s?' selected':'')+(lockOpt?' disabled':'')+'>'+PARTS_STATUS_PT[s]+(lockOpt?' (já autorizada)':'')+'</option>';
+    const lockLabel = lockOpt ? (authDate ? ' em ' + authDate : ' (já autorizada)') : '';
+    return '<option value="'+s+'"'+(p.status===s?' selected':'')+(lockOpt?' disabled':'')+'>'+PARTS_STATUS_PT[s]+lockLabel+'</option>';
   }).join('');
   return (
     '<div class="pkg-part-card">' +
