@@ -1,4 +1,30 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.21 — Build: 27/06/2026 -->
+<!-- v2.7.21: PARTS REQUESTS — workflow refinements:
+             • "Pedido feito" (Ordered) now REQUIRES Nº PO and Data
+               pedido before it can be saved (client + server
+               validation). ETA auto-fills as Data pedido + 30 days
+               (editable) when both Data pedido is set and ETA is
+               still blank.
+             • "Peça recebida" (Delivered) now REQUIRES Entregue em
+               (auto-fills to today, editable) and a new "Qtd
+               recebida" field (auto-fills to the part's full
+               ordered quantity, editable) — both required before
+               saving.
+             • New receipt-completeness tracking: if Qtd recebida <
+               quantity, the part is tagged "partial" (a new 4th
+               status color, distinct from red/yellow/green) instead
+               of fully green/done. A small chip on the part card
+               ("Completo" / "Parcial X/Y") reflects this, and the
+               read-only popover (all techs) shows it too.
+             • PartsRequests sheet gained a new received_quantity
+               column (auto-migrated for existing sheets — safe, no
+               data loss). The partial/full distinction feeds into
+               both the RO-card parts badge and the lightweight batch
+               summary endpoint used by the Patio dashboard — Patio's
+               own rendering code will need a matching update to
+               actually display the new "partial" color (not included
+               in this PWA-side change). -->
 <!-- Porsche Service Rio PWA — v2.7.20 — Build: 27/06/2026 -->
 <!-- v2.7.20: PARTS REQUESTS — locked "Autorizada a compra" option now
              shows the actual authorization date (e.g. "Autorizada a
@@ -366,6 +392,7 @@
   --border:#e0e0e0;--bg:#f7f7f7;
   --green:#1D9E75;--green-bg:#E1F5EE;--green-text:#085041;
   --amber:#D4860A;--amber-bg:#FEF3E2;--amber-text:#854F0B;
+  --blue:#2563EB;--blue-bg:#DBEAFE;--blue-text:#1E40AF;
   --danger-bg:#FEE2E2;--danger-text:#991111;--danger-border:#E24B4A;
 }
 html,body{height:100%;width:100%;overflow:hidden;background:#000}
@@ -512,10 +539,12 @@ input:focus{outline:none;border-color:var(--black)}
 /* ── Parts Requests (v1.8) ───────────────────────────────── */
 .parts-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.04em;cursor:pointer;white-space:nowrap;margin-top:6px;border:1px solid transparent}
 .pb-red{background:var(--danger-bg);color:var(--danger-text);border-color:var(--danger-border)}
+.pb-partial{background:var(--blue-bg);color:var(--blue-text);border-color:var(--blue)}
 .pb-yellow{background:var(--amber-bg);color:var(--amber-text);border-color:var(--amber)}
 .pb-green{background:var(--green-bg);color:var(--green-text);border-color:var(--green)}
 .pb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .pb-dot.pb-red{background:var(--red)}
+.pb-dot.pb-partial{background:var(--blue)}
 .pb-dot.pb-yellow{background:var(--amber)}
 .pb-dot.pb-green{background:var(--green)}
 .parts-pop-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:400;display:flex;align-items:flex-end;justify-content:center}
@@ -532,7 +561,7 @@ input:focus{outline:none;border-color:var(--black)}
 .pkg-field-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .pkg-field-row:last-child{margin-bottom:0}
 .pkg-field-lbl{font-size:10px;color:#888;width:78px;flex-shrink:0}
-.pkg-field-row input[type=text],.pkg-field-row input[type=date]{flex:1;padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;color:var(--black);-webkit-appearance:none}
+.pkg-field-row input[type=text],.pkg-field-row input[type=date],.pkg-field-row input[type=number]{flex:1;padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;color:var(--black);-webkit-appearance:none}
 .pkg-part-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
 .pkg-part-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .pkg-part-desc{font-size:12.5px;font-weight:600;color:var(--black);flex:1;line-height:1.4}
@@ -1401,7 +1430,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.20';
+const APP_VERSION = '2.7.21';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2590,7 +2619,7 @@ async function loadPartsSummaries(roNumbers) {
 function partsBadgeHtml(roNumber) {
   const s = partsSummaryCache[roNumber];
   if (!s || s.color === 'none' || !s.total) return '';
-  const labels = { red: 'Peças pendentes', yellow: 'Peças em andamento', green: 'Peças disponíveis' };
+  const labels = { red: 'Peças pendentes', partial: 'Recebimento parcial', yellow: 'Peças em andamento', green: 'Peças disponíveis' };
   const cls = 'pb-' + s.color;
   return (
     '<span class="parts-badge ' + cls + '" data-ro="' + roNumber + '">' +
@@ -2632,8 +2661,12 @@ function closePartsPopover() {
 }
 
 function partRowReadOnlyHtml(p) {
-  const stCls = partsStatusClass(p.status);
+  const stCls = partsStatusClass(p);
   const meta  = partMetaLine(p);
+  const isPartial = (p.status === 'Delivered' && p.receipt_complete === false);
+  const label = isPartial
+    ? 'Recebimento parcial (' + p.received_quantity + '/' + p.quantity + ')'
+    : (PARTS_STATUS_PT[p.status] || (p.status ? p.status : 'Pendente'));
   return (
     '<div class="pp-row">' +
       '<div>' +
@@ -2641,14 +2674,16 @@ function partRowReadOnlyHtml(p) {
         '<div class="pp-qty">Qtd: ' + p.quantity + '</div>' +
         (meta ? '<div class="pp-meta">' + meta + '</div>' : '') +
       '</div>' +
-      '<span class="pp-st ' + stCls + '">' + (PARTS_STATUS_PT[p.status] || (p.status ? p.status : 'Pendente')) + '</span>' +
+      '<span class="pp-st ' + stCls + '">' + label + '</span>' +
     '</div>'
   );
 }
 
-function partsStatusClass(status) {
+function partsStatusClass(p) {
+  const status = p.status;
   if (status === 'Back Order' || status === 'To Be Ordered' || !status) return 'pb-red';
-  if (status === 'Delivered'  || status === 'On Stock')                 return 'pb-green';
+  if (status === 'Delivered') return (p.receipt_complete === false) ? 'pb-partial' : 'pb-green';
+  if (status === 'On Stock') return 'pb-green';
   return 'pb-yellow'; // Ordered, Confirmed
 }
 
@@ -2658,6 +2693,9 @@ function partMetaLine(p) {
   if (p.date_ordered)   bits.push('Pedido ' + fmtDateDisplay(p.date_ordered));
   if (p.eta)             bits.push('ETA ' + fmtDateDisplay(p.eta));
   if (p.delivered_date) bits.push('Entregue ' + fmtDateDisplay(p.delivered_date));
+  if (p.status === 'Delivered' && p.received_quantity !== null && p.received_quantity !== undefined) {
+    bits.push('Recebido ' + p.received_quantity + '/' + p.quantity);
+  }
   return bits.join(' · ');
 }
 
@@ -3901,6 +3939,16 @@ function pkgSafeId(partKey) {
   return String(partKey).replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
+function receiptChipHtml(p) {
+  if (p.receipt_complete === false) {
+    return '<span class="parts-badge pb-partial" style="margin-top:0;cursor:default">Parcial ('+p.received_quantity+'/'+p.quantity+')</span>';
+  }
+  if (p.receipt_complete === true) {
+    return '<span class="parts-badge pb-green" style="margin-top:0;cursor:default">Completo</span>';
+  }
+  return '';
+}
+
 function pkgPartCardHtml(p) {
   const safeId   = pkgSafeId(p.part_key);
   const isOrdered = (p.status === 'To Be Ordered' || p.status === 'Ordered' || p.status === 'Confirmed' || p.status === 'Back Order' || p.status === 'Delivered');
@@ -3924,13 +3972,18 @@ function pkgPartCardHtml(p) {
           '<div class="pkg-part-desc">' + escapeHtml(p.part_description) + (p.source==='manual' ? ' <span style="color:#aaa;font-weight:400;font-size:10px">(manual)</span>' : '') + '</div>' +
           '<div class="pkg-part-qty">Qtd: ' + p.quantity + (p.part_code ? ' · Cód: '+p.part_code : '') + '</div>' +
         '</div>' +
+        (p.status === 'Delivered' ? receiptChipHtml(p) : '') +
       '</div>' +
       '<select class="pkg-status-sel" id="pkg-status-'+safeId+'">' + opts + '</select>' +
       '<div class="pkg-panel-fields" id="pkg-fields-'+safeId+'" style="display:'+(isOrdered?'block':'none')+'">' +
-        '<div class="pkg-field-row"><span class="pkg-field-lbl">Nº PO</span><input type="text" id="pkg-po-'+safeId+'" value="'+escapeHtml(p.po_number||'')+'" placeholder="ex: PO-12345"></div>' +
-        '<div class="pkg-field-row"><span class="pkg-field-lbl">Data pedido</span><input type="date" id="pkg-date-'+safeId+'" value="'+(p.date_ordered||'')+'"></div>' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">Nº PO *</span><input type="text" id="pkg-po-'+safeId+'" value="'+escapeHtml(p.po_number||'')+'" placeholder="ex: PO-12345"></div>' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">Data pedido *</span><input type="date" id="pkg-date-'+safeId+'" value="'+(p.date_ordered||'')+'"></div>' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">ETA</span><input type="date" id="pkg-eta-'+safeId+'" value="'+(p.eta||'')+'"></div>' +
-        '<div class="pkg-field-row"><span class="pkg-field-lbl">Entregue em</span><input type="date" id="pkg-delivered-'+safeId+'" value="'+(p.delivered_date||'')+'"></div>' +
+        '<div class="pkg-field-row"><span class="pkg-field-lbl">Entregue em *</span><input type="date" id="pkg-delivered-'+safeId+'" value="'+(p.delivered_date||'')+'"></div>' +
+        '<div class="pkg-field-row" id="pkg-recvqty-row-'+safeId+'" style="display:'+(p.status==='Delivered'?'flex':'none')+'">' +
+          '<span class="pkg-field-lbl">Qtd recebida *</span>' +
+          '<input type="number" min="0" step="1" id="pkg-recvqty-'+safeId+'" value="'+(p.received_quantity!==null&&p.received_quantity!==undefined?p.received_quantity:p.quantity)+'">' +
+        '</div>' +
       '</div>' +
       '<div class="pkg-save-row"><button class="pkg-save-btn" id="pkg-save-'+safeId+'">Guardar</button></div>' +
     '</div>'
@@ -3950,12 +4003,33 @@ function pkgToggleOrderedFields(safeId, status) {
     if (dateEl && !dateEl.value) dateEl.value = todayDateStr();
   }
 
-  // Auto-fill today's date when marking as Delivered, if not already set.
-  // Stays editable in case the Aprovador needs to correct it.
+  // When "Pedido feito" is chosen, auto-fill ETA as Data pedido + 30 days
+  // (if Data pedido is already set and ETA is still blank). Stays editable.
+  if (status === 'Ordered') {
+    const dateEl = document.getElementById('pkg-date-' + safeId);
+    const etaEl  = document.getElementById('pkg-eta-' + safeId);
+    if (dateEl && dateEl.value && etaEl && !etaEl.value) {
+      etaEl.value = addDaysToDateStr(dateEl.value, 30);
+    }
+  }
+
+  // Show/hide the "Qtd recebida" row only for Delivered, auto-filling today's
+  // date and the full ordered quantity as defaults — both stay editable so a
+  // partial receipt can be recorded.
+  const recvRow = document.getElementById('pkg-recvqty-row-' + safeId);
+  if (recvRow) recvRow.style.display = (status === 'Delivered') ? 'flex' : 'none';
   if (status === 'Delivered') {
     const delEl = document.getElementById('pkg-delivered-' + safeId);
     if (delEl && !delEl.value) delEl.value = todayDateStr();
   }
+}
+
+function addDaysToDateStr(dateStr, days) {
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
 function todayDateStr() {
@@ -3969,11 +4043,23 @@ async function pkgSavePart(roNumber, partKey) {
   const p      = parts.find(function(x) { return x.part_key === partKey; });
   if (!p) return;
 
-  const status = document.getElementById('pkg-status-' + safeId).value;
-  const poEl   = document.getElementById('pkg-po-' + safeId);
-  const dateEl = document.getElementById('pkg-date-' + safeId);
-  const etaEl  = document.getElementById('pkg-eta-' + safeId);
-  const delEl  = document.getElementById('pkg-delivered-' + safeId);
+  const status   = document.getElementById('pkg-status-' + safeId).value;
+  const poEl     = document.getElementById('pkg-po-' + safeId);
+  const dateEl   = document.getElementById('pkg-date-' + safeId);
+  const etaEl    = document.getElementById('pkg-eta-' + safeId);
+  const delEl    = document.getElementById('pkg-delivered-' + safeId);
+  const recvEl   = document.getElementById('pkg-recvqty-' + safeId);
+
+  // Required-field validation, mirrored on the server. Catches it here first
+  // so the Aprovador gets immediate feedback without a round-trip.
+  if (status === 'Ordered') {
+    if (!poEl || !poEl.value.trim())   { showToast('Nº PO é obrigatório para "Pedido feito".'); return; }
+    if (!dateEl || !dateEl.value)      { showToast('Data do pedido é obrigatória para "Pedido feito".'); return; }
+  }
+  if (status === 'Delivered') {
+    if (!delEl || !delEl.value)        { showToast('Data de entrega é obrigatória para "Peça recebida".'); return; }
+    if (!recvEl || recvEl.value === '') { showToast('Quantidade recebida é obrigatória para "Peça recebida".'); return; }
+  }
 
   const body = {
     action: 'savePartStatus',
@@ -3987,6 +4073,7 @@ async function pkgSavePart(roNumber, partKey) {
     date_ordered: dateEl ? dateEl.value : '',
     eta: etaEl ? etaEl.value : '',
     delivered_date: delEl ? delEl.value : '',
+    received_quantity: (status === 'Delivered' && recvEl) ? recvEl.value : '',
     tech: currentTech,
     source: p.source || 'auto',
   };
@@ -3995,10 +4082,14 @@ async function pkgSavePart(roNumber, partKey) {
     const res  = await fetch(API_URL, { method:'POST', body: JSON.stringify(body) });
     const data = await res.json();
     if (!data.ok) {
-      const msg = data.error === 'status_locked'
-        ? 'Compra já autorizada — não é possível voltar a este estado.'
-        : (data.error || 'não foi possível guardar');
-      showToast('Erro: ' + msg);
+      const errorMessages = {
+        status_locked:             'Compra já autorizada — não é possível voltar a este estado.',
+        po_number_required:        'Nº PO é obrigatório para "Pedido feito".',
+        date_ordered_required:     'Data do pedido é obrigatória para "Pedido feito".',
+        delivered_date_required:   'Data de entrega é obrigatória para "Peça recebida".',
+        received_quantity_required:'Quantidade recebida é obrigatória para "Peça recebida".',
+      };
+      showToast('Erro: ' + (errorMessages[data.error] || data.error || 'não foi possível guardar'));
       return;
     }
     showToast('&#x2714; Peça atualizada');
