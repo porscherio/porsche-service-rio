@@ -1,4 +1,18 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.22 — Build: 27/06/2026 -->
+<!-- v2.7.22: AGENDAMENTO MANAGEMENT — the "Últimos 7 dias e próximos
+             60 dias" subtitle on the Management list was a static
+             label, left over from before the v2.7.23 Code.gs fix that
+             removed ENTREGA's 7-day lower bound (delivery timing can't
+             be predicted from arrival date). It's now dynamic: SERVICOS
+             still shows "Últimos 7 dias e próximos 60 dias" (unchanged),
+             ENTREGA shows "Todos os agendamentos por entregar" by
+             default, or "Últimos 30 dias (entregues) e próximos 60
+             dias" when "Mostrar entregues" is checked — matching
+             exactly what the backend actually returns. Requires
+             Code.gs v2.7.23+ deployed for the label to match reality;
+             this index.html change is cosmetic only and doesn't affect
+             what data is fetched. -->
 <!-- Porsche Service Rio PWA — v2.7.21 — Build: 27/06/2026 -->
 <!-- v2.7.21: PARTS REQUESTS — workflow refinements:
              • "Pedido feito" (Ordered) now REQUIRES Nº PO and Data
@@ -1201,7 +1215,7 @@ input:focus{outline:none;border-color:var(--black)}
         <button class="back" onclick="agdMgmtGoStep2()">&#8592;</button>
         <div style="flex:1">
           <div class="tb-title" id="agd-mgmt-list-title">Agendamentos</div>
-          <div class="tb-sub">Últimos 7 dias e próximos 60 dias</div>
+          <div class="tb-sub" id="agd-mgmt-sub">Agendamentos</div>
         </div>
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="agdMgmtRefreshList()" title="Actualizar">&#x21BB;</button>
       </div>
@@ -1430,7 +1444,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.21';
+const APP_VERSION = '2.7.22';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3179,12 +3193,32 @@ function agdMgmtOpenList(which) {
   } else {
     showDeliveredRow.style.display = 'none';
   }
+  agdMgmtUpdateSubLabel();
   agdMgmtRefreshList();
+}
+
+// Keeps the "Últimos X dias..." subtitle in sync with the actual backend
+// date window (see getAgendamentos in Code.gs v2.7.23+) — SERVICOS is
+// always -7/+60 days; ENTREGA has no practical lower bound when showing
+// pending deliveries (delivery timing can't be predicted from arrival
+// date), or 30 days back when "Mostrar entregues" is checked.
+function agdMgmtUpdateSubLabel() {
+  const subEl = document.getElementById('agd-mgmt-sub');
+  if (!subEl) return;
+  if (agdCurrentCalendar === 'servicos') {
+    subEl.textContent = 'Últimos 7 dias e próximos 60 dias';
+    return;
+  }
+  const showDeliveredCb = document.getElementById('agd-mgmt-show-delivered');
+  subEl.textContent = (showDeliveredCb && showDeliveredCb.checked)
+    ? 'Últimos 30 dias (entregues) e próximos 60 dias'
+    : 'Todos os agendamentos por entregar';
 }
 
 function agdMgmtRefreshList() {
   const el = document.getElementById('agd-mgmt-list');
   el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
+  agdMgmtUpdateSubLabel();
   const showDeliveredCb = document.getElementById('agd-mgmt-show-delivered');
   const includeDelivered = (agdCurrentCalendar === 'entrega' && showDeliveredCb && showDeliveredCb.checked) ? '1' : '0';
   fetch(API_URL + '?action=getAgendamentos&calendar=' + agdCurrentCalendar + '&include_delivered=' + includeDelivered)
