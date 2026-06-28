@@ -1,4 +1,18 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.26 — Build: 27/06/2026 -->
+<!-- v2.7.26: AGENDAMENTO SLOTS — slot picker (Create and Reschedule,
+             both SERVICOS and ENTREGA) now shows up to 3 Agendamentos
+             per 1h slot instead of 1. Every slot stays selectable even
+             when already booked — small colored count pills (Matheus
+             blue, Sidney red, Eytan green) show who's already in that
+             slot and how many times, with a legend above the grid, so
+             the Aprovador can see at a glance how busy a slot already
+             is before adding another — 3 is a soft cap, just a visual
+             nudge, not a hard block. Requires Code.gs v2.7.27+
+             deployed, plus a new "Agendadores" sheet (column A: Eytan
+             Lubicz / Sidney Lubicz / Matheus Pego) in the PWA
+             spreadsheet — separate from the existing Aprovadores
+             sheet. -->
 <!-- Porsche Service Rio PWA — v2.7.25 — Build: 27/06/2026 -->
 <!-- v2.7.25: AGENDAMENTO — ENTREGA's "Local de retirada" dropdown is
              no longer greyed out, on both Create and Edit screens.
@@ -1553,7 +1567,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.25';
+const APP_VERSION = '2.7.26';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3797,9 +3811,12 @@ function agdLoadSlotsForDetail() {
           (data.reason === 'weekend' ? 'Fim de semana — sem expediente.' : 'Nenhum horário disponível neste dia.') + '</div>';
         return;
       }
-      slotsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      slotsEl.innerHTML = agdAgendadorLegendHtml() +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
         data.slots.map(s =>
-          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectSlot(this)">' + s.label + '</button>'
+          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectSlot(this)">' +
+            '<span>' + s.label + '</span>' + agdBookingsPillsHtml(s.bookings) +
+          '</button>'
         ).join('') +
       '</div>' +
       '<button class="bigbtn btn-ini" style="margin-top:12px" onclick="agdConfirmReschedule()">&#x2714; Confirmar novo horário</button>';
@@ -4082,13 +4099,61 @@ function agdLoadSlotsForCreate() {
           (data.reason === 'weekend' ? 'Fim de semana — sem expediente.' : 'Nenhum horário disponível neste dia.') + '</div>';
         return;
       }
-      slotsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      slotsEl.innerHTML = agdAgendadorLegendHtml() +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
         data.slots.map(s =>
-          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectCreateSlot(this)">' + s.label + '</button>'
+          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectCreateSlot(this)">' +
+            '<span>' + s.label + '</span>' + agdBookingsPillsHtml(s.bookings) +
+          '</button>'
         ).join('') +
       '</div>';
     })
     .catch(() => { slotsEl.innerHTML = '<div class="err-box">&#x26A0; Erro ao verificar horários.</div>'; });
+}
+
+// Renders one small solid-filled circle per existing booking in a slot
+// — one per Agendador (Matheus=blue/Sidney=red/Eytan=green, see
+// AGENDADOR_COLORS in Code.gs), so the Aprovador gets an instant visual
+// read of how busy a slot already is before picking it. Capacity is a
+// SOFT cap (v2.7.27) — a slot with 3 pills is still selectable, just a
+// strong visual nudge to consider a different time if possible.
+// Mirrors AGENDADOR_COLORS in Code.gs — kept here too so the legend
+// can render without an extra round-trip. If the named-Agendadores
+// list ever changes, update both places.
+const AGENDADOR_COLORS_JS = [
+  { name: 'Matheus', color: '#2563EB' },
+  { name: 'Sidney',  color: '#E11D2E' },
+  { name: 'Eytan',   color: '#16A34A' },
+];
+
+function agdAgendadorLegendHtml() {
+  return '<div style="display:flex;gap:14px;margin-bottom:8px;flex-wrap:wrap">' +
+    AGENDADOR_COLORS_JS.map(a =>
+      '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#888">' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + a.color + ';flex-shrink:0;display:inline-block"></span>' + a.name +
+      '</span>'
+    ).join('') +
+  '</div>';
+}
+
+function agdBookingsPillsHtml(bookings) {
+  if (!bookings || !bookings.length) return '';
+  // Group by tech — one Agendador can create more than one Agendamento
+  // in the same slot (the cap is 3 TOTAL per slot, not 1-per-person),
+  // so each color shows a COUNT, not just presence.
+  const counts = {};
+  const order  = [];
+  bookings.forEach(function(b) {
+    const key = b.tech || '';
+    if (!counts[key]) { counts[key] = { count: 0, color: b.color, tech: key }; order.push(key); }
+    counts[key].count++;
+  });
+  return '<span style="display:inline-flex;gap:3px">' +
+    order.map(function(key) {
+      const c = counts[key];
+      return '<span style="min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:' + c.color + ';color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="' + escapeHtml(c.tech || '') + '">' + c.count + '</span>';
+    }).join('') +
+  '</span>';
 }
 
 function agdSelectCreateSlot(btn) {
