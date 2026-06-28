@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.27 — Build: 27/06/2026 -->
+<!-- v2.7.27: AGENDAMENTO — opening an event's detail screen used to
+             always default the reschedule date picker to TODAY, even
+             if the event itself was scheduled for a different day.
+             That meant the colored slot pills shown were for whatever
+             OTHER events happened to be on today's calendar — nothing
+             to do with the event actually being viewed — which could
+             easily look like a coloring bug. Now it defaults to the
+             event's OWN scheduled date, and that specific slot is
+             marked with a bold border + "· Atual" label so it's
+             unambiguous which one is this event, even among several
+             colored pills in the same slot. Picking a different date
+             still works exactly as before for an actual reschedule.
+             Requires Code.gs v2.7.28+ deployed (bookings now include
+             each event's id, needed to match the "Atual" slot). -->
 <!-- Porsche Service Rio PWA — v2.7.26 — Build: 27/06/2026 -->
 <!-- v2.7.26: AGENDAMENTO SLOTS — slot picker (Create and Reschedule,
              both SERVICOS and ENTREGA) now shows up to 3 Agendamentos
@@ -1567,7 +1582,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.26';
+const APP_VERSION = '2.7.27';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3755,9 +3770,17 @@ function agdOpenEventDetail(ev) {
     warnEl.style.display = 'none';
   }
 
-  // Reset the reschedule picker to today's date by default
-  const todayStr = isoDateOnly(new Date());
-  document.getElementById('agd-detail-date').value = todayStr;
+  // Default the reschedule picker to the event's OWN current date —
+  // not always today (v2.7.28 fix). Opening an event scheduled for a
+  // future/past day used to silently show TODAY's slot grid instead,
+  // which could look like a bug (unrelated bookings/colors from other
+  // events that happen to be scheduled today, nothing to do with the
+  // event actually being viewed). Now the grid loads showing this
+  // event's own day, with its own slot marked "· Atual" so it's
+  // unambiguous which one it is — picking a different date is still
+  // just a normal date-picker change away, for an actual reschedule.
+  const eventOwnDateStr = isoDateOnly(new Date(ev.start));
+  document.getElementById('agd-detail-date').value = eventOwnDateStr;
   agdLoadSlotsForDetail();
 }
 
@@ -3813,11 +3836,12 @@ function agdLoadSlotsForDetail() {
       }
       slotsEl.innerHTML = agdAgendadorLegendHtml() +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-        data.slots.map(s =>
-          '<button class="bigbtn btn-sec" style="margin-bottom:0" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectSlot(this)">' +
-            '<span>' + s.label + '</span>' + agdBookingsPillsHtml(s.bookings) +
-          '</button>'
-        ).join('') +
+        data.slots.map(s => {
+          const isCurrent = agdCurrentEvent && s.bookings.some(b => b.id === agdCurrentEvent.id);
+          return '<button class="bigbtn btn-sec" style="margin-bottom:0' + (isCurrent ? ';border:2px solid var(--black)' : '') + '" data-slot-start="' + s.start + '" data-slot-end="' + s.end + '" onclick="agdSelectSlot(this)">' +
+            '<span>' + s.label + (isCurrent ? ' <span style="font-weight:700">· Atual</span>' : '') + '</span>' + agdBookingsPillsHtml(s.bookings) +
+          '</button>';
+        }).join('') +
       '</div>' +
       '<button class="bigbtn btn-ini" style="margin-top:12px" onclick="agdConfirmReschedule()">&#x2714; Confirmar novo horário</button>';
     })
