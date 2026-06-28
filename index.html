@@ -1,4 +1,17 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.24 — Build: 27/06/2026 -->
+<!-- v2.7.24: AGENDAMENTO BACKFILL — the "Agendamento ausente" form now
+             supports SERVIÇOS-only backfills: a "Criar também ENTREGA
+             (já entregue)" toggle, OFF by default, reveals the
+             delivery date field only when turned on — for vehicles
+             still actively under service that were simply never
+             scheduled, not yet delivered. Added two separate
+             observação/remark text fields, one for SERVIÇOS (always
+             visible) and one for ENTREGA (only shown when the toggle
+             is on), written into each event's description. Plate,
+             VIN, and customer name continue to be pulled automatically
+             from the ROs sheet by ro_number — no manual entry needed
+             for those. Requires Code.gs v2.7.25+ deployed. -->
 <!-- Porsche Service Rio PWA — v2.7.23 — Build: 27/06/2026 -->
 <!-- v2.7.23: AGENDAMENTO BACKFILL — new "Agendamento ausente" card in
              Gerir Agendamentos, listing open ROs (status != fechada)
@@ -1252,19 +1265,31 @@ input:focus{outline:none;border-color:var(--black)}
 
     <!-- Backfill form modal — appears over agd-missing-step when a row
          is toggled. Pre-fills SERVICOS start from the RO's opened_date
-         (09:00–10:00); ENTREGA delivery date is manually picked, must
-         be on/after the SERVICOS end. -->
+         (09:00–10:00), freely editable. ENTREGA is OPTIONAL — many
+         backfilled ROs are for vehicles still actively under service,
+         not yet delivered — toggled on via "Criar também ENTREGA",
+         off by default; when on, the delivery date (must be on/after
+         the SERVICOS end) and its own remark field appear. -->
     <div id="agd-backfill-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:16px">
       <div style="background:#fff;border-radius:12px;max-width:380px;width:100%;max-height:90vh;overflow-y:auto;padding:20px">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px" id="agd-backfill-title">RO #</div>
-        <div style="font-size:12px;color:#888;margin-bottom:16px">Criar agendamento retroativo (SERVIÇOS + ENTREGA já entregue)</div>
+        <div style="font-size:12px;color:#888;margin-bottom:16px">Criar agendamento retroativo</div>
 
         <div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px">SERVIÇOS — período da reparação</div>
         <div class="pkg-field-row"><span class="pkg-field-lbl" style="min-width:60px">Início</span><input type="datetime-local" id="agd-bf-servicos-start"></div>
         <div class="pkg-field-row"><span class="pkg-field-lbl" style="min-width:60px">Fim</span><input type="datetime-local" id="agd-bf-servicos-end"></div>
+        <div class="pkg-field-row" style="align-items:flex-start"><span class="pkg-field-lbl" style="min-width:60px;margin-top:8px">Obs.</span><textarea id="agd-bf-servicos-remark" rows="2" placeholder="Observação (opcional)" style="flex:1;padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;color:var(--black);resize:vertical;font-family:inherit"></textarea></div>
 
-        <div style="font-size:11px;font-weight:600;color:#666;margin:14px 0 6px">ENTREGA — data de entrega ao cliente</div>
-        <div class="pkg-field-row"><span class="pkg-field-lbl" style="min-width:60px">Entregue em</span><input type="datetime-local" id="agd-bf-entrega-date"></div>
+        <label for="agd-bf-create-entrega" style="display:flex;align-items:center;gap:8px;margin:16px 0 4px;cursor:pointer;font-size:12.5px;color:var(--black);font-weight:600">
+          <input type="checkbox" id="agd-bf-create-entrega" onchange="agdBackfillToggleEntrega()" style="width:18px;height:18px;accent-color:var(--black);cursor:pointer">
+          Criar também ENTREGA (já entregue)
+        </label>
+
+        <div id="agd-bf-entrega-fields" style="display:none;margin-top:10px">
+          <div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px">ENTREGA — data de entrega ao cliente</div>
+          <div class="pkg-field-row"><span class="pkg-field-lbl" style="min-width:60px">Entregue em</span><input type="datetime-local" id="agd-bf-entrega-date"></div>
+          <div class="pkg-field-row" style="align-items:flex-start"><span class="pkg-field-lbl" style="min-width:60px;margin-top:8px">Obs.</span><textarea id="agd-bf-entrega-remark" rows="2" placeholder="Observação (opcional)" style="flex:1;padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:#fff;font-size:12.5px;color:var(--black);resize:vertical;font-family:inherit"></textarea></div>
+        </div>
 
         <div style="display:flex;gap:8px;margin-top:18px">
           <button onclick="agdBackfillCancel()" style="flex:1;padding:11px;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--black);font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
@@ -1508,7 +1533,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.23';
+const APP_VERSION = '2.7.24';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3371,8 +3396,10 @@ function agdMissingRowHtml(ro) {
 
 // Opens the backfill modal, pre-filling SERVICOS start from opened_date
 // at 09:00 (1h default window) — per spec, freely editable, no slot
-// restrictions. ENTREGA date starts blank — the Aprovador must pick it
-// manually, and it's validated to be >= SERVICOS end before submit.
+// restrictions. ENTREGA is OFF by default (many backfilled ROs are for
+// vehicles still under active service, not yet delivered) — toggling
+// "Criar também ENTREGA" reveals the delivery date (validated to be
+// >= SERVICOS end) and its own remark field.
 function agdBackfillOpen(ro) {
   agdMissingCurrentRO = ro;
   document.getElementById('agd-backfill-title').textContent =
@@ -3382,11 +3409,20 @@ function agdBackfillOpen(ro) {
   if (isNaN(defaultStart.getTime())) defaultStart = new Date();
   const defaultEnd = new Date(defaultStart.getTime() + 60 * 60000);
 
-  document.getElementById('agd-bf-servicos-start').value = toDatetimeLocalStr(defaultStart);
-  document.getElementById('agd-bf-servicos-end').value   = toDatetimeLocalStr(defaultEnd);
-  document.getElementById('agd-bf-entrega-date').value   = '';
+  document.getElementById('agd-bf-servicos-start').value  = toDatetimeLocalStr(defaultStart);
+  document.getElementById('agd-bf-servicos-end').value    = toDatetimeLocalStr(defaultEnd);
+  document.getElementById('agd-bf-servicos-remark').value = '';
+  document.getElementById('agd-bf-create-entrega').checked = false;
+  document.getElementById('agd-bf-entrega-date').value    = '';
+  document.getElementById('agd-bf-entrega-remark').value  = '';
+  document.getElementById('agd-bf-entrega-fields').style.display = 'none';
 
   document.getElementById('agd-backfill-modal').style.display = 'flex';
+}
+
+function agdBackfillToggleEntrega() {
+  const on = document.getElementById('agd-bf-create-entrega').checked;
+  document.getElementById('agd-bf-entrega-fields').style.display = on ? 'block' : 'none';
 }
 
 function agdBackfillCancel() {
@@ -3403,28 +3439,42 @@ function agdBackfillSubmit() {
   if (!agdMissingCurrentRO) return;
   const startVal  = document.getElementById('agd-bf-servicos-start').value;
   const endVal    = document.getElementById('agd-bf-servicos-end').value;
-  const entregaVal = document.getElementById('agd-bf-entrega-date').value;
+  const servicosRemark = document.getElementById('agd-bf-servicos-remark').value.trim();
+  const createEntrega  = document.getElementById('agd-bf-create-entrega').checked;
+  const entregaVal     = document.getElementById('agd-bf-entrega-date').value;
+  const entregaRemark  = document.getElementById('agd-bf-entrega-remark').value.trim();
 
   if (!startVal || !endVal) { showToast('Preencha o início e fim de SERVIÇOS.'); return; }
-  if (!entregaVal)           { showToast('Preencha a data de entrega.'); return; }
 
-  const start   = new Date(startVal);
-  const end     = new Date(endVal);
-  const entrega = new Date(entregaVal);
+  const start = new Date(startVal);
+  const end   = new Date(endVal);
   if (end.getTime() < start.getTime()) { showToast('Fim de SERVIÇOS não pode ser antes do início.'); return; }
-  if (entrega.getTime() < end.getTime()) { showToast('Data de entrega não pode ser antes do fim de SERVIÇOS.'); return; }
+
+  let entrega = null;
+  if (createEntrega) {
+    if (!entregaVal) { showToast('Preencha a data de entrega, ou desative "Criar também ENTREGA".'); return; }
+    entrega = new Date(entregaVal);
+    if (entrega.getTime() < end.getTime()) { showToast('Data de entrega não pode ser antes do fim de SERVIÇOS.'); return; }
+  }
 
   const ro = agdMissingCurrentRO;
+  const payload = {
+    action: 'createBackfillAgendamento',
+    ro_number: ro.ro_number,
+    servicos_start: start.toISOString(),
+    servicos_end: end.toISOString(),
+    servicos_remark: servicosRemark,
+    create_entrega: createEntrega,
+    tech: currentTech,
+  };
+  if (createEntrega) {
+    payload.entrega_date = entrega.toISOString();
+    payload.entrega_remark = entregaRemark;
+  }
+
   fetch(API_URL, {
     method: 'POST',
-    body: JSON.stringify({
-      action: 'createBackfillAgendamento',
-      ro_number: ro.ro_number,
-      servicos_start: start.toISOString(),
-      servicos_end: end.toISOString(),
-      entrega_date: entrega.toISOString(),
-      tech: currentTech,
-    }),
+    body: JSON.stringify(payload),
   })
     .then(r => r.json())
     .then(data => {
@@ -3438,7 +3488,9 @@ function agdBackfillSubmit() {
         showToast('Erro: ' + (msgs[data.error] || data.error || 'não foi possível criar'));
         return;
       }
-      showToast('&#x2714; Agendamento retroativo criado — OS ' + ro.ro_number);
+      showToast(createEntrega
+        ? '&#x2714; SERVIÇOS + ENTREGA criados — OS ' + ro.ro_number
+        : '&#x2714; SERVIÇOS criado — OS ' + ro.ro_number);
       agdBackfillCancel();
       agdMissingLoad();
     })
