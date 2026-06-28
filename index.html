@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.25 — Build: 27/06/2026 -->
+<!-- v2.7.25: AGENDAMENTO — ENTREGA's "Local de retirada" dropdown is
+             no longer greyed out, on both Create and Edit screens.
+             Moved out of the structural-fields container that was
+             disabling it alongside RO/Cliente/Placa/etc (those stay
+             locked for ENTREGA — only location changed). Defaults to
+             the linked SERVICOS event's location, but the Aprovador
+             can pick a different one if the customer wants to collect
+             the vehicle elsewhere — submitted correctly on both create
+             and edit now (previously body.location_key was silently
+             never sent for ENTREGA in either flow, a gap from before
+             this fix even existed). Requires Code.gs v2.7.26+ deployed. -->
 <!-- Porsche Service Rio PWA — v2.7.24 — Build: 27/06/2026 -->
 <!-- v2.7.24: AGENDAMENTO BACKFILL — the "Agendamento ausente" form now
              supports SERVIÇOS-only backfills: a "Criar também ENTREGA
@@ -1341,7 +1353,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div class="sec-lbl">Detalhes</div>
         <div id="agd-entrega-link-warning" style="display:none;font-size:12px;color:#a33;background:#fdf0f0;border:1px solid #f0c9c9;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-weight:600"></div>
         <div id="agd-entrega-notice" style="display:none;font-size:12px;color:#888;background:#f7f7f7;border-radius:6px;padding:8px 10px;margin-bottom:12px">
-          &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui.
+          &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui. O local de retirada pode ser alterado.
         </div>
         <div id="agd-structural-fields">
           <label class="field-lbl" for="agd-f-ro">RO</label>
@@ -1369,12 +1381,17 @@ input:focus{outline:none;border-color:var(--black)}
 
           <label class="field-lbl" for="agd-f-mobile">Telefone</label>
           <input type="text" id="agd-f-mobile" class="agd-field-input" inputmode="tel">
-
-          <label class="field-lbl" for="agd-f-location">Local de retirada</label>
-          <select id="agd-f-location" class="agd-field-input">
-            <option value="">A carregar...</option>
-          </select>
         </div>
+
+        <!-- Pickup location: NOT structural for ENTREGA. Defaults to
+             SERVICOS' location only at creation time — once set, it's
+             independently editable, since the customer may want to
+             collect the vehicle from a different address than where
+             the repair happened. -->
+        <label class="field-lbl" for="agd-f-location">Local de retirada</label>
+        <select id="agd-f-location" class="agd-field-input">
+          <option value="">A carregar...</option>
+        </select>
 
         <div id="agd-f-createdby-row" class="drow" style="margin-top:10px;margin-bottom:14px">
           <span class="dlbl">Agendado por</span><span class="dval" id="agd-f-createdby">—</span>
@@ -1470,7 +1487,7 @@ input:focus{outline:none;border-color:var(--black)}
         <div id="agd-create-fields" style="display:none;margin-top:18px">
           <div class="sec-lbl">Detalhes</div>
           <div id="agd-c-entrega-notice" style="display:none;font-size:12px;color:#888;background:#f7f7f7;border-radius:6px;padding:8px 10px;margin-bottom:12px">
-            &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui.
+            &#x1F512; Dados do veículo/cliente vêm do agendamento de SERVIÇOS e não podem ser editados aqui. O local de retirada pode ser alterado.
           </div>
           <div id="agd-c-structural-fields">
             <label class="field-lbl" for="agd-c-f-ro">RO</label>
@@ -1498,12 +1515,15 @@ input:focus{outline:none;border-color:var(--black)}
 
             <label class="field-lbl" for="agd-c-f-mobile">Telefone</label>
             <input type="text" id="agd-c-f-mobile" class="agd-field-input" inputmode="tel">
-
-            <label class="field-lbl" for="agd-c-f-location">Local de retirada</label>
-            <select id="agd-c-f-location" class="agd-field-input">
-              <option value="">A carregar...</option>
-            </select>
           </div>
+
+          <!-- Pickup location: NOT structural for ENTREGA — defaults to
+               SERVICOS' location but is freely editable, since the
+               customer may want to collect the vehicle elsewhere. -->
+          <label class="field-lbl" for="agd-c-f-location">Local de retirada</label>
+          <select id="agd-c-f-location" class="agd-field-input">
+            <option value="">A carregar...</option>
+          </select>
 
           <div class="sec-lbl">Observação</div>
           <textarea id="agd-c-f-remark" rows="3" placeholder="Comentário sobre este agendamento..."
@@ -1533,7 +1553,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.24';
+const APP_VERSION = '2.7.25';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3736,6 +3756,7 @@ function agdSaveFieldEdits() {
     event_id:    agdCurrentEvent.id,
     tech:        currentTech,
     remark:      document.getElementById('agd-f-remark').value.trim(),
+    location_key: document.getElementById('agd-f-location').value,
   };
   if (!isEntrega) {
     body.ro_number   = document.getElementById('agd-f-ro').value.trim();
@@ -3745,7 +3766,6 @@ function agdSaveFieldEdits() {
     body.year        = document.getElementById('agd-f-year').value.trim();
     body.vin         = document.getElementById('agd-f-vin').value.trim().toUpperCase();
     body.mobile      = document.getElementById('agd-f-mobile').value.trim();
-    body.location_key = document.getElementById('agd-f-location').value;
   }
   // Optimistic local update so the list/title reflect the edit
   // immediately, consistent with the rest of the codebase's
@@ -4032,10 +4052,13 @@ function agdFillCreateFields(data) {
   document.getElementById('agd-c-f-vin').value     = data.vin         || '';
   document.getElementById('agd-c-f-mobile').value  = data.mobile      || '';
   document.getElementById('agd-c-f-remark').value  = data.remark      || '';
-  // Path A/B prefill data has no location of its own (it's a fresh
-  // choice for each new appointment, not pulled from the RO or
-  // Customers tab) — only set it if explicitly provided, otherwise
-  // leave whatever agdCreateOpenForm already defaulted it to.
+  // Path A/B (SERVICOS) prefill data has no location of its own (it's
+  // a fresh choice for each new appointment) — only set it if
+  // explicitly provided, otherwise leave whatever agdCreateOpenForm
+  // already defaulted it to. The ENTREGA gate-check path (see
+  // agdCheckEntregaGate) DOES provide one — the linked SERVICOS
+  // event's location_key — which becomes ENTREGA's one-time default,
+  // freely editable from there on (v2.7.26).
   if (data.location_key) document.getElementById('agd-c-f-location').value = data.location_key;
   const todayStr = isoDateOnly(new Date());
   document.getElementById('agd-c-date').value = todayStr;
@@ -4090,9 +4113,14 @@ function agdConfirmCreate() {
   };
 
   if (agdCreateCalendar === 'entrega') {
-    // ENTREGA: all structural data comes from the verified SERVICOS
+    // ENTREGA: vehicle/customer data comes from the verified SERVICOS
     // event, not from the (disabled) fields, matching the same
     // server-side restriction used when editing ENTREGA events.
+    // location_key is NOT structural though (v2.7.26) — it's read
+    // from the dropdown like SERVICOS, defaulting to the SERVICOS
+    // event's location (pre-filled by agdFillCreateFields) but freely
+    // editable, since the customer may want to collect the vehicle
+    // from a different address.
     body.ro_number   = agdEntregaGateRO;
     body.client_name = agdEntregaSourceEvent ? agdEntregaSourceEvent.client_name : '';
     body.plate       = agdEntregaSourceEvent ? agdEntregaSourceEvent.plate       : '';
@@ -4101,6 +4129,7 @@ function agdConfirmCreate() {
     body.vin         = agdEntregaSourceEvent ? agdEntregaSourceEvent.vin         : '';
     body.mobile      = agdEntregaSourceEvent ? agdEntregaSourceEvent.mobile      : '';
     body.cpf         = agdEntregaSourceEvent ? agdEntregaSourceEvent.cpf         : '';
+    body.location_key = document.getElementById('agd-c-f-location').value;
   } else {
     body.ro_number   = document.getElementById('agd-c-f-ro').value.trim();
     body.client_name = document.getElementById('agd-c-f-client').value.trim();
