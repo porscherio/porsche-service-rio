@@ -1,4 +1,12 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.28 — Build: 28/06/2026 -->
+<!-- v2.7.28: GANTT_URL updated to the new container-bound Gantt v2.0
+             deployment (rewritten to fetch from the PWA's own
+             action=ganttData endpoint instead of the legacy OI source
+             sheets — see Code.gs v2.7.34+/v2.7.35). The green GANTT
+             pill on the RO detail screen and the bottom-nav Gantt
+             tab both already build the URL correctly with the
+             current RO's ro_number — no other change needed here. -->
 <!-- Porsche Service Rio PWA — v2.7.27 — Build: 27/06/2026 -->
 <!-- v2.7.27: AGENDAMENTO — opening an event's detail screen used to
              always default the reschedule date picker to TODAY, even
@@ -1582,8 +1590,8 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.27';
-const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbzfgNHCiSmfYRQpxy4PPcAK9QuSLz55ZB7kax1XTSQsy5zGVqUqvo_7GyvqsgvdjicYK/exec';
+const APP_VERSION = '2.7.28';
+const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
 const USERS = {
