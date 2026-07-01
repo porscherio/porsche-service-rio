@@ -1,4 +1,15 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.30 — Build: 30/06/2026 -->
+<!-- v2.7.30: PARTS — 'Não autorizada' (Not Authorized) status now
+             appears first in the dropdown (after the blank option),
+             shown in red both on the option itself and on the select
+             element when that option is selected. Color clears
+             automatically when a different status is chosen. -->
+<!-- Porsche Service Rio PWA — v2.7.29 — Build: 30/06/2026 -->
+<!-- v2.7.29: PARTS — new 'Não autorizada' (Not Authorized) status
+             added to the parts approval dropdown, positioned before
+             'Autorizada a compra'. Not locked — Aprovador can still
+             authorize later. Requires Code.gs v2.7.41+ deployed. -->
 <!-- Porsche Service Rio PWA — v2.7.28 — Build: 28/06/2026 -->
 <!-- v2.7.28: GANTT_URL updated to the new container-bound Gantt v2.0
              deployment (rewritten to fetch from the PWA's own
@@ -1590,7 +1601,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.29';
+const APP_VERSION = '2.7.30';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1621,7 +1632,7 @@ const DEFAULT_JOBLINES = [
   'VAL de saida',
 ];
 
-const PARTS_STATUSES = ['On Stock', 'Not Authorized', 'To Be Ordered', 'Ordered', 'Confirmed', 'Back Order', 'Delivered'];
+const PARTS_STATUSES = ['Not Authorized', 'On Stock', 'To Be Ordered', 'Ordered', 'Confirmed', 'Back Order', 'Delivered'];
 const PARTS_STATUS_PT = {
   'On Stock':        'Disponível no estoque',
   'Not Authorized':  'Não autorizada',
@@ -4344,6 +4355,8 @@ function renderPkgPartsList(roNumber, parts) {
     if (selEl) {
       selEl.addEventListener('change', function() {
         pkgToggleOrderedFields(safeId, this.value);
+        this.style.color = (this.value === 'Not Authorized') ? '#dc2626' : '';
+        this.style.fontWeight = (this.value === 'Not Authorized') ? '600' : '';
       });
     }
     const saveBtn = document.getElementById('pkg-save-' + safeId);
@@ -4374,15 +4387,16 @@ function pkgPartCardHtml(p) {
   // itself stays fully editable so the workflow can keep moving forward
   // through Pedido feito / Pedido confirmado / Back order / Peça recebida,
   // in any order, as many times as needed.
-  // 'Not Authorized' does NOT count as past authorization — the Aprovador
-  // can still flip a rejected part to authorized later.
   const pastAuthorization = (!!p.status && p.status !== 'Not Authorized');
   const authDate = fmtDateDisplay(p.date_ordered);
+  const notAuthColor = 'color:#dc2626;font-weight:600'; // red, visible even on mobile when selected
   const opts = '<option value="">— Selecionar —</option>' + PARTS_STATUSES.map(function(s) {
-    const lockOpt = (s === 'To Be Ordered' && pastAuthorization);
+    const lockOpt  = (s === 'To Be Ordered' && pastAuthorization);
     const lockLabel = lockOpt ? (authDate ? ' em ' + authDate : ' (já autorizada)') : '';
-    return '<option value="'+s+'"'+(p.status===s?' selected':'')+(lockOpt?' disabled':'')+'>'+PARTS_STATUS_PT[s]+lockLabel+'</option>';
+    const optStyle = (s === 'Not Authorized') ? ' style="'+notAuthColor+'"' : '';
+    return '<option value="'+s+'"'+(p.status===s?' selected':'')+(lockOpt?' disabled':'')+optStyle+'>'+PARTS_STATUS_PT[s]+lockLabel+'</option>';
   }).join('');
+  const selColor = (p.status === 'Not Authorized') ? 'color:#dc2626;font-weight:600' : '';
   return (
     '<div class="pkg-part-card">' +
       '<div class="pkg-part-head">' +
@@ -4392,7 +4406,7 @@ function pkgPartCardHtml(p) {
         '</div>' +
         (p.status === 'Delivered' ? receiptChipHtml(p) : '') +
       '</div>' +
-      '<select class="pkg-status-sel" id="pkg-status-'+safeId+'">' + opts + '</select>' +
+      '<select class="pkg-status-sel" id="pkg-status-'+safeId+'"'+(selColor?' style="'+selColor+'"':'')+'>'+opts+'</select>' +
       '<div class="pkg-panel-fields" id="pkg-fields-'+safeId+'" style="display:'+(isOrdered?'block':'none')+'">' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">Nº PO *</span><input type="text" id="pkg-po-'+safeId+'" value="'+escapeHtml(p.po_number||'')+'" placeholder="ex: PO-12345"></div>' +
         '<div class="pkg-field-row"><span class="pkg-field-lbl">Data pedido *</span><input type="date" id="pkg-date-'+safeId+'" value="'+(p.date_ordered||'')+'"></div>' +
