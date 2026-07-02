@@ -1,4 +1,25 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.32 — Build: 02/07/2026 -->
+<!-- v2.7.32: MANUAL PATIO TAGGING — new Aprovador-only "Marcar no
+             Pátio (manual)" toggle on the RO detail screen (s2). One-
+             time migration tool for old ROs that predate the SERVICOS/
+             Confirmar Chegada workflow (e.g. RO 28682) — writes the
+             new manual_patio flag via Code.gs's setManualPatio, no
+             Calendar involved. "Veículos no Pátio" now also merges in
+             manually-tagged ROs (shown with a purple 📍 manual pill
+             instead of an arrival time), deduped against calendar-
+             confirmed arrivals by RO number. Requires Code.gs v2.7.47+
+             deployed. -->
+<!-- Porsche Service Rio PWA — v2.7.31 — Build: 01/07/2026 -->
+<!-- v2.7.31: AGENDAMENTO SERVICO — search box in the Management list
+             now offers a "Buscar no histórico completo" fallback
+             button when a numeric query (looks like an RO number)
+             finds nothing in the default -7/+60 day window — fixes
+             RO 28682, an open RO whose only SERVICOS event was old
+             enough to fall outside that window but too recent to be
+             flagged "missing" by Agendamento ausente's 2-year check.
+             Reuses the hasServicosEvent endpoint directly (no new
+             backend action). Requires Code.gs v2.7.46+ deployed. -->
 <!-- Porsche Service Rio PWA — v2.7.30 — Build: 30/06/2026 -->
 <!-- v2.7.30: PARTS — 'Não autorizada' (Not Authorized) status now
              appears first in the dropdown (after the blank option),
@@ -791,6 +812,11 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Cliente reclama de</div>
         <div style="font-size:13px;color:var(--red);font-style:italic;font-weight:500" id="s2-complaint"></div>
       </div>
+      <!-- v2.7.47 — Aprovador-only manual PATIO tagging, one-time
+           migration tool for legacy ROs with no reachable/useful
+           SERVICOS event (see setManualPatio in Code.gs). Hidden by
+           default; shown only for Aprovadores via openRO(). -->
+      <div id="s2-manual-patio-row" style="display:none;margin-bottom:14px"></div>
       <div id="jobline-list-content">
         <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar joblines...</div></div>
       </div>
@@ -1601,7 +1627,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.31';
+const APP_VERSION = '2.7.32';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1976,10 +2002,46 @@ function openRO(roNumber) {
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
   document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
+  renderManualPatioRow(ro);
   goTo('s2');
   loadJoblines(roNumber);
   attachMileagePillHandlers();
 }
+
+// v2.7.47 — Aprovador-only manual PATIO tagging row on the RO detail
+// screen. One-time migration tool for legacy ROs with no reachable/
+// useful SERVICOS event (see setManualPatio in Code.gs). Toggle
+// pattern mirrors the existing Confirmar Chegada chip exactly: tap
+// to turn ON instantly (no confirm), tap again → confirm → OFF.
+function renderManualPatioRow(ro) {
+  const row = document.getElementById('s2-manual-patio-row');
+  if (!isApproverTech) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+  row.innerHTML = ro.manual_patio
+    ? '<span class="chegada-pill clickable" style="background:#E8DEF8;color:#4A2E7A" onclick="toggleManualPatio(\''+escapeHtml(String(ro.ro_number))+'\',true)">&#x1F4CD; NO P&#xC1;TIO (manual) &mdash; toque para remover</span>'
+    : '<span class="chegada-chip-off" style="margin-left:0" onclick="toggleManualPatio(\''+escapeHtml(String(ro.ro_number))+'\',false)">&#x1F4CD; Marcar no P&#xC1;tio (manual)</span>';
+}
+
+function toggleManualPatio(roNumber, currentlyOn) {
+  if (currentlyOn && !confirm('Remover a marcação manual de "No Pátio" para esta RO?')) return;
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'setManualPatio', ro_number: roNumber, on: !currentlyOn, tech: currentTech }),
+  }).then(() => {
+    showToast(currentlyOn ? 'Marcação manual removida.' : '&#x2705; Marcado no Pátio (manual).');
+    // Optimistic local update, consistent with the rest of the codebase.
+    const ro = liveROs.find(r => String(r.ro_number) === String(roNumber));
+    if (ro) { ro.manual_patio = !currentlyOn; ro.chegada = ro.chegada || ro.manual_patio; }
+    if (activeRO && String(activeRO.ro_number) === String(roNumber)) {
+      activeRO.manual_patio = !currentlyOn;
+      activeRO.chegada = activeRO.chegada || activeRO.manual_patio;
+      openRO(roNumber); // re-render s2 with the new state
+    }
+    renderROList(liveROs);
+  }).catch(() => showToast('Erro ao atualizar marcação manual.'));
+}
+
 
 // ── Jobline rendering ─────────────────────────────────────────────
 function renderJoblines(roNumber, joblines) {
@@ -2977,6 +3039,14 @@ function attachMileagePillHandlers() {
 // endpoint Management already uses. No tap actions on rows — the
 // only way to toggle chegada remains Agendamento Management itself,
 // so there's only ever one place that controls the flag.
+//
+// v2.7.47: ALSO merges in ROs manually tagged via the RO detail
+// screen's "Marcar no Pátio (manual)" button — see setManualPatio in
+// Code.gs. These are old ROs with no reachable/useful SERVICOS event,
+// so they'd never appear via the calendar-based path above no matter
+// how wide its window got. Deduped by ro_number — a manually-tagged
+// RO that ALSO already has a calendar-confirmed arrival only shows
+// once, from the calendar entry (richer detail: exact arrival time).
 function openNoPatioPanel() {
   goTo('s-no-patio');
   loadNoPatioList();
@@ -2987,37 +3057,64 @@ function loadNoPatioList() {
   el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
   document.getElementById('no-patio-sub').textContent = 'A carregar...';
 
-  fetch(API_URL + '?action=getAgendamentos&calendar=servicos')
-    .then(r => r.json())
-    .then(data => {
-      if (!data.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar.</div>'; return; }
-      const arrived = (data.events || []).filter(ev => ev.chegada === true);
-      renderNoPatioList(arrived);
-    })
-    .catch(() => { el.innerHTML = '<div class="err-box">&#x26A0; Sem ligação ao servidor.</div>'; });
+  Promise.all([
+    fetch(API_URL + '?action=getAgendamentos&calendar=servicos').then(r => r.json()),
+    fetch(API_URL + '?action=ros').then(r => r.json()),
+  ]).then(([agendaData, rosData]) => {
+    if (!agendaData.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar.</div>'; return; }
+
+    const calendarArrived = (agendaData.events || [])
+      .filter(ev => ev.chegada === true)
+      .map(ev => {
+        const d = new Date(ev.start);
+        return {
+          ro_number:   ev.ro_number,
+          plate:       ev.plate,
+          client_name: ev.client_name,
+          modelo:      ev.modelo,
+          timeLabel:   pad(d.getHours()) + ':' + pad(d.getMinutes()),
+          manual:      false,
+        };
+      });
+
+    const seenRO = new Set(calendarArrived.map(v => String(v.ro_number)));
+    const manualArrived = (Array.isArray(rosData) ? rosData : [])
+      .filter(ro => ro.manual_patio === true && !seenRO.has(String(ro.ro_number)))
+      .map(ro => ({
+        ro_number:   ro.ro_number,
+        plate:       ro.plate,
+        client_name: ro.cust_name,
+        modelo:      ro.vehicle,
+        timeLabel:   null, // no precise arrival time — manually tagged
+        manual:      true,
+      }));
+
+    renderNoPatioList(calendarArrived.concat(manualArrived));
+  }).catch(() => { el.innerHTML = '<div class="err-box">&#x26A0; Sem ligação ao servidor.</div>'; });
 }
 
-function renderNoPatioList(events) {
+function renderNoPatioList(items) {
   const el = document.getElementById('no-patio-list');
-  document.getElementById('no-patio-sub').textContent = events.length + ' veículo(s) no pátio';
+  document.getElementById('no-patio-sub').textContent = items.length + ' veículo(s) no pátio';
 
-  if (!events.length) {
+  if (!items.length) {
     el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhum veículo confirmado no pátio.</div>';
     return;
   }
 
-  el.innerHTML = events.map(ev => {
-    const d = new Date(ev.start);
-    const timeLbl = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  el.innerHTML = items.map(v => {
+    const pill = v.manual
+      ? '<span class="chegada-pill" style="margin-left:0;background:#E8DEF8;color:#4A2E7A">&#x1F4CD; manual</span>'
+      : '<span class="chegada-pill" style="margin-left:0">&#x2705; ' + v.timeLabel + '</span>';
     return (
       '<div class="card" style="cursor:default">' +
         '<div class="crow"><div>' +
-          '<div class="cro">RO #' + escapeHtml(String(ev.ro_number || '—')) + '</div>' +
-          '<div class="cjob">Placa: ' + escapeHtml(ev.plate || '—') + '</div>' +
-          (ev.client_name ? '<div class="cjob">&#x1F464; ' + escapeHtml(ev.client_name) + '</div>' : '') +
-          (ev.modelo ? '<div class="cdesc">' + escapeHtml(ev.modelo) + '</div>' : '') +
+          '<div class="cro">RO #' + escapeHtml(String(v.ro_number || '—')) + '</div>' +
+          '<div class="cjob">Placa: ' + escapeHtml(v.plate || '—') + '</div>' +
+          (v.client_name ? '<div class="cjob">&#x1F464; ' + escapeHtml(v.client_name) + '</div>' : '') +
+          (v.modelo ? '<div class="cdesc">' + escapeHtml(v.modelo) + '</div>' : '') +
         '</div>' +
-        '<span class="chegada-pill" style="margin-left:0">&#x2705; ' + timeLbl + '</span>' +
+        pill +
         '</div>' +
       '</div>'
     );
