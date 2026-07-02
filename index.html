@@ -4701,7 +4701,7 @@ async function pkgSavePart(roNumber, partKey) {
 
 async function pkgSaveAll() {
   if (!pkgCurrentRO) return;
-  const roNumber  = pkgCurrentRO;
+  const roNumber  = String(pkgCurrentRO.ro_number || pkgCurrentRO);
   const parts     = partsDetailCache[roNumber] || [];
   const dirtyKeys = Object.keys(pkgDirtyParts).filter(function(k) { return pkgDirtyParts[k]; });
   if (!dirtyKeys.length) { showToast('Nenhuma alteração por guardar.'); return; }
