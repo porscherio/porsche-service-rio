@@ -2,7 +2,7 @@
 <!-- Porsche Service Rio PWA — v2.7.48 — Build: 02/07/2026 -->
 <!-- v2.7.48: VERSION SYNC — aligned frontend version number with
              Code.gs (both now v2.7.48). Also in this version:
-             PARTS — new "Guardar todas" (💾) batch save button,
+             PARTS — new "Salvar todas" (💾) batch save button,
              dirty tracking on all part fields, pkgSaveAll() sending
              all changed parts in one request. Requires Code.gs
              v2.7.48+ deployed. -->
@@ -1202,7 +1202,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div class="tb-title" id="pkg-ro-title">RO #----</div>
           <div class="tb-sub" id="pkg-ro-sub"></div>
         </div>
-        <button id="pkg-save-all-btn" style="display:none;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--green);padding:4px 8px" onclick="pkgSaveAll()" title="Guardar todas as alterações">&#x1F4BE; Guardar todas</button>
+        <button id="pkg-save-all-btn" style="display:none;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--green);padding:4px 8px" onclick="pkgSaveAll()" title="Salvar todas as alterações">&#x1F4BE; Salvar todas</button>
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="pkgReload()" title="Actualizar">&#x21BB;</button>
       </div>
       <div class="scroll" style="padding:14px 16px">
@@ -4495,39 +4495,50 @@ async function pkgLoadParts(roNumber) {
 }
 
 function renderPkgPartsList(roNumber, parts) {
-  const list = document.getElementById('pkg-parts-list');
+  const container = document.getElementById('pkg-parts-list');
   if (!parts.length) {
-    list.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px 0">Nenhuma peça registada para esta OS.</div>';
+    container.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px 0">Nenhuma peça registada para esta OS.</div>';
     return;
   }
-  list.innerHTML = parts.map(pkgPartCardHtml).join('');
+  // Replace the container with a fresh clone to remove any previously
+  // attached delegated listeners (avoids stacking on pkgReload).
+  const fresh = container.cloneNode(false); // shallow clone — no children
+  fresh.innerHTML = parts.map(pkgPartCardHtml).join('');
+  container.parentNode.replaceChild(fresh, container);
 
+  // Reset dirty state on every fresh render.
   pkgDirtyParts = {};
   const saveAllBtn = document.getElementById('pkg-save-all-btn');
   if (saveAllBtn) saveAllBtn.style.display = 'none';
 
-  function markDirty(partKey) {
-    pkgDirtyParts[partKey] = true;
-    if (saveAllBtn) saveAllBtn.style.display = '';
-  }
-
-  parts.forEach(function(p) {
-    const safeId = pkgSafeId(p.part_key);
-    const selEl  = document.getElementById('pkg-status-' + safeId);
-    if (selEl) {
-      selEl.addEventListener('change', function() {
-        pkgToggleOrderedFields(safeId, this.value);
-        this.style.color = (this.value === 'Not Authorized') ? '#dc2626' : '';
-        this.style.fontWeight = (this.value === 'Not Authorized') ? '600' : '';
-        markDirty(p.part_key);
-      });
+  // Event delegation — attach to the fresh container once, handle all
+  // child interactions via bubbling. Much more robust than per-element
+  // listeners which can miss elements not yet in the DOM at render time.
+  fresh.addEventListener('change', function(e) {
+    if (e.target.classList.contains('pkg-status-sel')) {
+      const safeId = e.target.id.replace('pkg-status-', '');
+      pkgToggleOrderedFields(safeId, e.target.value);
+      e.target.style.color      = (e.target.value === 'Not Authorized') ? '#dc2626' : '';
+      e.target.style.fontWeight = (e.target.value === 'Not Authorized') ? '600' : '';
+      const part = parts.find(function(p) { return pkgSafeId(p.part_key) === safeId; });
+      if (part) { pkgDirtyParts[part.part_key] = true; if (saveAllBtn) saveAllBtn.style.display = ''; }
     }
-    ['pkg-po-', 'pkg-date-', 'pkg-eta-', 'pkg-delivered-', 'pkg-recvqty-'].forEach(function(prefix) {
-      const el = document.getElementById(prefix + safeId);
-      if (el) el.addEventListener('input', function() { markDirty(p.part_key); });
-    });
-    const saveBtn = document.getElementById('pkg-save-' + safeId);
-    if (saveBtn) saveBtn.addEventListener('click', function() { pkgSavePart(roNumber, p.part_key); });
+  });
+  fresh.addEventListener('input', function(e) {
+    const prefixes = ['pkg-po-', 'pkg-date-', 'pkg-eta-', 'pkg-delivered-', 'pkg-recvqty-'];
+    const matched  = prefixes.find(function(pf) { return (e.target.id || '').startsWith(pf); });
+    if (matched) {
+      const safeId = e.target.id.replace(matched, '');
+      const part   = parts.find(function(p) { return pkgSafeId(p.part_key) === safeId; });
+      if (part) { pkgDirtyParts[part.part_key] = true; if (saveAllBtn) saveAllBtn.style.display = ''; }
+    }
+  });
+  fresh.addEventListener('click', function(e) {
+    const btn = e.target.closest('.pkg-save-btn');
+    if (!btn) return;
+    const safeId = btn.id.replace('pkg-save-', '');
+    const part   = parts.find(function(p) { return pkgSafeId(p.part_key) === safeId; });
+    if (part) pkgSavePart(roNumber, part.part_key);
   });
 }
 
@@ -4756,7 +4767,7 @@ async function pkgSaveAll() {
   } catch(e) {
     showToast('Erro de ligação ao guardar.');
   } finally {
-    if (saveAllBtn) { saveAllBtn.disabled = false; saveAllBtn.innerHTML = '&#x1F4BE; Guardar todas'; }
+    if (saveAllBtn) { saveAllBtn.disabled = false; saveAllBtn.innerHTML = '&#x1F4BE; Salvar todas'; }
   }
 }
 
