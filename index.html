@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.49 — Build: 02/07/2026 -->
+<!-- v2.7.49: APPROVALS — default joblines (PQIS, VAL de entrada,
+             Checklist, etc.) are now implicitly approved. Techs see
+             the green "✔ APROVADO" badge on them in the jobline list,
+             same as manually-approved regular joblines — no confusion
+             about whether they're cleared to work on them. In the
+             Aprovadores approval panel, default joblines show as
+             pre-checked and disabled (greyed checkbox) with label
+             "✔ APROVADO (padrão)" — visible for context but not
+             manually toggleable. No backend change needed. -->
 <!-- Porsche Service Rio PWA — v2.7.48 — Build: 02/07/2026 -->
 <!-- v2.7.48: VERSION SYNC — aligned frontend version number with
              Code.gs (both now v2.7.48). Also in this version:
@@ -1635,7 +1645,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.48';
+const APP_VERSION = '2.7.49';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2092,8 +2102,12 @@ function renderJoblines(roNumber, joblines) {
 
 // ── v1.6.3: lockedByMe bypass — same tech can reclaim their own lock ──
 function joblineCard(j) {
-  // Approval badge (visible to all techs)
-  const _apvState = (approvalCache[j.ro_number] || {})[j.job_description];
+  // Approval badge (visible to all techs).
+  // Default joblines (PQIS, VAL de entrada, Checklist, etc.) are
+  // implicitly approved — they're universal tasks that don't need
+  // individual authorization, so treating them as approved avoids
+  // confusing techs who see them alongside unapproved regular joblines.
+  const _apvState = j.is_default ? true : (approvalCache[j.ro_number] || {})[j.job_description];
   const apvBadge  = _apvState === true
     ? '<span class="badge b-apv-ok" style="display:inline-block;margin-top:5px">&#x2714; APROVADO</span>'
     : _apvState === false
@@ -2788,16 +2802,18 @@ function renderApvJoblines(roNumber, joblines) {
   });
 
   const rows = joblines.map(function(j, idx) {
-    const val   = apvCheckboxes[j.job_description];
-    const stCls = val === null ? 'apv-none' : (val ? 'apv-ok' : 'apv-no');
-    const stTxt = val === null ? 'Pendente'  : (val ? '✔ APROVADO' : '✖ NÃO APROVADO');
+    const val   = j.is_default ? true : apvCheckboxes[j.job_description];
+    const stCls = j.is_default ? 'apv-ok' : (val === null ? 'apv-none' : (val ? 'apv-ok' : 'apv-no'));
+    const stTxt = j.is_default ? '✔ APROVADO (padrão)' : (val === null ? 'Pendente' : (val ? '✔ APROVADO' : '✖ NÃO APROVADO'));
     const icon  = j.is_default ? '&#x1F4CB;' : '&#x1F527;';
     return (
       '<div class="apv-jl-row">' +
         '<span class="apv-jl-desc">'+icon+' '+j.job_description+'</span>' +
         '<span class="apv-status '+stCls+'" id="apvst-'+idx+'">'+stTxt+'</span>' +
-        '<input type="checkbox" class="apv-cb" id="apvcb-'+idx+'" data-idx="'+idx+
-          '" data-desc="'+encodeURIComponent(j.job_description)+'"'+(val===true?' checked':'')+'>'+
+        (j.is_default
+          ? '<input type="checkbox" class="apv-cb" checked disabled style="opacity:0.4">'
+          : '<input type="checkbox" class="apv-cb" id="apvcb-'+idx+'" data-idx="'+idx+
+            '" data-desc="'+encodeURIComponent(j.job_description)+'"'+(val===true?' checked':'')+'>') +
       '</div>'
     );
   });
