@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v2.7.48 — Build: 02/07/2026 -->
+<!-- v2.7.48: VERSION SYNC — aligned frontend version number with
+             Code.gs (both now v2.7.48). Also in this version:
+             PARTS — new "Guardar todas" (💾) batch save button,
+             dirty tracking on all part fields, pkgSaveAll() sending
+             all changed parts in one request. Requires Code.gs
+             v2.7.48+ deployed. -->
 <!-- Porsche Service Rio PWA — v2.7.32 — Build: 02/07/2026 -->
 <!-- v2.7.32: MANUAL PATIO TAGGING — new Aprovador-only "Marcar no
              Pátio (manual)" toggle on the RO detail screen (s2). One-
@@ -1198,8 +1205,9 @@ input:focus{outline:none;border-color:var(--black)}
         <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="pkgReload()" title="Actualizar">&#x21BB;</button>
       </div>
       <div class="scroll" style="padding:14px 16px">
-        <div id="pkg-add-toggle-wrap" style="margin-bottom:10px">
-          <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="pkgToggleAddForm()">&#x2795; Adicionar peça manualmente</button>
+        <div id="pkg-add-toggle-wrap" style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+          <button class="bigbtn btn-sec" style="margin-bottom:0;flex:1" onclick="pkgToggleAddForm()">&#x2795; Adicionar peça manualmente</button>
+          <button class="bigbtn btn-ini" id="pkg-save-all-btn" style="margin-bottom:0;flex:1;display:none" onclick="pkgSaveAll()">&#x1F4BE; Guardar todas</button>
         </div>
         <div class="pkg-add-form" id="pkg-add-form" style="display:none">
           <input type="text" id="pkg-add-desc" placeholder="Descrição da peça">
@@ -1627,7 +1635,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.32';
+const APP_VERSION = '2.7.48';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1678,6 +1686,7 @@ let apvCheckboxes = {}; // active editing session { jobDescription: bool|null }
 let partsSummaryCache = {}; // { roNumber: { color, total, red, yellow, green } }
 let partsDetailCache  = {}; // { roNumber: [ {part_key, status, ...} ] }
 let pkgCurrentRO = null;
+let pkgDirtyParts = {}; // { partKey: true } — parts with unsaved changes
 let seconds = 0, timerIv = null, timerOn = false;
 let photoCount = 0, sessionHistory = [];
 let gpsStart = null, gpsCurrent = null;
@@ -4493,17 +4502,30 @@ function renderPkgPartsList(roNumber, parts) {
   }
   list.innerHTML = parts.map(pkgPartCardHtml).join('');
 
+  pkgDirtyParts = {};
+  const saveAllBtn = document.getElementById('pkg-save-all-btn');
+  if (saveAllBtn) saveAllBtn.style.display = 'none';
+
+  function markDirty(partKey) {
+    pkgDirtyParts[partKey] = true;
+    if (saveAllBtn) saveAllBtn.style.display = '';
+  }
+
   parts.forEach(function(p) {
     const safeId = pkgSafeId(p.part_key);
     const selEl  = document.getElementById('pkg-status-' + safeId);
-    const fieldsEl = document.getElementById('pkg-fields-' + safeId);
     if (selEl) {
       selEl.addEventListener('change', function() {
         pkgToggleOrderedFields(safeId, this.value);
         this.style.color = (this.value === 'Not Authorized') ? '#dc2626' : '';
         this.style.fontWeight = (this.value === 'Not Authorized') ? '600' : '';
+        markDirty(p.part_key);
       });
     }
+    ['pkg-po-', 'pkg-date-', 'pkg-eta-', 'pkg-delivered-', 'pkg-recvqty-'].forEach(function(prefix) {
+      const el = document.getElementById(prefix + safeId);
+      if (el) el.addEventListener('input', function() { markDirty(p.part_key); });
+    });
     const saveBtn = document.getElementById('pkg-save-' + safeId);
     if (saveBtn) saveBtn.addEventListener('click', function() { pkgSavePart(roNumber, p.part_key); });
   });
@@ -4674,6 +4696,67 @@ async function pkgSavePart(roNumber, partKey) {
     loadPartsSummaries(liveROs.map(r => r.ro_number)); // refresh badges on RO list
   } catch(e) {
     showToast('Erro de ligação ao guardar.');
+  }
+}
+
+async function pkgSaveAll() {
+  if (!pkgCurrentRO) return;
+  const roNumber  = pkgCurrentRO;
+  const parts     = partsDetailCache[roNumber] || [];
+  const dirtyKeys = Object.keys(pkgDirtyParts).filter(function(k) { return pkgDirtyParts[k]; });
+  if (!dirtyKeys.length) { showToast('Nenhuma alteração por guardar.'); return; }
+
+  const batchParts = [];
+  for (var i = 0; i < dirtyKeys.length; i++) {
+    const partKey = dirtyKeys[i];
+    const p = parts.find(function(x) { return x.part_key === partKey; });
+    if (!p) continue;
+    const safeId  = pkgSafeId(partKey);
+    const status  = (document.getElementById('pkg-status-'   + safeId) || {}).value || '';
+    const poEl    = document.getElementById('pkg-po-'        + safeId);
+    const dateEl  = document.getElementById('pkg-date-'      + safeId);
+    const etaEl   = document.getElementById('pkg-eta-'       + safeId);
+    const delEl   = document.getElementById('pkg-delivered-' + safeId);
+    const recvEl  = document.getElementById('pkg-recvqty-'   + safeId);
+    batchParts.push({
+      ro_number:         roNumber,
+      part_key:          partKey,
+      part_code:         p.part_code,
+      part_description:  p.part_description,
+      quantity:          p.quantity,
+      status:            status,
+      po_number:         poEl   ? poEl.value   : '',
+      date_ordered:      dateEl ? dateEl.value  : '',
+      eta:               etaEl  ? etaEl.value   : '',
+      delivered_date:    delEl  ? delEl.value   : '',
+      received_quantity: (status === 'Delivered' && recvEl) ? recvEl.value : '',
+      source:            p.source || 'auto',
+    });
+  }
+
+  if (!batchParts.length) { showToast('Nenhuma alteração por guardar.'); return; }
+
+  const saveAllBtn = document.getElementById('pkg-save-all-btn');
+  if (saveAllBtn) { saveAllBtn.disabled = true; saveAllBtn.textContent = 'A guardar...'; }
+
+  try {
+    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+      action:    'saveBatchPartStatus',
+      ro_number: roNumber,
+      tech:      currentTech,
+      parts:     batchParts,
+    })});
+    const data = await res.json();
+    if (!data.ok) { showToast('Erro: ' + (data.error || 'não foi possível guardar')); return; }
+    const msg = '&#x2714; ' + data.saved + (data.saved === 1 ? ' peça guardada' : ' peças guardadas')
+      + (data.failed ? ' · ' + data.failed + ' erro(s)' : '');
+    showToast(msg);
+    await pkgLoadParts(roNumber);
+    loadPartsSummaries(liveROs.map(r => r.ro_number));
+  } catch(e) {
+    showToast('Erro de ligação ao guardar.');
+  } finally {
+    if (saveAllBtn) { saveAllBtn.disabled = false; saveAllBtn.innerHTML = '&#x1F4BE; Guardar todas'; }
   }
 }
 
