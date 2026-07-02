@@ -1,4 +1,4 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <!-- Porsche Service Rio PWA — v2.7.30 — Build: 30/06/2026 -->
 <!-- v2.7.30: PARTS — 'Não autorizada' (Not Authorized) status now
              appears first in the dropdown (after the blank option),
@@ -1601,7 +1601,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.30';
+const APP_VERSION = '2.7.31';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3592,11 +3592,59 @@ function agdFilterMgmtList(q) {
     return roMatch || plateMatch || nameMatch;
   });
   if (!filtered.length) {
-    document.getElementById('agd-mgmt-list').innerHTML =
-      '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhum agendamento encontrado para "'+escapeHtml(q)+'".</div>';
+    // v2.7.31 — RO 28682 fix: the list only ever holds SERVICOS's
+    // default -7/+60 day window, so an old-but-real event (e.g. an RO
+    // open 1+ years) can search-miss here even though it genuinely
+    // exists. When the query looks like an RO number (digits only,
+    // matching how RO numbers are actually typed/searched), offer a
+    // one-tap fallback that checks the full calendar history via the
+    // same endpoint backing the ENTREGA hard-gate (hasServicosEvent,
+    // now AGENDA_HISTORY_FLOOR-wide as of Code.gs v2.7.46) — only
+    // triggered on demand, so the normal narrow list stays fast and
+    // uncluttered for everyday use.
+    const looksLikeRO = /^\d{3,}$/.test(q.trim());
+    const el = document.getElementById('agd-mgmt-list');
+    if (agdCurrentCalendar === 'servicos' && looksLikeRO) {
+      el.innerHTML =
+        '<div style="text-align:center;color:#aaa;font-size:13px;padding:24px 0 12px">Nenhum agendamento encontrado para "'+escapeHtml(q)+'" nos últimos 7 dias / próximos 60 dias.</div>' +
+        '<div style="text-align:center;padding:0 16px 24px">' +
+          '<button onclick="agdSearchHistoricoCompleto(\''+escapeHtml(q.trim())+'\')" style="background:var(--black);color:#fff;border:none;border-radius:6px;padding:10px 16px;font-size:13px;cursor:pointer">Buscar no histórico completo</button>' +
+        '</div>';
+    } else {
+      el.innerHTML =
+        '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhum agendamento encontrado para "'+escapeHtml(q)+'".</div>';
+    }
     return;
   }
   agdRenderList(filtered);
+}
+
+// v2.7.31 — full-history fallback for a single RO number, triggered
+// on demand from agdFilterMgmtList. Reuses the hasServicosEvent
+// endpoint (AGENDA_HISTORY_FLOOR-wide, Code.gs v2.7.46+) rather than
+// a dedicated action, since it already returns the full event object
+// via agendaEventToObj — no backend duplication needed. Renders
+// through the normal agdRenderList so the result looks/behaves
+// exactly like any other card (tap to open, Confirmar Chegada, etc).
+function agdSearchHistoricoCompleto(roNumber) {
+  const el = document.getElementById('agd-mgmt-list');
+  el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A buscar no histórico completo...</div></div>';
+  fetch(API_URL + '?action=hasServicosEvent&ro_number=' + encodeURIComponent(roNumber))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.exists || !data.event) {
+        el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhum agendamento SERVICOS encontrado para RO #'+escapeHtml(roNumber)+' em todo o histórico.</div>';
+        return;
+      }
+      agdRenderList([data.event]);
+      const note = document.createElement('div');
+      note.style.cssText = 'text-align:center;color:#a80;font-size:11.5px;padding:8px 16px 0';
+      note.textContent = 'Encontrado fora do período padrão (últimos 7 dias / próximos 60 dias) — evento de ' + fmtDateTime(new Date(data.event.start)) + '.';
+      el.prepend(note);
+    })
+    .catch(() => {
+      el.innerHTML = '<div class="err-box">&#x26A0; Erro ao buscar histórico completo.</div>';
+    });
 }
 
 function agdRenderList(events) {
