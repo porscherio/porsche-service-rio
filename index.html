@@ -1,521 +1,14 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.7.49 — Build: 02/07/2026 --> redeployed D
-<!-- v2.7.49: APPROVALS — default joblines (PQIS, VAL de entrada,
-             Checklist, etc.) are now implicitly approved. Techs see
-             the green "✔ APROVADO" badge on them in the jobline list,
-             same as manually-approved regular joblines — no confusion
-             about whether they're cleared to work on them. In the
-             Aprovadores approval panel, default joblines show as
-             pre-checked and disabled (greyed checkbox) with label
-             "✔ APROVADO (padrão)" — visible for context but not
-             manually toggleable. No backend change needed. -->
-<!-- Porsche Service Rio PWA — v2.7.48 — Build: 02/07/2026 -->
-<!-- v2.7.48: VERSION SYNC — aligned frontend version number with
-             Code.gs (both now v2.7.48). Also in this version:
-             PARTS — new "Salvar todas" (💾) batch save button,
-             dirty tracking on all part fields, pkgSaveAll() sending
-             all changed parts in one request. Requires Code.gs
-             v2.7.48+ deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.32 — Build: 02/07/2026 -->
-<!-- v2.7.32: MANUAL PATIO TAGGING — new Aprovador-only "Marcar no
-             Pátio (manual)" toggle on the RO detail screen (s2). One-
-             time migration tool for old ROs that predate the SERVICOS/
-             Confirmar Chegada workflow (e.g. RO 28682) — writes the
-             new manual_patio flag via Code.gs's setManualPatio, no
-             Calendar involved. "Veículos no Pátio" now also merges in
-             manually-tagged ROs (shown with a purple 📍 manual pill
-             instead of an arrival time), deduped against calendar-
-             confirmed arrivals by RO number. Requires Code.gs v2.7.47+
-             deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.31 — Build: 01/07/2026 -->
-<!-- v2.7.31: AGENDAMENTO SERVICO — search box in the Management list
-             now offers a "Buscar no histórico completo" fallback
-             button when a numeric query (looks like an RO number)
-             finds nothing in the default -7/+60 day window — fixes
-             RO 28682, an open RO whose only SERVICOS event was old
-             enough to fall outside that window but too recent to be
-             flagged "missing" by Agendamento ausente's 2-year check.
-             Reuses the hasServicosEvent endpoint directly (no new
-             backend action). Requires Code.gs v2.7.46+ deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.30 — Build: 30/06/2026 -->
-<!-- v2.7.30: PARTS — 'Não autorizada' (Not Authorized) status now
-             appears first in the dropdown (after the blank option),
-             shown in red both on the option itself and on the select
-             element when that option is selected. Color clears
-             automatically when a different status is chosen. -->
-<!-- Porsche Service Rio PWA — v2.7.29 — Build: 30/06/2026 -->
-<!-- v2.7.29: PARTS — new 'Não autorizada' (Not Authorized) status
-             added to the parts approval dropdown, positioned before
-             'Autorizada a compra'. Not locked — Aprovador can still
-             authorize later. Requires Code.gs v2.7.41+ deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.28 — Build: 28/06/2026 -->
-<!-- v2.7.28: GANTT_URL updated to the new container-bound Gantt v2.0
-             deployment (rewritten to fetch from the PWA's own
-             action=ganttData endpoint instead of the legacy OI source
-             sheets — see Code.gs v2.7.34+/v2.7.35). The green GANTT
-             pill on the RO detail screen and the bottom-nav Gantt
-             tab both already build the URL correctly with the
-             current RO's ro_number — no other change needed here. -->
-<!-- Porsche Service Rio PWA — v2.7.27 — Build: 27/06/2026 -->
-<!-- v2.7.27: AGENDAMENTO — opening an event's detail screen used to
-             always default the reschedule date picker to TODAY, even
-             if the event itself was scheduled for a different day.
-             That meant the colored slot pills shown were for whatever
-             OTHER events happened to be on today's calendar — nothing
-             to do with the event actually being viewed — which could
-             easily look like a coloring bug. Now it defaults to the
-             event's OWN scheduled date, and that specific slot is
-             marked with a bold border + "· Atual" label so it's
-             unambiguous which one is this event, even among several
-             colored pills in the same slot. Picking a different date
-             still works exactly as before for an actual reschedule.
-             Requires Code.gs v2.7.28+ deployed (bookings now include
-             each event's id, needed to match the "Atual" slot). -->
-<!-- Porsche Service Rio PWA — v2.7.26 — Build: 27/06/2026 -->
-<!-- v2.7.26: AGENDAMENTO SLOTS — slot picker (Create and Reschedule,
-             both SERVICOS and ENTREGA) now shows up to 3 Agendamentos
-             per 1h slot instead of 1. Every slot stays selectable even
-             when already booked — small colored count pills (Matheus
-             blue, Sidney red, Eytan green) show who's already in that
-             slot and how many times, with a legend above the grid, so
-             the Aprovador can see at a glance how busy a slot already
-             is before adding another — 3 is a soft cap, just a visual
-             nudge, not a hard block. Requires Code.gs v2.7.27+
-             deployed, plus a new "Agendadores" sheet (column A: Eytan
-             Lubicz / Sidney Lubicz / Matheus Pego) in the PWA
-             spreadsheet — separate from the existing Aprovadores
-             sheet. -->
-<!-- Porsche Service Rio PWA — v2.7.25 — Build: 27/06/2026 -->
-<!-- v2.7.25: AGENDAMENTO — ENTREGA's "Local de retirada" dropdown is
-             no longer greyed out, on both Create and Edit screens.
-             Moved out of the structural-fields container that was
-             disabling it alongside RO/Cliente/Placa/etc (those stay
-             locked for ENTREGA — only location changed). Defaults to
-             the linked SERVICOS event's location, but the Aprovador
-             can pick a different one if the customer wants to collect
-             the vehicle elsewhere — submitted correctly on both create
-             and edit now (previously body.location_key was silently
-             never sent for ENTREGA in either flow, a gap from before
-             this fix even existed). Requires Code.gs v2.7.26+ deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.24 — Build: 27/06/2026 -->
-<!-- v2.7.24: AGENDAMENTO BACKFILL — the "Agendamento ausente" form now
-             supports SERVIÇOS-only backfills: a "Criar também ENTREGA
-             (já entregue)" toggle, OFF by default, reveals the
-             delivery date field only when turned on — for vehicles
-             still actively under service that were simply never
-             scheduled, not yet delivered. Added two separate
-             observação/remark text fields, one for SERVIÇOS (always
-             visible) and one for ENTREGA (only shown when the toggle
-             is on), written into each event's description. Plate,
-             VIN, and customer name continue to be pulled automatically
-             from the ROs sheet by ro_number — no manual entry needed
-             for those. Requires Code.gs v2.7.25+ deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.23 — Build: 27/06/2026 -->
-<!-- v2.7.23: AGENDAMENTO BACKFILL — new "Agendamento ausente" card in
-             Gerir Agendamentos, listing open ROs (status != fechada)
-             with no SERVICOS event at all (e.g. a walk-in/urgent
-             repair that was never scheduled). Tapping a row opens a
-             form pre-filled with SERVICOS start = RO's opened_date at
-             09:00 (1h default, freely editable, no slot restrictions),
-             plus a manually-picked ENTREGA delivery date (must be on
-             or after the SERVICOS end). Submitting creates BOTH events
-             in one step via Code.gs's createBackfillAgendamento — the
-             ENTREGA event already marked delivered — making these
-             historical ROs fully consistent with the normal
-             Agendamento workflow everywhere else in the app (Patio,
-             reports, etc). Requires Code.gs v2.7.24+ deployed. -->
-<!-- Porsche Service Rio PWA — v2.7.22 — Build: 27/06/2026 -->
-<!-- v2.7.22: AGENDAMENTO MANAGEMENT — the "Últimos 7 dias e próximos
-             60 dias" subtitle on the Management list was a static
-             label, left over from before the v2.7.23 Code.gs fix that
-             removed ENTREGA's 7-day lower bound (delivery timing can't
-             be predicted from arrival date). It's now dynamic: SERVICOS
-             still shows "Últimos 7 dias e próximos 60 dias" (unchanged),
-             ENTREGA shows "Todos os agendamentos por entregar" by
-             default, or "Últimos 30 dias (entregues) e próximos 60
-             dias" when "Mostrar entregues" is checked — matching
-             exactly what the backend actually returns. Requires
-             Code.gs v2.7.23+ deployed for the label to match reality;
-             this index.html change is cosmetic only and doesn't affect
-             what data is fetched. -->
-<!-- Porsche Service Rio PWA — v2.7.21 — Build: 27/06/2026 -->
-<!-- v2.7.21: PARTS REQUESTS — workflow refinements:
-             • "Pedido feito" (Ordered) now REQUIRES Nº PO and Data
-               pedido before it can be saved (client + server
-               validation). ETA auto-fills as Data pedido + 30 days
-               (editable) when both Data pedido is set and ETA is
-               still blank.
-             • "Peça recebida" (Delivered) now REQUIRES Entregue em
-               (auto-fills to today, editable) and a new "Qtd
-               recebida" field (auto-fills to the part's full
-               ordered quantity, editable) — both required before
-               saving.
-             • New receipt-completeness tracking: if Qtd recebida <
-               quantity, the part is tagged "partial" (a new 4th
-               status color, distinct from red/yellow/green) instead
-               of fully green/done. A small chip on the part card
-               ("Completo" / "Parcial X/Y") reflects this, and the
-               read-only popover (all techs) shows it too.
-             • PartsRequests sheet gained a new received_quantity
-               column (auto-migrated for existing sheets — safe, no
-               data loss). The partial/full distinction feeds into
-               both the RO-card parts badge and the lightweight batch
-               summary endpoint used by the Patio dashboard — Patio's
-               own rendering code will need a matching update to
-               actually display the new "partial" color (not included
-               in this PWA-side change). -->
-<!-- Porsche Service Rio PWA — v2.7.20 — Build: 27/06/2026 -->
-<!-- v2.7.20: PARTS REQUESTS — locked "Autorizada a compra" option now
-             shows the actual authorization date (e.g. "Autorizada a
-             compra em 27/06/2026"), read from the part's "Data
-             pedido" field, instead of the generic "(já autorizada)"
-             text. Falls back to the generic text only if no date was
-             ever recorded (e.g. parts authorized before this date
-             auto-fill existed). -->
-<!-- Porsche Service Rio PWA — v2.7.19 — Build: 26/06/2026 -->
-<!-- v2.7.19: App version number now shown in the persistent top status
-             bar (next to "PORSCHE SERVICE RIO", on every screen), not
-             just on the login screen badge. Helps confirm which build
-             is running without having to log out. -->
-<!-- Porsche Service Rio PWA — v2.7.18 — Build: 26/06/2026 -->
-<!-- v2.7.18: PARTS REQUESTS — when an Aprovador selects "Autorizada a
-             compra" (To Be Ordered), "Data pedido" now auto-fills with
-             today's date (same pattern already used for "Entregue em"
-             on Delivered), and the PO/dates fields block becomes
-             visible at that point instead of only from "Pedido feito"
-             onward. The date stays editable in case it needs
-             correcting. -->
-<!-- Porsche Service Rio PWA — v2.7.17 — Build: 26/06/2026 -->
-<!-- v2.7.17: PARTS REQUESTS — fix from v2.7.16: the status field was
-             being fully disabled once authorized, blocking the
-             Aprovador from progressing the part through the rest of
-             the purchase workflow (Pedido feito → Pedido confirmado →
-             Back order → Peça recebida). Corrected: the select stays
-             fully editable; only the "Autorizada a compra" option
-             itself becomes unselectable once a status has been set,
-             so the approval step can never be undone, while every
-             other status remains freely selectable in any order, any
-             number of times. -->
-<!-- Porsche Service Rio PWA — v2.7.16 — Build: 26/06/2026 -->
-<!-- v2.7.16: PARTS REQUESTS — relabeled status options (e.g. "A solicitar"
-             → "Autorizada a compra", "Entregue" → "Peça recebida") to
-             better match real-world terminology. New parts now start
-             with a BLANK status (no action taken yet) instead of
-             defaulting to "To Be Ordered" — this was previously
-             misleading, implying authorization had already happened.
-             Once an Aprovador sets a status, that status dropdown
-             locks (greyed out, read-only) to prevent accidental
-             re-authorization/reversal — PO number, dates, and ETA
-             remain editable to track the order as it progresses.
-             Lock is enforced server-side too (savePartStatus rejects
-             status changes once a part already has a non-blank
-             status), so it can't be bypassed via stale UI or a
-             direct API call. -->
-<!-- Porsche Service Rio PWA — v2.7.15 — Build: 26/06/2026 -->
-<!-- v2.7.15: Agendamento Management list (both SERVICOS and ENTREGA)
-              now SORTS ASCENDING by RO number by default — previously
-              came back in whatever order Code.gs's Calendar query
-              returned (chronological by event start time), making a
-              specific RO hard to locate in a long list. Also added a
-              search box (#agd-mgmt-search, same visual pattern as
-              #ro-search on screen s1) filtering by RO number, plate,
-              or customer name — client-side only, against a new
-              agdMgmtAllEvents cache, no re-fetch on each keystroke.
-              Both fixes target the same complaint: finding a specific
-              RO inside Gerir Agendamentos → SERVICOS/ENTREGA → pick
-              RO, used right before scanning Documentos de Entrega. -->
-<!-- Porsche Service Rio PWA — v2.7.14 — Build: 26/06/2026 -->
-<!-- v2.7.14: Fixed the Documentos de Entrega re-entry pill (📄 Docs,
-              next to the ENTREGUE pill, introduced v2.7.8) — it was
-              previously a tiny 20×20px icon-only box in near-
-              invisible light-gray-on-light-gray (#f7f7f7 on #e0e0e0),
-              which essentially disappeared next to the bold yellow
-              ENTREGUE pill right beside it. Rebuilt as a proper dark
-              pill (var(--black) bg, white text, "📄 Docs" label)
-              matching the size and visual weight of its pill
-              neighbors. NOTE on version numbering: this PWA's prior
-              shipped version was v2.7.10 ("NO PÁTIO QUICK-CHECK",
-              below) — v2.7.11/12/13 were used by a parallel Code.gs-
-              only line of work (chegada/entregue plate-matching
-              fixes, WhatsApp card redesign) that never touched this
-              file. Jumping straight to v2.7.14 here avoids re-using
-              any of those numbers for a second, different change. -->
-<!-- Porsche Service Rio PWA — v2.7.10 — Build: 25/06/2026 -->
-<!-- v2.7.10: NO PÁTIO QUICK-CHECK. New 🅿️ icon in the s1 topbar —
-             visible to EVERY logged-in user, no Aprovador gate
-             (unlike the rest of Agendamento) — opens a simple,
-             read-only screen listing every SERVICOS appointment
-             currently confirmed chegada=true (filtered client-side
-             from the same getAgendamentos endpoint Management
-             already uses). Minimal row detail only: RO number,
-             plate, customer name, vehicle, arrival time. No tap
-             actions on rows — toggling chegada still only happens
-             inside Agendamento Management, so there remains only
-             one place that controls the flag. No backend changes —
-             pure read of data Code.gs already returns. -->
-<!-- Porsche Service Rio PWA — v2.7.9 — Build: 25/06/2026 -->
-<!-- v2.7.9: DOCUMENTOS DE ENTREGA (introduced v2.7.7, fixed v2.7.8) +
-             VIN on active-timer screen (v2.7.9). Right after a tech
-             confirms ENTREGUE, a chooser modal now prompts scanning
-             "OS de Saída" and "Pagamento" — each captured via the
-             browser-native <input type=file capture> picker (hands
-             framing/crop off to the phone's own camera/scanner app,
-             fixing the poorly-framed custom-camera v2.7.7 attempt),
-             bundled into one PDF (jsPDF) when multiple image pages
-             are added, uploaded DIRECTLY to Dropbox (get_dropbox_token
-             pattern, same as video/remarks/audio), logged via new
-             Code.gs route saveEntregaDocStatus into append-only tab
-             EntregaDocs. A persistent 📄 icon next to the ENTREGUE
-             pill reopens the chooser any time afterward — un-marking/
-             re-marking delivery is never required to scan a missed
-             doc. Scan modal uses a sticky footer (.edoc-scan-pop) so
-             Finalizar/Cancelar stay visible regardless of page count.
-             Paths: .../#{RO}/os_assinada/SAI_{RO}_{ts}.pdf and
-             .../pagamento/PAG_{RO}_{ts}.pdf — re-scans never overwrite,
-             always a fresh timestamped file + fresh audit row.
-             Separately: VIN now always shown on screen s4 ("Em
-             andamento") for every jobline, every RO — was already in
-             activeRO.vin, just missing as its own display row.
-             Paired with backend Code.gs v2.7.9. -->
-<!-- Porsche Service Rio PWA — v2.7.6 — Build: 24/06/2026 -->
-<!-- v2.7.6: MILEAGE CHECK. RO cards (s1 list) and the RO detail
-             header (s2) now show a blinking amber "Confirmar
-             quilometragem" pill whenever a RO's mileage is missing
-             or still the OI placeholder value (1) — meaning an
-             Approver never checked the real odometer reading when
-             opening the RO. ANY tech can tap it (not Aprovador-
-             gated) and type the current km in a small modal;
-             submission is validated client-side (whole number > 1)
-             and again server-side. Once a real mileage exists, the
-             pill is replaced by plain "· N km" text next to the
-             plate. Backend: new updateMileage action writes to both
-             the PWA's own ROs tab (mileage + mileage_source='pwa',
-             so the separate sync_all.gs project never overwrites it
-             again) AND the OI source spreadsheet's column J
-             directly (best-effort — a source-write failure is
-             logged but doesn't block the PWA-visible update).
-             Paired with backend Code.gs v2.7.6 and sync_all.gs
-             v1.10.0/v1.10.1 (new ROs-tab columns + backfill tool
-             for ROs that already existed before this update). -->
-<!-- Porsche Service Rio PWA — v2.7.4 — Build: 24/06/2026 -->
-<!-- v2.7.4: RELIABLE RELEASE. 'release' (and 'complete_default', when
-             applicable) on the pause/complete screens were pure
-             fire-and-forget (mode:'no-cors') — the PWA had NO way to
-             know if the server-side write actually succeeded.
-             Confirmed real case: 'log_work' succeeded while 'release'
-             → updateCompletion() silently failed server-side, leaving
-             Work Log correct but the Joblines sheet's own
-             completion_pct blank (RO 29912, jobline 003 — repaired
-             manually via Code.gs's reconcileCompletionFromWorkLog).
-             Fix: new releaseJoblineReliably() helper makes both calls
-             AWAITED and readable (no no-cors) — confirms a real
-             { ok: true } from the server before doing any local UI
-             update or navigation. The Confirmar pausa / Confirmar e
-             concluir buttons now disable + dim while the request is
-             in flight (also fixes accidental double-taps). On
-             failure (network error or non-ok response), a new modal
-             appears — "Tentar novamente" / "Cancelar" — and the tech
-             stays exactly where they were, task still locked, nothing
-             lost, free to retry whenever ready. Paired with backend
-             Code.gs v2.7.4 (reconcileCompletionFromWorkLog rename). -->
-<!-- Porsche Service Rio PWA — v2.7.3 — Build: 24/06/2026 -->
-<!-- v2.7.3: Aprovadores now see ALL joblines on the REGULAR RO screen
-             too (s1 → s2), not just in the Approval panel. Previously
-             loadJoblines() always sent &tech=<currentTech>, so an
-             Aprovador opening any RO from the normal list was still
-             subject to Default Assignments keyword filtering exactly
-             like any other tech — meaning an RO whose joblines were
-             all keyword-gated to OTHER techs would show up empty for
-             an Aprovador, even though v2.7.2 had already fixed this
-             for the dedicated Approval panel. Fix: loadJoblines() now
-             omits &tech entirely when isApproverTech is true, so
-             getJoblines() returns the complete, unfiltered list — same
-             mechanism already used by apvSelectRO() since v2.7.2.
-             Regular (non-Aprovador) techs are unaffected; their view
-             stays scoped to their assigned keywords as before. -->
-<!-- Porsche Service Rio PWA — v2.7.2 — Build: 24/06/2026 -->
-<!-- v2.7.2: BUGFIX — Approval panel served stale, keyword-filtered
-             joblines. apvSelectRO() previously reused liveJoblines[ro]
-             if already cached — but that cache may have been
-             populated by the regular RO screen's &tech=<currentTech>
-             fetch, which getJoblines() filters by Default Assignments
-             keywords. An Aprovador opening Approvals for an RO already
-             opened (by anyone, in the same session) would silently see
-             that filtered list instead of every jobline — surfaced by
-             an Agendamento RO-number collision, but the root cause was
-             unrelated to Agendamento. Fix: the Approval panel now
-             ALWAYS fetches fresh, with no &tech param at all (so
-             getJoblines() returns the full, unfiltered list), and
-             never writes into or reads from liveJoblines. renderApv
-             Joblines() now takes the jobline list as a parameter
-             instead of reading the shared cache.
-             ALSO: login screen's tech dropdown is now sorted
-             alphabetically (was insertion order from the USERS
-             object) — easier to find a name in a long roster. -->
-<!-- Porsche Service Rio PWA — v2.7.1 — Build: 24/06/2026 -->
-<!-- v2.7.1: Management list now also looks 7 days BACK (was "today
-             onward" only), so a missed/no-show appointment from
-             yesterday can still be found and caught up on (e.g.
-             retroactively tapping Confirmar Chegada). New "Mostrar
-             entregues" switch in the ENTREGA list header — OFF by
-             default, which hides already-delivered (ENTREGUE)
-             events so the wider date window doesn't clutter the
-             list with completed deliveries; flip it on to see them
-             again. SERVIÇOS list is unaffected by this switch — it
-             always shows every event in range regardless of chegada
-             state. Paired with backend Code.gs v2.7.1. -->
-<!-- Porsche Service Rio PWA — v2.7.0 — Build: 24/06/2026 -->
-<!-- v2.7.0: CONFIRMAR ENTREGA + chegada visible on the RO workflow.
-             Management → ENTREGA list now shows the same chip
-             pattern as SERVIÇOS/chegada: neutral "Confirmar Entrega"
-             chip, or — once confirmed — an acid-yellow "ENTREGUE"
-             pill. Unlike chegada, BOTH directions of this toggle ask
-             for confirmation, since marking entregue also clears the
-             linked SERVICOS event's "NO PÁTIO" status as a one-way
-             side effect (handled server-side; undoing entregue does
-             NOT restore chegada). Separately: the acid-green "NO
-             PÁTIO" pill is now also shown — read-only, no tap target
-             — on the technician's normal RO list (s1) and RO detail
-             screen (s2), next to the RO number, so a tech opening an
-             RO can immediately see if the vehicle has already
-             arrived. Matched server-side by PLATE (not RO number,
-             since an Agendamento can exist before an RO does) against
-             the closest SERVICOS Agendamento event for that plate —
-             see Code.gs v2.7.0's getChegadaByPlateMap(). Paired with
-             backend Code.gs v2.7.0. -->
-<!-- v2.6.0: CONFIRMAR CHEGADA — customer arrival confirmation, in the
-             Management → SERVIÇOS list. Each SERVICOS card now shows
-             a tappable chip next to the RO title: a neutral
-             "Confirmar Chegada" chip (tap → marks arrival instantly,
-             no confirm) or, once arrived, an acid-green "✅ NO PÁTIO"
-             pill (tap → asks "Cancelar chegada?" before un-marking,
-             same friction as cancelling an agendamento). ENTREGA rows
-             show the green pill read-only (no tap target) — chegada
-             is owned by SERVICOS and always mirrors live, same
-             pattern as client_name/modelo/location. Backend: new
-             toggleChegada action (Aprovadores-gated) flips the
-             EVT_PROP_CHEGADA tag and fires a Zapier webhook on every
-             toggle. Paired with backend Code.gs v2.6.0. -->
-<!-- v2.5.3: PICKUP LOCATION dropdown for Create SERVICOS (Porsche
-             Service Rio default, or Porsche Pre-Owned Rio), and now
-             also editable on existing SERVICOS events in the
-             Management detail screen. Options fetched once from the
-             new getAgendaLocations backend route — never hardcoded
-             here, so a 3rd location later needs only a Code.gs
-             change. ENTREGA has no dropdown of its own; the field is
-             shown read-only (same disabled styling as its other
-             mirrored fields) since location is always inherited live
-             from the linked SERVICOS event. Paired with backend
-             Code.gs v2.5.3. -->
-<!-- v2.5.2: Version bump only, no functional changes to this file —
-             kept in sync with Code.gs v2.5.2 (WhatsApp/WABA backend
-             messaging: text confirmations/reminders live, image_url
-             now wired into every trigger). All Agendamento backend
-             work in v2.5.0–v2.5.2 is server-side only and has no
-             PWA-side surface. -->
-<!-- v2.4.1: ENTREGA→SERVICOS link health. ENTREGA's vehicle/customer
-             fields are now always shown freshly mirrored from the
-             linked SERVICOS event (matched by a permanent event-ID
-             pointer set at creation, not by re-checking RO numbers —
-             RO/plate are immutable by design). If that link is
-             broken (SERVICOS event deleted) or this is an older
-             ENTREGA event created before the linkage existed, a
-             warning banner appears in the detail screen, plus a
-             small ⚠ next to the RO number in the list view so it's
-             visible before opening. Paired with backend Code.gs
-             v2.4.1. -->
-<!-- v2.4.0: CRIAR AGENDAMENTO (Create New) — Phase 1 complete. New
-             "Criar Novo" flow alongside Management: SERVIÇOS/ENTREGA
-             choice → form → day/slot picker → create.
-             SERVIÇOS: Path A (RO already exists) — enter RO number,
-             "Buscar dados do RO" looks it up via ROs sheet + Customers
-             tab and auto-fills everything. Path B (no RO yet) — enter
-             plate and/or name manually, tap Buscar, searches the
-             Customers tab (fuzzy/partial); single match auto-fills,
-             multiple matches show a tappable list, no match lets the
-             tech proceed with manually-typed data.
-             ENTREGA: RO number required up front, hard-gated via
-             hasServicosEvent — blocks immediately with a message if
-             no SERVIÇOS event exists for that RO. Once verified, all
-             vehicle/customer fields are read-only (sourced from the
-             SERVIÇOS event), matching the same restriction as editing
-             ENTREGA events. Only Observação + day/slot are entered.
-             Both calendars converge on the same day-by-day free/busy
-             slot picker already used for reschedule. Paired with new
-             backend route getROPrefillData in Code.gs v2.4.0. -->
-<!-- v2.3.1: ENTREGA detail screen — RO/Cliente/Placa/Modelo/Ano/VIN/
-             Telefone now show as read-only (greyed out, disabled
-             inputs) for ENTREGA events, with a notice explaining why
-             (data belongs to the linked SERVICOS event). Only the
-             Observação remark and the reschedule date remain
-             editable for ENTREGA. SERVICOS events are unaffected —
-             all fields stay fully editable there. Paired with
-             backend Code.gs v2.3.1, which enforces this server-side
-             too. -->
-<!-- v2.3.0: Agenda detail screen — new standalone Observação (remark)
-             field, free text, separate from the structured fields,
-             editable alongside them. Vehicle/customer fields
-             (Cliente/Modelo/Ano/VIN/Telefone) now auto-populate from
-             the Customers tab using the event's plate when the
-             detail screen opens, for any field not already filled
-             from the event itself — existing events that already
-             name the customer (e.g. in the title) are left untouched.
-             Paired with backend Code.gs v2.3.0. -->
-<!-- v2.2.0: Agenda Management — Descrição is now editable. RO,
-             Cliente, Placa, Modelo, Ano, VIN, Telefone all editable
-             individually in the event detail screen ("Salvar
-             alterações"), rebuilt server-side into the calendar
-             event's title + description on save (same format as
-             event creation), instead of the previous read-only
-             dump of the raw description text. Paired with backend
-             Code.gs v2.2.0. -->
-<!-- v2.1.0: AGENDAMENTO (SCHEDULING) — Phase 1, Management flow.
-             New 📅 topbar icon (Aprovadores-gated, same as ✅/📦).
-             Opens a panel: Gerir Agendamentos → SERVIÇOS/ENTREGA →
-             event list (live from Google Calendar) → detail view
-             with reschedule (day + free/busy slot picker) and
-             cancel. "Criar Novo" (Create New) flow not yet built —
-             placeholder shown, disabled. Paired with backend
-             Code.gs v2.1.0. -->
-<!-- v2.0.0: PRODUCTION RELEASE. No functional changes from v1.14 —
-             version bumped to mark go-live with real technicians.
-             Covers all v1.x work to date: live timer/lock workflow,
-             jobline approvals, Parts Requests, GANTT/SI integration,
-             text + audio Remarks, and the 100%-completion confirm
-             step. Paired with backend Code.gs v2.0.0. -->
-<!-- v1.13: AUDIO REMARKS — new "Gravar áudio" button alongside the
-             text remark button on the active-timer screen. Records up
-             to 60s of audio (e.g. engine noise); tech can tap "Marcar
-             narração" mid-recording to mark, in seconds, when they
-             start describing what's captured. Audio file uploads to
-             the jobline's existing Dropbox folder; metadata (filename,
-             narration offset) logged to the Remarks tab. -->
-<!-- v1.12: REMARKS — tech can attach a free-text remark (typed or
-             dictated via Web Speech API, pt-BR) to the jobline they're
-             actively working on, from the active-timer screen. New
-             bright-blue "Adicionar observação" button. Saved to the
-             backend Remarks tab (append-only) AND uploaded as its own
-             .txt file to the jobline's existing Dropbox folder. Timer
-             keeps running in the background while the panel is open. -->
-<!-- v1.7.2: jobline approval system (Aprovacoes / Aprovadores tabs) -->
-<!-- v1.8: Parts Requests system — read-only status badge on every RO card
-           (all techs) + popover detail; Aprovadores-only 📦 panel to
-           authorize/track parts purchase status per RO -->
-<!-- v1.8.1: renamed green badge label to "Peças disponíveis"; auto-fill
-             delivery date when a part's status is set to Delivered -->
-<!-- v1.8.2: fixed date display — dates were showing as raw ISO
-             timestamps (Sheets auto-converts date strings to Date
-             objects); now normalised server-side and formatted as
-             dd/MM/yyyy in the read-only popover -->
-<!-- v1.10: backend removed RO-level "authorized" flag (superseded by
-             per-jobline approvals) -->
-<!-- v1.11: restored an RO-list approval badge, now sourced from
-             per-jobline data — backend returns approval_total /
-             approval_approved / approval_status per RO (rolled up from
-             the Aprovacoes tab, default joblines excluded). RO card now
-             shows a blue oval "APROVADO X/Y" pill if 1+ jobline is
-             approved, or a red oval "NÃO APROVADO" pill if none are
-             (no pill if the RO has no eligible joblines at all). -->
+<!-- Porsche Service Rio PWA — v2.7.50 — Build: 02/07/2026 -->
+<!-- v2.7.50: PRIORITY — Aprovador-only priority field added to the RO
+             detail screen (s2), mirroring the v2.7.47 manual-patio-
+             tagging UI pattern. Shows current priority (if any) and
+             lets an Aprovador set/change it via Code.gs's setPriority
+             endpoint (v2.7.47+, PWA_Code.gs). No priority display on
+             the RO list (s1) yet — detail screen only for now. -->
+<!-- Changelog reset 2026-07-02: history prior to this line archived
+     outside this file to keep it lean. See project docs/older saved
+     copies for full version history back to v1.7.2. -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -834,6 +327,10 @@ input:focus{outline:none;border-color:var(--black)}
            SERVICOS event (see setManualPatio in Code.gs). Hidden by
            default; shown only for Aprovadores via openRO(). -->
       <div id="s2-manual-patio-row" style="display:none;margin-bottom:14px"></div>
+      <!-- v2.7.50 — Aprovador-only priority field. Hidden by default;
+           shown only for Aprovadores via openRO(). Mirrors the
+           manual-patio-row pattern above. -->
+      <div id="s2-priority-row" style="display:none;margin-bottom:14px"></div>
       <div id="jobline-list-content">
         <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar joblines...</div></div>
       </div>
@@ -1645,7 +1142,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.49';
+const APP_VERSION = '2.7.50';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2022,6 +1519,7 @@ function openRO(roNumber) {
   document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
   renderManualPatioRow(ro);
+  renderPriorityRow(ro);
   goTo('s2');
   loadJoblines(roNumber);
   attachMileagePillHandlers();
@@ -2059,6 +1557,61 @@ function toggleManualPatio(roNumber, currentlyOn) {
     }
     renderROList(liveROs);
   }).catch(() => showToast('Erro ao atualizar marcação manual.'));
+}
+
+// v2.7.50 — Aprovador-only priority field on the RO detail screen.
+// Priority is not included in the main ?action=ros payload (kept as
+// a separate on-demand lookup, same pattern as getROPrefillData),
+// so this fetches action=getPriority for just this RO each time the
+// detail screen opens. Setting a value calls Code.gs's setPriority,
+// which handles the insert-at-N reorder server-side.
+async function renderPriorityRow(ro) {
+  const row = document.getElementById('s2-priority-row');
+  if (!isApproverTech) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+  row.innerHTML = '<span style="font-size:12px;color:#888">A carregar prioridade...</span>';
+
+  const roNumber = ro.ro_number;
+  let priority = null;
+  try {
+    const data = await fetch(API_URL + '?action=getPriority&ro_number=' + encodeURIComponent(roNumber)).then(r => r.json());
+    if (data.ok) priority = data.priority;
+  } catch (e) {
+    // Leave priority as null — row still renders, just shows "—"
+  }
+
+  // Only re-render if the user hasn't navigated away from this RO
+  // while the fetch was in flight.
+  if (!activeRO || String(activeRO.ro_number) !== String(roNumber)) return;
+
+  const badge = (priority !== null && priority !== undefined)
+    ? '<span class="chegada-pill" style="background:#1e3a5f;color:#fff">&#x1F3C6; Prioridade #'+priority+'</span>'
+    : '<span style="font-size:12px;color:#888">Sem prioridade definida</span>';
+
+  row.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      badge +
+      '<input type="number" min="1" step="1" id="s2-priority-input" placeholder="Nº" ' +
+        'style="width:56px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;text-align:center">' +
+      '<button class="pill-btn" style="background:#1e3a5f;color:#fff;border:none;cursor:pointer" ' +
+        'onclick="setPriorityForRO(\''+escapeHtml(String(roNumber))+'\')">Definir</button>' +
+    '</div>';
+}
+
+function setPriorityForRO(roNumber) {
+  const input = document.getElementById('s2-priority-input');
+  const val   = parseInt(input.value, 10);
+  if (isNaN(val) || val < 1) { showToast('Informe um número de prioridade válido (≥ 1).'); return; }
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'setPriority', ro_number: roNumber, priority: val, tech: currentTech }),
+  }).then(() => {
+    showToast('&#x2705; Prioridade #' + val + ' definida.');
+    if (activeRO && String(activeRO.ro_number) === String(roNumber)) {
+      renderPriorityRow(activeRO); // re-fetch to reflect any reorder that happened server-side
+    }
+  }).catch(() => showToast('Erro ao definir prioridade.'));
 }
 
 
