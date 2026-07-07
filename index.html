@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.7.50 — Build: 02/07/2026 -->
+<!-- Porsche Service Rio PWA — v2.7.51 — Build: 02/07/2026 -->
+<!-- v2.7.51: RO search box now also matches vehicle model (e.g. "Panamera"),
+             alongside the existing number/plate/name matching. -->
 <!-- v2.7.50: PRIORITY — Aprovador-only priority field added to the RO
              detail screen (s2), mirroring the v2.7.47 manual-patio-
              tagging UI pattern. Shows current priority (if any) and
@@ -282,7 +284,7 @@ input:focus{outline:none;border-color:var(--black)}
     <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
       <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0 10px;gap:8px">
         <span style="font-size:14px;color:#aaa">&#x1F50D;</span>
-        <input type="text" id="ro-search" placeholder="Buscar por número, placa ou nome..." inputmode="text"
+        <input type="text" id="ro-search" placeholder="Buscar por número, placa, nome ou modelo..." inputmode="text"
           style="flex:1;border:none;background:transparent;padding:9px 0;font-size:13px;color:var(--black);outline:none;-webkit-appearance:none">
         <button id="ro-search-clear" onclick="clearROSearch()" style="display:none;background:none;border:none;font-size:16px;color:#aaa;cursor:pointer;padding:0">&#x2715;</button>
       </div>
@@ -1142,7 +1144,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.50';
+const APP_VERSION = '2.7.51';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1401,7 +1403,8 @@ function filterAndRenderROList(q) {
     const roMatch    = String(r.ro_number).includes(q);
     const plateMatch = String(r.plate || '').toLowerCase().replace(/[-\s]/g, '').includes(qCompact);
     const nameMatch  = String(r.cust_name || '').toLowerCase().includes(qLower);
-    return roMatch || plateMatch || nameMatch;
+    const modelMatch = String(r.vehicle || '').toLowerCase().includes(qLower);
+    return roMatch || plateMatch || nameMatch || modelMatch;
   });
   if (!filtered.length) {
     document.getElementById('ro-list-content').innerHTML =
