@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.7.51 — Build: 02/07/2026 -->
+<!-- Porsche Service Rio PWA — v2.8.0 — Build: 02/07/2026 -->
+<!-- v2.8.0: VERSION CHECK — checkAppVersion() fires once at login,
+             non-blocking, comparing this build's APP_VERSION against
+             the server's LATEST_PWA_VERSION (PWA_Code.gs). Shows a
+             dismissible warning if they don't match; app loads and
+             works normally either way. -->
 <!-- v2.7.51: RO search box now also matches vehicle model (e.g. "Panamera"),
              alongside the existing number/plate/name matching. -->
 <!-- v2.7.50: PRIORITY — Aprovador-only priority field added to the RO
@@ -493,6 +498,23 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="confirm100Proceed()">&#x2714; OK — confirmar conclusão</button>
       <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="confirm100Cancel()">&#8592; Voltar</button>
+    </div>
+  </div>
+
+  <!-- OUTDATED-VERSION WARNING MODAL (v2.8.0) — checkAppVersion() fires
+       at login, in parallel with loadROs() (never blocks it). If the
+       client's local APP_VERSION doesn't match the server's
+       LATEST_PWA_VERSION, this shows once so the tech knows a newer
+       build exists - "Continuar" just dismisses it; the app keeps
+       working normally on the version it already has, nothing is
+       gated on this check either way. -->
+  <div class="parts-pop-backdrop" id="version-warning-backdrop" style="display:none">
+    <div class="parts-pop" style="text-align:center">
+      <div class="parts-pop-title" style="font-size:15px;margin-bottom:10px">&#x26A0; Versão desatualizada</div>
+      <div style="font-size:13px;color:var(--black);line-height:1.5;margin-bottom:18px" id="version-warning-text">
+        Uma nova versão do aplicativo está disponível. Peça para o administrador atualizar o dispositivo quando possível.
+      </div>
+      <button class="bigbtn btn-ini" style="margin-bottom:0" onclick="dismissVersionWarning()">Continuar</button>
     </div>
   </div>
 
@@ -1144,7 +1166,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.7.51';
+const APP_VERSION = '2.8.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1241,6 +1263,7 @@ function doLogin() {
   document.getElementById('t1-greet').textContent = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
   loadROs();
   checkAndShowApprovalButton();
+  checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
   goTo('s1');
 }
 
@@ -1296,6 +1319,32 @@ function goTo(id) {
 }
 
 // ── Live data from Google Sheets ──────────────────────────────────
+// ── App version check (v2.8.0) ─────────────────────────────────────
+// Fired once at login, in parallel with everything else - never awaited,
+// never blocks the app from loading or working. If the server's
+// LATEST_PWA_VERSION doesn't match this client's own APP_VERSION, shows
+// a one-time, dismissible warning. A network failure here is silently
+// ignored - not knowing whether an update exists is not worth bothering
+// the tech about on top of an already-flaky connection.
+async function checkAppVersion() {
+  try {
+    const res  = await fetch(API_URL + '?action=latestVersion');
+    const data = await res.json();
+    if (data.latest_version && data.latest_version !== APP_VERSION) {
+      document.getElementById('version-warning-text').textContent =
+        'Uma nova versão do aplicativo está disponível (' + data.latest_version + ' - você está usando ' + APP_VERSION + '). ' +
+        'Peça para o administrador atualizar o dispositivo quando possível.';
+      document.getElementById('version-warning-backdrop').style.display = 'flex';
+    }
+  } catch (e) {
+    // Silently ignore - see comment above.
+  }
+}
+
+function dismissVersionWarning() {
+  document.getElementById('version-warning-backdrop').style.display = 'none';
+}
+
 async function loadROs() {
   document.getElementById('ro-list-content').innerHTML =
     '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar ordens...</div></div>';
