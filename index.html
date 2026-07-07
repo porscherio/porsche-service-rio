@@ -1,5 +1,26 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v2.8.0 — Build: 02/07/2026 -->
+<!-- Porsche Service Rio PWA — v3.0.0 — Build: 07/07/2026 -->
+<!-- v3.0.0: RESUME-ON-RESTART — bumped to a major version (not the usual
+             2.x.y pattern) because this changes what happens on every
+             login, not just one screen: previously reopening the app
+             mid-task silently dropped the tech back at the RO list with
+             no indication a task was still locked. From this version on,
+             login itself can branch into a mandatory resume/release
+             decision before the tech ever sees s1 — a structural change
+             to the login flow, not an additive feature layered on top.
+             checkForActiveLock() calls the new ?action=getMyActiveLock&tech=X (Code.gs
+             v3.0.0). If this tech already holds a 'locked' row (app
+             was killed/restarted mid-task), a modal asks whether to
+             resume it. RESUME: jumps straight to s4 (timer screen) —
+             no RO/jobline picking — with `seconds` recalculated as
+             now-minus-the-lock's-real-`started`-timestamp, so the
+             clock reflects true elapsed time, not zero. DECLINE:
+             drops straight into s6p (pause screen) with the same
+             recalculated elapsed time pre-filled, ready for the tech
+             to pick a % and confirm via the existing
+             releaseJoblineReliably() flow — then s1 as usual to pick
+             a different RO/task. Nothing changes for a normal login
+             with no active lock. -->
 <!-- v2.8.0: VERSION CHECK — checkAppVersion() fires once at login,
              non-blocking, comparing this build's APP_VERSION against
              the server's LATEST_PWA_VERSION (PWA_Code.gs). Shows a
@@ -498,6 +519,31 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="confirm100Proceed()">&#x2714; OK — confirmar conclusão</button>
       <button class="bigbtn btn-sec" style="margin-bottom:0" onclick="confirm100Cancel()">&#8592; Voltar</button>
+    </div>
+  </div>
+
+  <!-- RESUME-ON-RESTART MODAL (v3.0.0) — checkForActiveLock() fires at
+       login, in parallel with loadROs() (never blocks it). If this
+       tech already holds a 'locked' jobline (app was killed/restarted
+       mid-task), this asks whether to resume it. Not dismissible by
+       backdrop tap — this is a required decision, not an info banner:
+       "Retomar" jumps straight to the running timer (activeLockResume,
+       clock recalculated from the real started timestamp); "Não,
+       finalizar" drops straight into the pause screen with the same
+       recalculated elapsed time pre-filled (activeLockDiscardAndPause),
+       so the tech can close it out before picking a different task. -->
+  <div class="parts-pop-backdrop" id="active-lock-backdrop" style="display:none">
+    <div class="parts-pop" style="text-align:center">
+      <div class="parts-pop-title" style="font-size:15px;margin-bottom:4px">&#x21BA; Tarefa em andamento</div>
+      <div style="font-size:12.5px;color:#888;margin-bottom:14px">Você tinha uma tarefa bloqueada quando o app foi reiniciado.</div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:16px;text-align:left">
+        <div style="font-size:13px;font-weight:600;color:var(--black)" id="active-lock-ro">RO #----</div>
+        <div style="font-size:12.5px;color:var(--black);margin-top:2px" id="active-lock-job"></div>
+        <div style="font-size:11.5px;color:#888;margin-top:2px" id="active-lock-vehicle"></div>
+        <div style="font-size:11px;color:#aaa;margin-top:6px">Iniciada em <span id="active-lock-since">—</span></div>
+      </div>
+      <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="activeLockResume()">&#x25B6; Retomar tarefa</button>
+      <button class="bigbtn btn-stop" style="margin-bottom:0" onclick="activeLockDiscardAndPause()">&#x23F9; Não — finalizar esta tarefa</button>
     </div>
   </div>
 
@@ -1166,7 +1212,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '3.0.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1265,6 +1311,7 @@ function doLogin() {
   checkAndShowApprovalButton();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
   goTo('s1');
+  checkForActiveLock(); // v3.0.0 — may pop the resume/release modal over s1
 }
 
 function doLogout() {
@@ -1343,6 +1390,136 @@ async function checkAppVersion() {
 
 function dismissVersionWarning() {
   document.getElementById('version-warning-backdrop').style.display = 'none';
+}
+
+// ── RESUME-ON-RESTART (v3.0.0) ────────────────────────────────────
+// Fired once at login, in parallel with loadROs()/checkAndShowApprovalButton
+// — never awaited, never blocks the app from loading. Asks the backend
+// (getMyActiveLock, Code.gs v3.0.0) whether this tech already holds a
+// 'locked' jobline from before the app was killed/restarted. If so, a
+// modal offers to resume it (straight to the timer screen, clock
+// recalculated from the lock's real `started` timestamp) or release it
+// (straight to the pause screen, same recalculated elapsed time
+// pre-filled) — either way the tech never has to hunt down the same
+// RO/jobline manually. A network failure here is silently ignored, same
+// policy as checkAppVersion — the tech can still find the task manually
+// via the normal "Retomar" jobline-list styling either way.
+let _activeLockPending = null; // the getMyActiveLock response, held while the modal is open
+
+async function checkForActiveLock() {
+  try {
+    const res  = await fetch(API_URL + '?action=getMyActiveLock&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (data.ok && data.found) {
+      _activeLockPending = data;
+      showActiveLockModal(data);
+    }
+  } catch (e) {
+    // Silently ignore - see comment above.
+  }
+}
+
+function showActiveLockModal(lock) {
+  document.getElementById('active-lock-ro').textContent = 'RO #' + lock.ro_number;
+  document.getElementById('active-lock-job').textContent = lock.job_description || '—';
+  document.getElementById('active-lock-vehicle').textContent =
+    vehicleWithYear(lock.vehicle, lock.vin) + (lock.plate ? ' · ' + lock.plate : '');
+  const startedDate = new Date(lock.started);
+  document.getElementById('active-lock-since').textContent =
+    isNaN(startedDate.getTime()) ? '—' : fmtDateTime(startedDate);
+  document.getElementById('active-lock-backdrop').style.display = 'flex';
+}
+
+function closeActiveLockModal() {
+  document.getElementById('active-lock-backdrop').style.display = 'none';
+}
+
+// Builds the same shape activeRO/activeTask normally have (from liveROs/
+// liveJoblines), but from the getMyActiveLock payload alone — the tech
+// may not have loaded that RO's joblines list yet this session, and
+// there's no need to wait on loadROs()/loadJoblines() just to resume.
+function activeROFromLock(lock) {
+  return {
+    ro_number: lock.ro_number,
+    vehicle:   lock.vehicle   || '',
+    plate:     lock.plate     || '',
+    vin:       lock.vin       || '',
+    complaint: lock.complaint || '',
+    cust_name: lock.cust_name || '',
+  };
+}
+
+function activeTaskFromLock(lock) {
+  return {
+    ro_number:       lock.ro_number,
+    jobline_id:      lock.jobline_id,
+    job_description: lock.job_description || '',
+    is_default:      !!lock.is_default,
+  };
+}
+
+// Real elapsed seconds since the lock's original `started` timestamp —
+// the whole point of this feature: the displayed/logged time reflects
+// actual elapsed time, not zero, regardless of how long the app was closed.
+function elapsedSecondsSince(isoStart) {
+  const startedMs = new Date(isoStart).getTime();
+  if (isNaN(startedMs)) return 0;
+  return Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
+}
+
+// SIM — resume straight into the running timer, no RO/jobline picking.
+function activeLockResume() {
+  if (!_activeLockPending) { closeActiveLockModal(); return; }
+  const lock = _activeLockPending;
+  closeActiveLockModal();
+
+  activeRO   = activeROFromLock(lock);
+  activeTask = activeTaskFromLock(lock);
+  seconds    = elapsedSecondsSince(lock.started);
+  photoCount = 0;
+  gpsStart   = gpsCurrent;
+
+  document.getElementById('media-grid').innerHTML = '';
+  document.getElementById('s4-ro').textContent = '#'+activeTask.ro_number;
+  document.getElementById('s4-vehicle').textContent = vehicleWithYear(activeRO.vehicle, activeRO.vin);
+  document.getElementById('s4-vin').textContent = activeRO.vin || '—';
+  document.getElementById('s4-job').textContent = activeTask.job_description;
+  document.getElementById('s4-title').textContent = 'Em andamento — RO #'+activeTask.ro_number;
+  document.getElementById('s5-folder').textContent = 'Dropbox / #'+activeTask.ro_number+' / '+activeTask.job_description;
+  document.getElementById('ov-ro').textContent = activeTask.ro_number;
+  document.getElementById('ov-vehicle').textContent = vehicleWithYear(activeRO.vehicle, activeRO.vin);
+  document.getElementById('ov-tech').textContent = currentTech;
+  document.getElementById('s4-remark-count').style.display = 'none';
+  document.getElementById('s4-audio-count').style.display = 'none';
+  document.getElementById('timer-disp').textContent = fmtTime(seconds); // goTo('s4') only starts the interval below, it never resets `seconds`
+
+  goTo('s4');
+  showToast('↺ Tarefa retomada — cronômetro recalculado ('+fmtTime(seconds)+').');
+}
+
+// NÃO — release instead: drop straight into the pause screen with the
+// real elapsed time pre-filled, ready for the tech to pick a % and
+// confirm via the existing confirmarPausa()/releaseJoblineReliably()
+// flow. From there it's s1 as usual to pick a different RO/task.
+function activeLockDiscardAndPause() {
+  if (!_activeLockPending) { closeActiveLockModal(); return; }
+  const lock = _activeLockPending;
+  closeActiveLockModal();
+
+  activeRO   = activeROFromLock(lock);
+  activeTask = activeTaskFromLock(lock);
+  seconds    = elapsedSecondsSince(lock.started);
+  photoCount = 0;
+  timerOn    = false; // this session's clock was never actually ticking
+
+  const t = fmtTime(seconds);
+  document.getElementById('s6p-ro').textContent = '#'+activeTask.ro_number+' — '+vehicleWithYear(activeRO.vehicle, activeRO.vin);
+  document.getElementById('s6p-job').textContent = activeTask.job_description;
+  document.getElementById('s6p-time').textContent = t;
+  document.getElementById('s6p-photos').textContent = photoCount+' foto(s)';
+
+  goTo('s6p'); // goTo's own s6p auto-fill only runs if timerOn was true, so our fields above stand as populated
+  showToast('Finalize esta tarefa (tempo recalculado: '+t+') antes de iniciar outra.');
 }
 
 async function loadROs() {
