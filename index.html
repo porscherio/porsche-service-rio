@@ -194,6 +194,9 @@ input:focus{outline:none;border-color:var(--black)}
 .apv-ok{background:var(--green-bg);color:var(--green-text)}
 .apv-no{background:var(--danger-bg);color:var(--danger-text)}
 .apv-none{background:#f0f0f0;color:#999}
+/* v3.1.0: shadow-approval warning backstop (see renderApvJoblines) */
+.apv-jl-row-warn{background:#FFF8E1}
+.apv-warn{font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;letter-spacing:.02em;white-space:nowrap;flex-shrink:0;background:#FFF3CD;color:#8A6D00;border:1px solid #F0D875;cursor:help}
 .b-apv-ok{background:#1D9E75;color:#fff}
 .b-apv-no{background:#E00000;color:#fff}
 /* ── Parts Requests (v1.8) ───────────────────────────────── */
@@ -1212,7 +1215,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1258,6 +1261,13 @@ const PARTS_STATUS_PT = {
 let currentTech = '', activeTask = null, activeRO = null;
 let isApproverTech = false; // cached after login, drives 📦 + ✅ visibility
 let approvalCache = {}; // { roNumber: { jobDescription: true|false } }
+// v3.1.0: shadow-approval warning backstop. Populated from
+// getApprovals()'s new `warning` field (see Code.gs) — true when a
+// jobline's most recent Aprovacoes row was an automated 'system'
+// reseed that silently disagreed with the most recent human decision.
+// Purely a UI signal for the Aprovações panel; never affects which
+// value approvalCache resolves to.
+let warningCache  = {}; // { roNumber: { jobDescription: true|false } }
 let apvCurrentRO  = null;
 let apvCheckboxes = {}; // active editing session { jobDescription: bool|null }
 let partsSummaryCache = {}; // { roNumber: { color, total, red, yellow, green } }
@@ -2557,7 +2567,11 @@ async function apvSelectRO(roNumber) {
 
     if (results[0].status==='fulfilled' && Array.isArray(results[0].value)) {
       approvalCache[roNumber] = {};
-      results[0].value.forEach(a => { approvalCache[roNumber][a.jobline] = a.approved; });
+      warningCache[roNumber]  = {};
+      results[0].value.forEach(a => {
+        approvalCache[roNumber][a.jobline] = a.approved;
+        warningCache[roNumber][a.jobline]  = !!a.warning;
+      });
     }
 
     let apvJoblines = null;
@@ -2578,6 +2592,7 @@ async function apvSelectRO(roNumber) {
 function renderApvJoblines(roNumber, joblines) {
   joblines = joblines || [];
   const cache    = approvalCache[roNumber] || {};
+  const warnings = warningCache[roNumber]  || {};
   apvCheckboxes  = {};
   joblines.forEach(j => {
     apvCheckboxes[j.job_description] = j.job_description in cache ? cache[j.job_description] : null;
@@ -2588,9 +2603,19 @@ function renderApvJoblines(roNumber, joblines) {
     const stCls = j.is_default ? 'apv-ok' : (val === null ? 'apv-none' : (val ? 'apv-ok' : 'apv-no'));
     const stTxt = j.is_default ? '✔ APROVADO (padrão)' : (val === null ? 'Pendente' : (val ? '✔ APROVADO' : '✖ NÃO APROVADO'));
     const icon  = j.is_default ? '&#x1F4CB;' : '&#x1F527;';
+    // v3.1.0: shadow-approval warning — an automated reseed silently
+    // disagreed with the last human decision for this jobline. Purely
+    // informational; re-approving/re-denying via the checkbox below
+    // resolves it (the next human row becomes the newest, and the
+    // warning naturally clears on the next panel load).
+    const hasWarning = !j.is_default && !!warnings[j.job_description];
+    const warnBadge = hasWarning
+      ? '<span class="apv-warn" title="Uma reavaliação automática do sistema divergiu da última decisão humana registada — confirme o estado atual.">&#x26A0; verificar histórico</span>'
+      : '';
     return (
-      '<div class="apv-jl-row">' +
+      '<div class="apv-jl-row'+(hasWarning?' apv-jl-row-warn':'')+'">' +
         '<span class="apv-jl-desc">'+icon+' '+j.job_description+'</span>' +
+        warnBadge +
         '<span class="apv-status '+stCls+'" id="apvst-'+idx+'">'+stTxt+'</span>' +
         (j.is_default
           ? '<input type="checkbox" class="apv-cb" checked disabled style="opacity:0.4">'
