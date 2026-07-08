@@ -1131,6 +1131,9 @@ input:focus{outline:none;border-color:var(--black)}
           <input type="text" id="agd-c-ro-entrega" class="agd-field-input" inputmode="numeric" placeholder="Ex: 29890">
           <button class="bigbtn btn-ini" onclick="agdCheckEntregaGate()">&#x1F50D; Verificar</button>
           <div id="agd-entrega-gate-msg" style="font-size:13px;color:#c00;margin-top:4px;margin-bottom:10px;display:none"></div>
+          <!-- v3.4.0: informational only — never blocks. See
+               agdCheckEntregaGate()/checkEntregaGate() in Code.gs. -->
+          <div id="agd-entrega-jl-warn" style="font-size:13px;color:#8A6D00;background:#FFF3CD;border:1px solid #F0D875;border-radius:8px;padding:10px 12px;margin-top:4px;margin-bottom:10px;display:none"></div>
         </div>
 
         <!-- SERVICOS: Path A (RO exists) or Path B (manual + search) -->
@@ -1220,7 +1223,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.3.0';
+const APP_VERSION = '3.4.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3959,6 +3962,7 @@ function agdCreateOpenForm(which) {
   document.getElementById('agd-create-fields').style.display = 'none';
   document.getElementById('agd-c-confirm-btn').disabled = true;
   document.getElementById('agd-entrega-gate-msg').style.display = 'none';
+  document.getElementById('agd-entrega-jl-warn').style.display  = 'none';
   document.getElementById('agd-create-search-results').innerHTML = '';
   document.getElementById('agd-c-ro-entrega').value = '';
   document.getElementById('agd-c-ro').value = '';
@@ -4021,7 +4025,9 @@ function agdPopulateLocationSelect(selectEl, locations) {
 function agdCheckEntregaGate() {
   const ro = document.getElementById('agd-c-ro-entrega').value.trim();
   const msgEl = document.getElementById('agd-entrega-gate-msg');
+  const warnEl = document.getElementById('agd-entrega-jl-warn');
   msgEl.style.display = 'none';
+  warnEl.style.display = 'none';
   if (!ro) { msgEl.textContent = 'Informe o número da RO.'; msgEl.style.display = 'block'; return; }
 
   fetch(API_URL + '?action=hasServicosEvent&ro_number=' + encodeURIComponent(ro))
@@ -4041,6 +4047,25 @@ function agdCheckEntregaGate() {
       agdFillCreateFields(data.event);
       document.getElementById('agd-create-fields').style.display = 'block';
       showToast('RO encontrada — dados carregados do agendamento de SERVIÇOS.');
+
+      // v3.4.0: informational-only warning — NEVER blocks. The confirm
+      // button above is already enabled by agdFillCreateFields; this
+      // fetch runs in parallel purely to surface a heads-up about any
+      // of the 5 gate joblines (Lavagem/Checklist entrada/VAL de
+      // entrada/PQIS/VAL de saida) not yet at 100%. Failure here is
+      // silent (no toast/error) — losing this advisory check must
+      // never interfere with the actual, already-successful gate pass
+      // above.
+      fetch(API_URL + '?action=entregaGateStatus&ro_number=' + encodeURIComponent(ro))
+        .then(r => r.json())
+        .then(gateData => {
+          if (!gateData || !gateData.missing || !gateData.missing.length) return;
+          warnEl.innerHTML = '&#x26A0; Ainda pendente: <strong>' +
+            gateData.missing.map(escapeHtml).join(', ') +
+            '</strong>. Você pode criar a ENTREGA mesmo assim.';
+          warnEl.style.display = 'block';
+        })
+        .catch(() => {});
     })
     .catch(() => { msgEl.textContent = 'Erro ao verificar. Tente novamente.'; msgEl.style.display = 'block'; });
 }
