@@ -79,6 +79,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .cro{font-size:13px;font-weight:600;color:var(--black)}
 .cjob{font-size:12px;color:#666;margin-top:2px}
 .cdesc{font-size:11px;color:#999;margin-top:3px;font-style:italic}
+.cdates{font-size:10px;color:#888;margin-top:4px}
 .clast{font-size:10px;color:#aaa;margin-top:4px}
 .badge{display:inline-block;font-size:9px;font-weight:600;padding:3px 8px;border-radius:3px;white-space:nowrap;letter-spacing:.04em;flex-shrink:0}
 .b-sug{background:var(--black);color:#fff}
@@ -177,6 +178,7 @@ input:focus{outline:none;border-color:var(--black)}
 .apr-no{background:var(--red);color:#fff}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
+.priority-pill{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;letter-spacing:.02em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#1a1a1a;color:#fff}
 .chegada-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#9EFF00;color:#1a1a1a}
 .chegada-pill.clickable{cursor:pointer}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
@@ -1215,7 +1217,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.2.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1717,6 +1719,28 @@ function roCard(r) {
   const mileageHtml = mileageIsMissing(r.mileage)
     ? '<span class="mileage-pill-blink" data-mileage-ro="' + r.ro_number + '">&#x26A0; Confirmar quilometragem</span>'
     : ' &middot; ' + Number(r.mileage).toLocaleString('pt-BR') + ' km';
+  // v3.2.0: Priority pill — only rendered when a priority number is
+  // actually set for this RO (see readPriorityMap/setPriority in
+  // Code.gs). null/undefined means never prioritized — no pill at
+  // all, not even a "0" one, so the normal card layout is completely
+  // unaffected for the common case.
+  const priorityPill = (r.priority !== null && r.priority !== undefined)
+    ? '<span class="priority-pill" title="Prioridade '+r.priority+'">&#x1F6A9; ' + r.priority + '</span>'
+    : '';
+  // v3.2.0: Created / Entrega date line. Created date (r.opened_date)
+  // always shows when present. Entrega date (r.entrega_date) only
+  // shows when an ENTREGA Agendamento event already exists for this
+  // RO (see getROs()/getEntregueByPlateMap in Code.gs) — a plain "—"
+  // or omission otherwise, never a guessed/placeholder date.
+  const createdTxt = r.opened_date ? fmtDateDisplay(r.opened_date) : '';
+  const entregaTxt = r.entrega_date ? fmtEntregaDateTime(r.entrega_date) : '';
+  const datesLine = (createdTxt || entregaTxt)
+    ? '<div class="cdates">' +
+        (createdTxt ? '&#x1F4C5; Aberta: ' + createdTxt : '') +
+        (createdTxt && entregaTxt ? ' &middot; ' : '') +
+        (entregaTxt ? '&#x1F69A; Entrega: ' + entregaTxt : '') +
+      '</div>'
+    : '';
   return (
     '<div class="card' +
       (isLocked ? ' locked' : '') +
@@ -1724,10 +1748,11 @@ function roCard(r) {
       (r.suggested === currentTech ? ' sugerida' : '') +
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + chegadaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
+        '<div class="cro">RO #' + r.ro_number + priorityPill + chegadaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
         '<div class="cjob">Placa: ' + r.plate + mileageHtml + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
+        datesLine +
       '</div><span class="badge ' + bc + '">' + bt + '</span></div>' +
       authTag + partsBadge +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
@@ -2773,6 +2798,18 @@ function fmtDateDisplay(isoDateStr) {
   const m = String(isoDateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return isoDateStr;
   return m[3] + '/' + m[2] + '/' + m[1];
+}
+
+// v3.2.0: full ISO datetime (e.g. an Agendamento event's .start) →
+// "dd/MM/yyyy HH:mm" for card display. Distinct from fmtDateDisplay
+// above (date-only strings, no time component) — this one parses a
+// real Date and includes the scheduled time, which matters for a
+// delivery appointment.
+function fmtEntregaDateTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes());
 }
 
 function escapeHtml(str) {
