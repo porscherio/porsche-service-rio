@@ -3748,19 +3748,38 @@ function agdToggleChegadaFromList(eventId, currentlyOn) {
 // Never opens on the un-marking (ON→OFF) path — undoing a delivery
 // confirmation isn't itself a delivery event.
 function agdToggleEntregaFromList(eventId, currentlyOn, roNumber) {
-  const msg = currentlyOn
-    ? 'Cancelar entrega? O status ficará como ainda não entregue.'
-    : 'Confirmar entrega ao cliente? Isso também removerá o status "NO PÁTIO" do agendamento de SERVIÇOS vinculado.';
-  if (!confirm(msg)) return;
+  function doToggle(extraWarning) {
+    const baseMsg = currentlyOn
+      ? 'Cancelar entrega? O status ficará como ainda não entregue.'
+      : 'Confirmar entrega ao cliente? Isso também removerá o status "NO PÁTIO" do agendamento de SERVIÇOS vinculado.';
+    const msg = extraWarning
+      ? baseMsg + '\n\n&#x26A0; Ainda pendente: ' + extraWarning + '. Deseja confirmar mesmo assim?'
+      : baseMsg;
+    if (!confirm(msg)) return;
 
-  fetch(API_URL, {
-    method: 'POST', mode: 'no-cors',
-    body: JSON.stringify({ action: 'toggleEntrega', event_id: eventId, tech: currentTech }),
-  }).then(() => {
-    showToast(currentlyOn ? 'Entrega cancelada.' : '&#x1F7E1; Entrega confirmada — ENTREGUE');
-    agdMgmtRefreshList();
-    if (!currentlyOn) edocOpenChooser(roNumber); // was OFF, now confirming ON — prompt for scans
-  }).catch(() => showToast('Erro ao atualizar entrega.'));
+    fetch(API_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ action: 'toggleEntrega', event_id: eventId, tech: currentTech }),
+    }).then(() => {
+      showToast(currentlyOn ? 'Entrega cancelada.' : '&#x1F7E1; Entrega confirmada — ENTREGUE');
+      agdMgmtRefreshList();
+      if (!currentlyOn) edocOpenChooser(roNumber); // was OFF, now confirming ON — prompt for scans
+    }).catch(() => showToast('Erro ao atualizar entrega.'));
+  }
+
+  // v3.4.0: informational-only jobline warning, folded into this SAME
+  // confirm() prompt rather than a separate step — this is the actual
+  // delivery-confirmation moment (unlike agdCheckEntregaGate(), which
+  // only runs when CREATING a new ENTREGA event, often well before the
+  // vehicle is actually ready). Only checked when confirming ON
+  // (currentlyOn false → true); undoing a confirmation never needs it.
+  // Never blocks — the fetch failing, timing out, or returning nothing
+  // pending all fall through to the plain base message unchanged.
+  if (currentlyOn || !roNumber) { doToggle(null); return; }
+  fetch(API_URL + '?action=entregaGateStatus&ro_number=' + encodeURIComponent(roNumber))
+    .then(r => r.json())
+    .then(data => doToggle((data && data.missing && data.missing.length) ? data.missing.join(', ') : null))
+    .catch(() => doToggle(null));
 }
 
 function agdOpenEventDetail(ev) {
