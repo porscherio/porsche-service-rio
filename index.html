@@ -1,5 +1,12 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v3.0.0 — Build: 07/07/2026 -->
+<!-- Porsche Service Rio PWA — v3.4.4 — Build: 08/07/2026 -->
+<!-- v3.4.4: Version-sync only, no frontend logic changed. Bumped to
+             keep both files' version numbers in lockstep with Code.gs
+             v3.4.4, which fixed a sync bug where cleanupRepairOrdersDuplicates()
+             deleting duplicate rows from OLD's RepairOrders tab could
+             silently invalidate syncROs()'s row-number watermark and
+             cause a not-yet-synced RO to be skipped forever (root cause
+             of RO 29956 missing from PWA). No PWA-facing behavior change. -->
 <!-- v3.0.0: RESUME-ON-RESTART — bumped to a major version (not the usual
              2.x.y pattern) because this changes what happens on every
              login, not just one screen: previously reopening the app
@@ -1223,7 +1230,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.4.3';
+const APP_VERSION = '3.4.4';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
