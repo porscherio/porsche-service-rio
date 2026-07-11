@@ -1,5 +1,15 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v3.4.6 — Build: 11/07/2026 -->
+<!-- Porsche Service Rio PWA — v3.4.7 — Build: 11/07/2026 -->
+<!-- v3.4.7: DISPONIBILIDADE ROSTER FIX — disp-panel was listing all 13
+             USERS (including Aprovadores/office: Eytan, Sidney,
+             Matheus; and non-oficina roles: Joao Pedro, Sebastiao
+             Neto), instead of only direct-labour technicians. New
+             DIRECT_LABOUR_TECHS constant (8 names: Alvaro Mello,
+             Claudio Reis, Andre Sampaio, Jose Carlos, Luiz Fernando,
+             Mike Luciano, Raynan Ventura, Silvania) now sources both
+             loadDisponibilidadePanel and saveDisponibilidade, in
+             place of Object.keys(USERS). USERS itself is unchanged —
+             still used for login as before. No backend change. -->
 <!-- v3.4.6: DISPONIBILIDADE ICON — new header icon (btn-disponibilidade,
              🕐) visible only to Raynan Ventura / Eytan Lubicz, checked
              via new action=isDisponibilidadeAdmin (Code.gs v3.4.6 →
@@ -1278,7 +1288,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.4.6';
+const APP_VERSION = '3.4.7';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1297,6 +1307,23 @@ const USERS = {
   'Matheus Pego':   '1234',
   'Sebastiao Neto': '1234',
 };
+
+// v3.4.7 — mão de obra direta (bancada), distinto de USERS que
+// também inclui Aprovadores/escritório (Eytan, Sidney, Matheus) e
+// outros papéis não-oficina (Joao Pedro, Sebastiao Neto). Fonte da
+// lista do painel de Disponibilidade — não confundir com Aprovadores
+// ou DISPONIBILIDADE_ADMINS (Capacidade.gs), que são sobre QUEM PODE
+// marcar, não sobre QUEM aparece na lista para ser marcado.
+const DIRECT_LABOUR_TECHS = [
+  'Alvaro Mello',
+  'Claudio Reis',
+  'Andre Sampaio',
+  'Jose Carlos',
+  'Luiz Fernando',
+  'Mike Luciano',
+  'Raynan Ventura',
+  'Silvania',
+];
 
 // Approval / parts-admin rights managed in the Aprovadores sheet tab (queried via isApprover API)
 
@@ -2648,7 +2675,7 @@ async function loadDisponibilidadePanel() {
     if (data.ok) hoje = data.tecnicos || {};
   } catch(e) { console.warn('getDisponibilidade failed', e); }
 
-  const nomes = Object.keys(USERS).sort();
+  const nomes = DIRECT_LABOUR_TECHS.slice().sort();
   list.innerHTML = nomes.map(nome => {
     const info = hoje[nome] || { disponivel: true, hora_inicio: '09:00' };
     const id   = 'disp-' + nome.replace(/[^a-zA-Z0-9]/g, '');
@@ -2670,7 +2697,7 @@ async function loadDisponibilidadePanel() {
 }
 
 function saveDisponibilidade() {
-  const nomes = Object.keys(USERS);
+  const nomes = DIRECT_LABOUR_TECHS;
   const chamadas = nomes.map(nome => {
     const id  = 'disp-' + nome.replace(/[^a-zA-Z0-9]/g, '');
     const sim = document.getElementById(id + '-sim');
