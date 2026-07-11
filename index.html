@@ -1,5 +1,17 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v3.4.5 — Build: 11/07/2026 -->
+<!-- Porsche Service Rio PWA — v3.4.6 — Build: 11/07/2026 -->
+<!-- v3.4.6: DISPONIBILIDADE ICON — new header icon (btn-disponibilidade,
+             🕐) visible only to Raynan Ventura / Eytan Lubicz, checked
+             via new action=isDisponibilidadeAdmin (Code.gs v3.4.6 →
+             Capacidade.gs checkDisponibilidadeAdmin, same gate as
+             setDisponibilidade). Opens disp-panel: one row per
+             technician (sourced from the existing USERS roster),
+             each with a "Disponível" checkbox and a time input for
+             hora_inicio (disabled when not disponível). Loads today's
+             state via action=getDisponibilidade, saves via one
+             action=setDisponibilidade POST per technician on Salvar.
+             Same visual pattern as the existing apv-panel/pkg-panel/
+             agenda-panel full-screen panels — no new CSS classes. -->
 <!-- v3.4.5: PRIORITY MOTIVO — renderPriorityRow's priority-set control
              now includes a required "motivo" dropdown (fixed list,
              same wording as Prioridade_v3.xlsx: Cliente VIP / Prazo
@@ -336,6 +348,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button id="btn-approval" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openApprovalPanel()" title="Aprovar Joblines">&#x2705;</button>
       <button id="btn-parts-admin" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openPartsAdminPanel()" title="Gerir Peças">&#x1F4E6;</button>
       <button id="btn-agenda" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openAgendaPanel()" title="Agendamentos">&#x1F4C5;</button>
+      <button id="btn-disponibilidade" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openDisponibilidadePanel()" title="Disponibilidade dos técnicos">&#x1F550;</button>
       <button id="btn-no-patio" style="background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openNoPatioPanel()" title="Veículos no Pátio">&#x1F17F;&#xFE0F;</button>
     </div>
     <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
@@ -778,6 +791,25 @@ input:focus{outline:none;border-color:var(--black)}
         <div style="height:14px"></div>
         <button class="bigbtn btn-ini" onclick="saveApprovals()">&#x2714; Guardar aprova&#xE7;&#xF5;es</button>
         <button class="bigbtn btn-sec" onclick="apvGoStep1()">&#8592; Voltar &#xE0;s OS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISPONIBILIDADE PANEL (v3.4.5 — Raynan/Eytan only) -->
+  <div class="apv-panel" id="disp-panel" style="display:none">
+    <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="topbar">
+        <button class="back" onclick="closeDisponibilidadePanel()">&#8592;</button>
+        <div style="flex:1">
+          <div class="tb-title">Disponibilidade dos técnicos</div>
+          <div class="tb-sub" id="disp-sub">Somente Raynan e Eytan — hoje</div>
+        </div>
+      </div>
+      <div class="scroll" style="padding:14px 16px" id="disp-list">
+        <div style="font-size:12px;color:#888">A carregar...</div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);background:#fff;flex-shrink:0">
+        <button class="bigbtn btn-ini" onclick="saveDisponibilidade()">&#x2714; Salvar disponibilidade de hoje</button>
       </div>
     </div>
   </div>
@@ -1246,7 +1278,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.4.5';
+const APP_VERSION = '3.4.6';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1350,6 +1382,7 @@ function doLogin() {
   document.getElementById('t1-greet').textContent = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
   loadROs();
   checkAndShowApprovalButton();
+  checkAndShowDisponibilidadeIcon();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
   goTo('s1');
   checkForActiveLock(); // v3.0.0 — may pop the resume/release modal over s1
@@ -2565,6 +2598,18 @@ async function checkAndShowApprovalButton() {
   } catch(e) { console.warn('isApprover check failed', e); }
 }
 
+// v3.4.5 — mesmo padrão de checkAndShowApprovalButton, mas para o
+// ícone de disponibilidade (Raynan + Eytan, gate separado de Aprovadores).
+async function checkAndShowDisponibilidadeIcon() {
+  const btn = document.getElementById('btn-disponibilidade');
+  if (btn) btn.style.display = 'none';
+  try {
+    const res  = await fetch(API_URL + '?action=isDisponibilidadeAdmin&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (data.ok && data.isDisponibilidadeAdmin && btn) btn.style.display = 'flex';
+  } catch(e) { console.warn('isDisponibilidadeAdmin check failed', e); }
+}
+
 function openApprovalPanel() {
   document.getElementById('apv-panel').style.display = 'flex';
   apvGoStep1();
@@ -2578,6 +2623,70 @@ function openApprovalPanel() {
 
 function closeApprovalPanel() {
   document.getElementById('apv-panel').style.display = 'none';
+}
+
+// v3.4.5 — Disponibilidade dos técnicos, Raynan/Eytan only. Fonte da
+// lista de técnicos = USERS (mesmo objeto usado no login), sem filtro
+// por cargo — Raynan/Eytan decidem quem faz sentido marcar hoje.
+async function openDisponibilidadePanel() {
+  document.getElementById('disp-panel').style.display = 'flex';
+  await loadDisponibilidadePanel();
+}
+
+function closeDisponibilidadePanel() {
+  document.getElementById('disp-panel').style.display = 'none';
+}
+
+async function loadDisponibilidadePanel() {
+  const list = document.getElementById('disp-list');
+  list.innerHTML = '<div style="font-size:12px;color:#888">A carregar...</div>';
+
+  let hoje = {};
+  try {
+    const res  = await fetch(API_URL + '?action=getDisponibilidade');
+    const data = await res.json();
+    if (data.ok) hoje = data.tecnicos || {};
+  } catch(e) { console.warn('getDisponibilidade failed', e); }
+
+  const nomes = Object.keys(USERS).sort();
+  list.innerHTML = nomes.map(nome => {
+    const info = hoje[nome] || { disponivel: true, hora_inicio: '09:00' };
+    const id   = 'disp-' + nome.replace(/[^a-zA-Z0-9]/g, '');
+    return (
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:14px">' + escapeHtml(nome) + '</span>' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<input type="time" id="' + id + '-hora" value="' + (info.hora_inicio || '09:00') + '" ' +
+            (info.disponivel ? '' : 'disabled') + ' style="width:88px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-size:13px">' +
+          '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#666">' +
+            '<input type="checkbox" id="' + id + '-sim" ' + (info.disponivel ? 'checked' : '') + ' ' +
+              'onchange="document.getElementById(\'' + id + '-hora\').disabled = !this.checked">' +
+            'Disponível' +
+          '</label>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function saveDisponibilidade() {
+  const nomes = Object.keys(USERS);
+  const chamadas = nomes.map(nome => {
+    const id  = 'disp-' + nome.replace(/[^a-zA-Z0-9]/g, '');
+    const sim = document.getElementById(id + '-sim');
+    const hora = document.getElementById(id + '-hora');
+    if (!sim) return Promise.resolve();
+    return fetch(API_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({
+        action: 'setDisponibilidade', tech: currentTech,
+        tecnico: nome, disponivel: sim.checked, hora_inicio: sim.checked ? hora.value : '',
+      }),
+    });
+  });
+  Promise.all(chamadas)
+    .then(() => showToast('&#x2705; Disponibilidade de hoje salva.'))
+    .catch(() => showToast('Erro ao salvar disponibilidade.'));
 }
 
 function apvGoStep1() {
