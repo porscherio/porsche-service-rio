@@ -1,4 +1,41 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.5.1 — Build: 12/07/2026 -->
+<!-- v3.5.1: EARLY DEPARTURE — disp-panel rows now have a second time
+             input, "até" (hora_fim), alongside the existing "das"
+             (hora_inicio). Placeholder "18:00", empty = full turno,
+             same default as always — this isn't a new requirement,
+             just makes the existing default explicit and editable.
+             Row restructured to two lines (name+checkbox, then the
+             das/até pair) since three inputs on one line got cramped.
+             saveDisponibilidade now sends hora_fim in the POST body
+             alongside the existing fields. Requires Capacidade.gs
+             v3.4 — setDisponibilidade/getDisponibilidadeHoje there
+             were updated for the 5-column Presenca shape; this file
+             alone does nothing without that backend change deployed
+             too. No Code.gs change needed — its doPost route already
+             forwards the whole body object generically. -->
+<!-- Porsche Service Rio PWA — v3.5.0 — Build: 12/07/2026 -->
+<!-- v3.5.0: SUGGESTED TASKS SCREEN — new sSug screen shown right after
+             login, before s1, sourced from Capacidade.gs's AgendaTecnica
+             via the new action=getMyAgenda (Code.gs v3.5.0). One card
+             per jobline in the tech's planned order for today; the
+             card whose window contains (or is next after) the current
+             time is highlighted "Próxima" with a full Iniciar button —
+             the rest render collapsed, already-past ones dimmed.
+             Iniciar reuses the existing openRO/loadJoblines/startTask
+             pipeline via new startSuggestedTask(ro, jlid) — doesn't
+             reimplement task-starting, just reaches it from a
+             different entry point. "Substituir — ver todas as ROs" at
+             the bottom drops straight to the normal s1 RO list, no
+             confirmation needed. doLogin() is now async: loadROs() is
+             awaited (was fire-and-forget) since the suggestion screen
+             needs liveROs populated to show vehicle/client per card;
+             if AgendaTecnica has nothing for this tech today (not yet
+             run, or genuinely nothing assigned), loadSuggestedAgenda()
+             falls straight through to s1 instead of showing an empty
+             screen. checkForActiveLock()'s resume/release modal still
+             fires after, as an overlay — works identically whether
+             sSug or s1 is the screen underneath it. -->
 <!-- Porsche Service Rio PWA — v3.4.7 — Build: 11/07/2026 -->
 <!-- v3.4.7: DISPONIBILIDADE ROSTER FIX — disp-panel was listing all 13
              USERS (including Aprovadores/office: Eytan, Sidney,
@@ -348,6 +385,24 @@ input:focus{outline:none;border-color:var(--black)}
   </div>
 
   <!-- LISTA DE ROs -->
+  <!-- SUGESTÃO DE TAREFAS DO DIA (v3.5.0) — mostrada logo após o
+       login, antes de s1, a partir de AgendaTecnica. Sem nav bar —
+       tela de trânsito, não uma aba persistente. -->
+  <div class="screen" id="sSug">
+    <div class="topbar">
+      <div style="flex:1">
+        <div class="tb-title" id="sug-greet">Bom dia</div>
+        <div class="tb-sub">Sugestão de tarefas para hoje</div>
+      </div>
+    </div>
+    <div class="scroll" id="sug-list-content" style="padding:16px">
+      <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar sugestões...</div></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);background:#fff;flex-shrink:0">
+      <button style="width:100%;background:none;border:1px solid var(--border);color:#666;padding:10px;border-radius:6px;font-size:13px" onclick="goTo('s1')">Substituir — ver todas as ROs</button>
+    </div>
+  </div>
+
   <div class="screen" id="s1">
     <div class="topbar">
       <div style="flex:1">
@@ -1288,7 +1343,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.4.7';
+const APP_VERSION = '3.5.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1399,20 +1454,27 @@ updateClock(); setInterval(updateClock, 10000);
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('inp-pin').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
-function doLogin() {
+async function doLogin() {
   const tech = document.getElementById('sel-tech').value;
   const pin  = document.getElementById('inp-pin').value;
   if (!tech || USERS[tech] !== pin) { document.getElementById('login-err').style.display='flex'; return; }
   document.getElementById('login-err').style.display = 'none';
   currentTech = tech;
   const h = new Date().getHours();
-  document.getElementById('t1-greet').textContent = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
-  loadROs();
+  const saudacao = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
+  document.getElementById('t1-greet').textContent = saudacao;
+  document.getElementById('sug-greet').textContent = saudacao;
   checkAndShowApprovalButton();
   checkAndShowDisponibilidadeIcon();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
-  goTo('s1');
-  checkForActiveLock(); // v3.0.0 — may pop the resume/release modal over s1
+  // v3.5.0 — loadROs() agora é aguardado (era fire-and-forget) porque
+  // a tela de sugestão precisa de liveROs já preenchido pra mostrar
+  // cliente/veículo de cada tarefa sugerida. renderROList já roda
+  // dentro de loadROs, então s1 continua populada normalmente mesmo
+  // que o técnico acabe indo por "Substituir".
+  await loadROs();
+  await loadSuggestedAgenda(); // decide entre sSug (com sugestões) e s1 (sem sugestões) — nunca deixa a tela em branco
+  checkForActiveLock(); // v3.0.0 — pode abrir o modal de retomar/liberar por cima de sSug ou s1, tanto faz
 }
 
 function doLogout() {
@@ -1639,6 +1701,81 @@ async function loadROs() {
   } catch(e) {
     showError('ro-list-content', 'Sem ligação ao servidor. Verifique a internet.');
   }
+}
+
+// ── SUGESTÃO DE TAREFAS DO DIA (v3.5.0) ─────────────────────────
+// Chamada no login, depois de loadROs() ter preenchido liveROs (que
+// esta tela usa pra cruzar cada ro_number com cliente/veículo — sem
+// duplicar esse dado no backend). Se não houver sugestões (AgendaTecnica
+// ainda não rodou hoje, ou este técnico não tem nada alocado), cai
+// direto pra s1 em vez de mostrar uma tela vazia.
+async function loadSuggestedAgenda() {
+  try {
+    const res  = await fetch(API_URL + '?action=getMyAgenda&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.agenda) || data.agenda.length === 0) {
+      goTo('s1');
+      return;
+    }
+    renderSuggestedAgenda(data.agenda);
+    goTo('sSug');
+  } catch(e) {
+    goTo('s1'); // sem ligação — não trava o tech na tela de sugestão, cai pro fluxo normal
+  }
+}
+
+function renderSuggestedAgenda(agenda) {
+  const agoraDecimal = new Date().getHours() + new Date().getMinutes()/60;
+  // "Próxima" = primeira cuja janela ainda não terminou (cobre tanto
+  // "estou dentro da janela agora" quanto "estou adiantado, a próxima
+  // ainda não começou" — o técnico pode estar à frente do previsto).
+  let proximaIdx = agenda.findIndex(a => agoraDecimal < a.hora_fim_esperada);
+  if (proximaIdx === -1) proximaIdx = agenda.length - 1; // já passou de tudo — mostra a última mesmo assim
+
+  const fmtHora = h => {
+    if (isNaN(h)) return '--:--';
+    const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+    return String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+  };
+  const roInfo = ro_number => liveROs.find(r => String(r.ro_number) === String(ro_number)) || {};
+
+  const html = agenda.map((a, i) => {
+    const ro = roInfo(a.ro_number);
+    const veiculo = ro.vehicle ? vehicleWithYear(ro.vehicle, ro.vin) : '';
+    const janela = fmtHora(a.hora_inicio_esperada) + '–' + fmtHora(a.hora_fim_esperada);
+    if (i === proximaIdx) {
+      return '<div style="background:#fff;border:2px solid var(--accent,#1e3a5f);border-radius:12px;padding:14px 16px;margin-bottom:10px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+          '<span style="background:#eaf1fb;color:#1e3a5f;font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px">Próxima</span>' +
+          '<span style="font-size:12px;color:#888">&#x1F551; ' + escapeHtml(janela) + '</span>' +
+        '</div>' +
+        '<p style="font-size:15px;font-weight:600;margin:0 0 2px">OS ' + escapeHtml(a.ro_number) + (veiculo ? ' — ' + escapeHtml(veiculo) : '') + '</p>' +
+        '<p style="font-size:14px;color:#666;margin:0 0 12px">' + escapeHtml(a.job_description) + '</p>' +
+        '<button style="width:100%;background:#1e3a5f;color:#fff;border:none;padding:10px;border-radius:6px;font-size:14px;cursor:pointer" ' +
+          'onclick="startSuggestedTask(\'' + escapeHtml(String(a.ro_number)) + '\',\'' + escapeHtml(String(a.jobline_id)) + '\')">Iniciar &#x2192;</button>' +
+      '</div>';
+    }
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center' +
+      (i < proximaIdx ? ';opacity:0.55' : '') + '">' +
+      '<div><p style="font-size:13px;font-weight:500;margin:0 0 2px">OS ' + escapeHtml(a.ro_number) + (veiculo ? ' — ' + escapeHtml(veiculo) : '') + '</p>' +
+      '<p style="font-size:12px;color:#888;margin:0">' + escapeHtml(a.job_description) + ' · ' + escapeHtml(janela) + '</p></div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('sug-list-content').innerHTML = html;
+}
+
+// Reaproveita openRO/loadJoblines/startTask já existentes — não
+// reimplementa a lógica de iniciar uma tarefa, só chega nela por um
+// caminho diferente (a partir da sugestão, não da lista normal de ROs).
+async function startSuggestedTask(roNumber, joblineId) {
+  const ro = liveROs.find(r => String(r.ro_number) === String(roNumber));
+  if (!ro) { showToast('RO não encontrada — tente actualizar.'); return; }
+  activeRO = ro;
+  await loadJoblines(roNumber);
+  const j = (liveJoblines[roNumber] || []).find(x => String(x.jobline_id) === String(joblineId));
+  if (!j) { showToast('Esta tarefa já não está disponível — pode ter sido concluída.'); goTo('s1'); return; }
+  startTask(j);
 }
 
 async function loadJoblines(roNumber) {
@@ -2677,19 +2814,26 @@ async function loadDisponibilidadePanel() {
 
   const nomes = DIRECT_LABOUR_TECHS.slice().sort();
   list.innerHTML = nomes.map(nome => {
-    const info = hoje[nome] || { disponivel: true, hora_inicio: '09:00' };
+    const info = hoje[nome] || { disponivel: true, hora_inicio: '09:00', hora_fim: '' };
     const id   = 'disp-' + nome.replace(/[^a-zA-Z0-9]/g, '');
     return (
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
-        '<span style="font-size:14px">' + escapeHtml(nome) + '</span>' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
-          '<input type="time" id="' + id + '-hora" value="' + (info.hora_inicio || '09:00') + '" ' +
-            (info.disponivel ? '' : 'disabled') + ' style="width:88px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-size:13px">' +
+      '<div style="padding:10px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+          '<span style="font-size:14px">' + escapeHtml(nome) + '</span>' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#666">' +
             '<input type="checkbox" id="' + id + '-sim" ' + (info.disponivel ? 'checked' : '') + ' ' +
-              'onchange="document.getElementById(\'' + id + '-hora\').disabled = !this.checked">' +
+              'onchange="document.getElementById(\'' + id + '-hora\').disabled = !this.checked; document.getElementById(\'' + id + '-fim\').disabled = !this.checked;">' +
             'Disponível' +
           '</label>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#888">' +
+          '<span>das</span>' +
+          '<input type="time" id="' + id + '-hora" value="' + (info.hora_inicio || '09:00') + '" ' +
+            (info.disponivel ? '' : 'disabled') + ' style="width:88px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-size:13px">' +
+          '<span>até</span>' +
+          '<input type="time" id="' + id + '-fim" value="' + (info.hora_fim || '') + '" placeholder="18:00" ' +
+            (info.disponivel ? '' : 'disabled') + ' style="width:88px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-size:13px">' +
+          '<span style="font-size:11px;color:#aaa">(vazio = dia todo)</span>' +
         '</div>' +
       '</div>'
     );
@@ -2702,12 +2846,15 @@ function saveDisponibilidade() {
     const id  = 'disp-' + nome.replace(/[^a-zA-Z0-9]/g, '');
     const sim = document.getElementById(id + '-sim');
     const hora = document.getElementById(id + '-hora');
+    const fim  = document.getElementById(id + '-fim');
     if (!sim) return Promise.resolve();
     return fetch(API_URL, {
       method: 'POST', mode: 'no-cors',
       body: JSON.stringify({
         action: 'setDisponibilidade', tech: currentTech,
-        tecnico: nome, disponivel: sim.checked, hora_inicio: sim.checked ? hora.value : '',
+        tecnico: nome, disponivel: sim.checked,
+        hora_inicio: sim.checked ? hora.value : '',
+        hora_fim: sim.checked ? fim.value : '',
       }),
     });
   });
