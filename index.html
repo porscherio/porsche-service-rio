@@ -1,4 +1,31 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.6.0 — Build: 14/07/2026 -->
+<!-- v3.6.0: SUGGESTED TASKS — REWORKED FLOW. v3.5.0 had doLogin()
+             await loadROs()+loadSuggestedAgenda() before showing
+             ANY screen, deciding between sSug and s1 — on a slow
+             connection this made the app look hung for several
+             seconds right after login, before a tech saw anything at
+             all. Reverted: s1 shows immediately again (goTo('s1'),
+             loadROs() back to fire-and-forget), and the suggestion
+             flow now runs fully in the background via
+             checkSuggestedTasksBackground(), which quietly fetches
+             the agenda, populates a badge count on the new header
+             icon (btn-suggested-tasks, 📋, visible to every tech —
+             unlike btn-disponibilidade which is gated), and — once
+             per login only — shows a pop-up ("Ver tarefas sugeridas
+             de hoje? Você tem N tarefas planejadas") instead of
+             hard-navigating. "Ver agora" opens the same sSug screen
+             as before; "Agora não" just dismisses the pop-up, s1
+             stays exactly where the tech already is. The icon stays
+             available afterward regardless of which button was
+             tapped, or if the pop-up never got the chance to show at
+             all — openSuggestedTasksScreen() reuses the cached fetch
+             if fresh, or re-fetches on demand. Old loadSuggestedAgenda()
+             removed, replaced by the two functions above plus
+             showSuggestedTasksPopup()/dismissSuggestedTasksPopup().
+             Popup markup follows the exact .parts-pop-backdrop/
+             .parts-pop convention already used by the resume-lock and
+             version-warning modals — no new CSS classes. -->
 <!-- Porsche Service Rio PWA — v3.5.1 — Build: 12/07/2026 -->
 <!-- v3.5.1: EARLY DEPARTURE — disp-panel rows now have a second time
              input, "até" (hora_fim), alongside the existing "das"
@@ -414,6 +441,10 @@ input:focus{outline:none;border-color:var(--black)}
       <button id="btn-parts-admin" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openPartsAdminPanel()" title="Gerir Peças">&#x1F4E6;</button>
       <button id="btn-agenda" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openAgendaPanel()" title="Agendamentos">&#x1F4C5;</button>
       <button id="btn-disponibilidade" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openDisponibilidadePanel()" title="Disponibilidade dos técnicos">&#x1F550;</button>
+      <button id="btn-suggested-tasks" style="display:none;position:relative;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openSuggestedTasksScreen()" title="Tarefas sugeridas para hoje">
+        &#x1F4CB;
+        <span id="suggested-tasks-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:500;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px">0</span>
+      </button>
       <button id="btn-no-patio" style="background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openNoPatioPanel()" title="Veículos no Pátio">&#x1F17F;&#xFE0F;</button>
     </div>
     <div style="padding:8px 16px 10px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
@@ -653,6 +684,20 @@ input:focus{outline:none;border-color:var(--black)}
       </div>
       <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="activeLockResume()">&#x25B6; Retomar tarefa</button>
       <button class="bigbtn btn-stop" style="margin-bottom:0" onclick="activeLockDiscardAndPause()">&#x23F9; Não — finalizar esta tarefa</button>
+    </div>
+  </div>
+
+  <!-- SUGESTÃO DE TAREFAS DO DIA — pop-up (v3.6.0) — mostrado uma vez
+       por login, em segundo plano após s1 já estar visível (ver
+       checkSuggestedTasksBackground). Mesmo padrão de backdrop/pop
+       dos modais acima. "Agora não" só fecha o pop-up — o ícone no
+       cabeçalho continua disponível pra abrir a mesma tela depois. -->
+  <div class="parts-pop-backdrop" id="suggested-tasks-popup" style="display:none">
+    <div class="parts-pop" style="text-align:center">
+      <div class="parts-pop-title" style="font-size:15px;margin-bottom:4px">&#x1F4CB; Ver tarefas sugeridas de hoje?</div>
+      <div style="font-size:12.5px;color:#888;margin-bottom:18px" id="sugpop-count">Você tem 5 tarefas planejadas para hoje</div>
+      <button class="bigbtn btn-ini" style="margin-bottom:8px" onclick="openSuggestedTasksScreen()">Ver agora</button>
+      <button class="bigbtn" style="margin-bottom:0" onclick="dismissSuggestedTasksPopup()">Agora não</button>
     </div>
   </div>
 
@@ -1343,7 +1388,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.5.1';
+const APP_VERSION = '3.6.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1467,14 +1512,90 @@ async function doLogin() {
   checkAndShowApprovalButton();
   checkAndShowDisponibilidadeIcon();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
-  // v3.5.0 — loadROs() agora é aguardado (era fire-and-forget) porque
-  // a tela de sugestão precisa de liveROs já preenchido pra mostrar
-  // cliente/veículo de cada tarefa sugerida. renderROList já roda
-  // dentro de loadROs, então s1 continua populada normalmente mesmo
-  // que o técnico acabe indo por "Substituir".
-  await loadROs();
-  await loadSuggestedAgenda(); // decide entre sSug (com sugestões) e s1 (sem sugestões) — nunca deixa a tela em branco
-  checkForActiveLock(); // v3.0.0 — pode abrir o modal de retomar/liberar por cima de sSug ou s1, tanto faz
+  // v3.6.0 — REVERTED the v3.5.0 change that awaited loadROs()/
+  // loadSuggestedAgenda() before showing anything: on a slow
+  // connection this made the app look hung for several seconds right
+  // after login, before a tech saw ANY screen at all. s1 now shows
+  // immediately, same as pre-v3.5.0 — loadROs() is fire-and-forget
+  // again. The suggestion flow runs fully in the background and
+  // surfaces itself as a popup over whatever screen the tech is
+  // already looking at, instead of deciding what screen to show.
+  goTo('s1');
+  loadROs();
+  checkSuggestedTasksBackground(); // fire-and-forget — see below, never blocks login
+  checkForActiveLock(); // v3.0.0 — pode abrir o modal de retomar/liberar por cima de s1
+}
+
+// v3.6.0 — replaces the old loadSuggestedAgenda's "decide the screen"
+// role. Fetches the agenda quietly in the background (liveROs may
+// still be loading in parallel — renderSuggestedAgenda tolerates a
+// vehicle/client lookup coming back blank, it just won't show that
+// line for a card until liveROs catches up). Populates the header
+// icon's badge either way, and — once per login only — shows the
+// "ver tarefas sugeridas?" popup if there's anything to suggest.
+// A slow/failed fetch fails silently here: the icon just won't show
+// a badge yet, and tapping it later re-fetches fresh anyway.
+let _suggestedAgendaCache = null;
+let _suggestedPopupShownThisLogin = false;
+
+async function checkSuggestedTasksBackground() {
+  const btn = document.getElementById('btn-suggested-tasks');
+  if (btn) btn.style.display = 'flex'; // visible to every tech, unlike btn-disponibilidade
+  try {
+    const res  = await fetch(API_URL + '?action=getMyAgenda&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.agenda)) return;
+    _suggestedAgendaCache = data.agenda;
+    updateSuggestedTasksBadge(data.agenda.length);
+    if (data.agenda.length > 0 && !_suggestedPopupShownThisLogin) {
+      _suggestedPopupShownThisLogin = true;
+      showSuggestedTasksPopup(data.agenda.length);
+    }
+  } catch(e) { console.warn('checkSuggestedTasksBackground failed', e); }
+}
+
+function updateSuggestedTasksBadge(count) {
+  const badge = document.getElementById('suggested-tasks-badge');
+  if (!badge) return;
+  if (count > 0) { badge.textContent = count; badge.style.display = 'flex'; }
+  else badge.style.display = 'none';
+}
+
+function showSuggestedTasksPopup(count) {
+  document.getElementById('sugpop-count').textContent =
+    'Você tem ' + count + (count === 1 ? ' tarefa planejada' : ' tarefas planejadas') + ' para hoje';
+  document.getElementById('suggested-tasks-popup').style.display = 'flex';
+}
+
+function dismissSuggestedTasksPopup() {
+  document.getElementById('suggested-tasks-popup').style.display = 'none';
+}
+
+// Shared entry point for both "Ver agora" (from the popup) and the
+// header icon (tapped any time, whether or not the popup ever showed).
+// Reuses the cached fetch from checkSuggestedTasksBackground if it's
+// still fresh (same login session); otherwise re-fetches — covers a
+// tech tapping the icon well after login, when the plan may have
+// changed (a new priority RO, someone reassigned, etc.).
+async function openSuggestedTasksScreen() {
+  dismissSuggestedTasksPopup();
+  if (_suggestedAgendaCache && _suggestedAgendaCache.length > 0) {
+    renderSuggestedAgenda(_suggestedAgendaCache);
+    goTo('sSug');
+    return;
+  }
+  try {
+    const res  = await fetch(API_URL + '?action=getMyAgenda&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.agenda) && data.agenda.length > 0) {
+      _suggestedAgendaCache = data.agenda;
+      updateSuggestedTasksBadge(data.agenda.length);
+      renderSuggestedAgenda(data.agenda);
+      goTo('sSug');
+    } else {
+      showToast('Nenhuma tarefa sugerida no momento.');
+    }
+  } catch(e) { showToast('Erro ao carregar tarefas sugeridas.'); }
 }
 
 function doLogout() {
@@ -1703,26 +1824,11 @@ async function loadROs() {
   }
 }
 
-// ── SUGESTÃO DE TAREFAS DO DIA (v3.5.0) ─────────────────────────
-// Chamada no login, depois de loadROs() ter preenchido liveROs (que
-// esta tela usa pra cruzar cada ro_number com cliente/veículo — sem
-// duplicar esse dado no backend). Se não houver sugestões (AgendaTecnica
-// ainda não rodou hoje, ou este técnico não tem nada alocado), cai
-// direto pra s1 em vez de mostrar uma tela vazia.
-async function loadSuggestedAgenda() {
-  try {
-    const res  = await fetch(API_URL + '?action=getMyAgenda&tech=' + encodeURIComponent(currentTech));
-    const data = await res.json();
-    if (!data.ok || !Array.isArray(data.agenda) || data.agenda.length === 0) {
-      goTo('s1');
-      return;
-    }
-    renderSuggestedAgenda(data.agenda);
-    goTo('sSug');
-  } catch(e) {
-    goTo('s1'); // sem ligação — não trava o tech na tela de sugestão, cai pro fluxo normal
-  }
-}
+// ── SUGESTÃO DE TAREFAS DO DIA (v3.5.0, fluxo revisado em v3.6.0) ──
+// A decisão de qual tela mostrar foi removida daqui — ver
+// checkSuggestedTasksBackground()/openSuggestedTasksScreen() perto de
+// doLogin(), que agora tratam isso via pop-up + ícone em vez de
+// navegação automática.
 
 function renderSuggestedAgenda(agenda) {
   const agoraDecimal = new Date().getHours() + new Date().getMinutes()/60;
