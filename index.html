@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.6.1 — Build: 14/07/2026 -->
+<!-- v3.6.1: SUGGESTED TASKS ICON — btn-suggested-tasks now uses a real
+             Tabler Icons glyph (ti-clipboard-check) instead of the
+             📋 emoji v3.6.0 shipped with. New <link> in <head>
+             loading @tabler/icons-webfont (pinned version, via CDN)
+             — this project's first icon-font dependency; every other
+             header icon (🕐📦✅📅) stays plain emoji, unchanged. Same
+             external-CDN risk profile as the existing jsPDF script
+             tag: needs network on first load, doesn't affect any
+             other part of the app if offline. Purely visual — no
+             logic changed from v3.6.0's popup/badge/background-fetch
+             behavior. -->
 <!-- Porsche Service Rio PWA — v3.6.0 — Build: 14/07/2026 -->
 <!-- v3.6.0: SUGGESTED TASKS — REWORKED FLOW. v3.5.0 had doLogin()
              await loadROs()+loadSuggestedAgenda() before showing
@@ -10,7 +22,7 @@
              flow now runs fully in the background via
              checkSuggestedTasksBackground(), which quietly fetches
              the agenda, populates a badge count on the new header
-             icon (btn-suggested-tasks, 📋, visible to every tech —
+             icon (btn-suggested-tasks, visible to every tech —
              unlike btn-disponibilidade which is gated), and — once
              per login only — shows a pop-up ("Ver tarefas sugeridas
              de hoje? Você tem N tarefas planejadas") instead of
@@ -154,6 +166,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#1a1a1a">
 <title>Porsche Service Rio</title>
+<!-- v3.6.1 — Tabler Icons webfont, added only for btn-suggested-tasks'
+     clipboard icon, to match the originally-approved mockup design
+     instead of a plain emoji. Pinned to a specific version (not
+     @latest) so a future upstream release can't silently change how
+     this looks. Same external-CDN-dependency risk profile as the
+     existing jsPDF script tag below — needs network on first load,
+     rest of the app is unaffected if offline. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/dist/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -442,7 +462,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button id="btn-agenda" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openAgendaPanel()" title="Agendamentos">&#x1F4C5;</button>
       <button id="btn-disponibilidade" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openDisponibilidadePanel()" title="Disponibilidade dos técnicos">&#x1F550;</button>
       <button id="btn-suggested-tasks" style="display:none;position:relative;background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openSuggestedTasksScreen()" title="Tarefas sugeridas para hoje">
-        &#x1F4CB;
+        <i class="ti ti-clipboard-check" aria-hidden="true"></i>
         <span id="suggested-tasks-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:500;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px">0</span>
       </button>
       <button id="btn-no-patio" style="background:none;border:none;cursor:pointer;font-size:20px;color:#aaa" onclick="openNoPatioPanel()" title="Veículos no Pátio">&#x1F17F;&#xFE0F;</button>
@@ -1388,7 +1408,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.6.0';
+const APP_VERSION = '3.6.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
