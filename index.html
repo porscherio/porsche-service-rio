@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.6.2 — Build: 14/07/2026 -->
+<!-- v3.6.2: ICON FIX — v3.6.1's Tabler Icons <link> was pinned to
+             @2.47.0, a version that doesn't exist for this package
+             (confirmed via npm registry — real current is 3.44.0).
+             The 404'd stylesheet meant no icon classes loaded at
+             all, so btn-suggested-tasks rendered with nothing
+             visible — reported by Eytan as the icon having
+             "vanished" right after v3.6.1 went live. Switched to
+             @latest (see the <head> comment for the full tradeoff).
+             No other logic changed — popup/badge/background-fetch
+             behavior from v3.6.0 is untouched. Separately confirmed
+             with Eytan: the popup not appearing in this same test was
+             NOT a bug — AgendaTecnica was genuinely empty (no
+             technician availability marked, outside working hours),
+             which is the correct "nothing to suggest" behavior. -->
 <!-- Porsche Service Rio PWA — v3.6.1 — Build: 14/07/2026 -->
 <!-- v3.6.1: SUGGESTED TASKS ICON — btn-suggested-tasks now uses a real
              Tabler Icons glyph (ti-clipboard-check) instead of the
@@ -166,14 +181,20 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#1a1a1a">
 <title>Porsche Service Rio</title>
-<!-- v3.6.1 — Tabler Icons webfont, added only for btn-suggested-tasks'
-     clipboard icon, to match the originally-approved mockup design
-     instead of a plain emoji. Pinned to a specific version (not
-     @latest) so a future upstream release can't silently change how
-     this looks. Same external-CDN-dependency risk profile as the
-     existing jsPDF script tag below — needs network on first load,
-     rest of the app is unaffected if offline. -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/dist/tabler-icons.min.css">
+<!-- v3.6.2 — FIX: v3.6.1 pinned to @2.47.0, a version number I
+     invented from memory that doesn't actually exist for this
+     package (npm's own registry lists the real current version as
+     3.44.0 — nowhere close). That 404 on the stylesheet meant no
+     icon classes ever loaded, so the icon rendered as nothing —
+     confirmed by Eytan reporting it had "vanished" after the v3.6.1
+     deploy. Switched to @latest, which always resolves to whatever
+     the real current version is — sacrifices protection against a
+     hypothetical future breaking rename, but that's a much smaller
+     risk than shipping another guessed-wrong pinned version number.
+     Same external-CDN-dependency risk profile as the existing jsPDF
+     script tag below either way — needs network on first load, rest
+     of the app is unaffected if offline. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -1408,7 +1429,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.6.2';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
