@@ -1,4 +1,24 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.6.4 — Build: 14/07/2026 -->
+<!-- v3.6.4: LOGOUT FIX — doLogout() never reset
+             _suggestedPopupShownThisLogin, _suggestedAgendaCache, or
+             the suggested-tasks icon's visibility/badge. Found via a
+             real report: Eytan saw the popup once, chose "Agora não",
+             logged out, logged back in as (in this case) the same
+             tech, and never saw it again — confirmed this wasn't a
+             one-time-only design choice sticking correctly, it was
+             the flag leaking across logout because doLogout() resets
+             UI state without reloading the page, so any plain JS
+             variable (not tied to a DOM element or storage) survives
+             untouched. On a shared device this meant only the very
+             FIRST technician after a page load would ever see the
+             popup — everyone after that inherited the first person's
+             "already shown" state and stale cached agenda, regardless
+             of their own actual agenda. Also reset
+             btn-disponibilidade's visibility on logout — same
+             pre-existing gap, unrelated to this feature but the same
+             category of bug, fixed alongside since it was cheap to
+             include. -->
 <!-- Porsche Service Rio PWA — v3.6.2 — Build: 14/07/2026 -->
 <!-- v3.6.2: ICON FIX — v3.6.1's Tabler Icons <link> was pinned to
              @2.47.0, a version that doesn't exist for this package
@@ -1429,7 +1449,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.6.2';
+const APP_VERSION = '3.6.4';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1651,6 +1671,22 @@ function doLogout() {
   document.getElementById('btn-approval').style.display='none';
   document.getElementById('btn-parts-admin').style.display='none';
   document.getElementById('btn-agenda').style.display='none';
+  // v3.6.3 — FIX: none of these were being reset on logout, so on a
+  // shared device (multiple techs using the same phone/tablet through
+  // the day) only the FIRST tech after a page load would ever see the
+  // suggested-tasks popup — _suggestedPopupShownThisLogin is a plain
+  // JS variable that only resets on an actual page reload, and
+  // doLogout() never reloads the page, just resets UI state. A second
+  // tech logging in afterward inherited the first tech's "already
+  // shown" flag and their stale cached agenda/badge count. Also
+  // resets btn-disponibilidade, which had this same gap already,
+  // pre-existing and unrelated to this feature — fixed alongside
+  // since it's the same category of bug and cheap to include here.
+  document.getElementById('btn-disponibilidade').style.display='none';
+  document.getElementById('btn-suggested-tasks').style.display='none';
+  updateSuggestedTasksBadge(0);
+  _suggestedAgendaCache = null;
+  _suggestedPopupShownThisLogin = false;
   goTo('s0');
 }
 
