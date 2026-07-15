@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.6.5 — Build: 14/07/2026 -->
+<!-- v3.6.5: RO LIST — NEW STATUS FILTER. loadROs() and loadNoPatioList()
+             now send &tech=currentTech on their ?action=ros fetches —
+             required for Code.gs v3.6.5's new NEW-status filter to
+             know whether the caller is an Approver (who should see
+             everything, including long-delivered ROs, for history/
+             auditing) or a regular tech (who shouldn't see ROs
+             already marked Entregue in NEW, even if the PWA's own
+             status column hasn't caught up yet — real case: RO
+             28638). No other logic changed. -->
 <!-- Porsche Service Rio PWA — v3.6.4 — Build: 14/07/2026 -->
 <!-- v3.6.4: LOGOUT FIX — doLogout() never reset
              _suggestedPopupShownThisLogin, _suggestedAgendaCache, or
@@ -1449,7 +1459,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.6.4';
+const APP_VERSION = '3.6.5';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1887,7 +1897,7 @@ async function loadROs() {
   document.getElementById('ro-list-content').innerHTML =
     '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar ordens...</div></div>';
   try {
-    const res = await fetch(API_URL+'?action=ros');
+    const res = await fetch(API_URL+'?action=ros&tech='+encodeURIComponent(currentTech));
     const data = await res.json();
     if (Array.isArray(data)) {
       liveROs = data;
@@ -3447,7 +3457,7 @@ function loadNoPatioList() {
 
   Promise.all([
     fetch(API_URL + '?action=getAgendamentos&calendar=servicos').then(r => r.json()),
-    fetch(API_URL + '?action=ros').then(r => r.json()),
+    fetch(API_URL + '?action=ros&tech=' + encodeURIComponent(currentTech)).then(r => r.json()),
   ]).then(([agendaData, rosData]) => {
     if (!agendaData.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar.</div>'; return; }
 
