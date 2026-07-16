@@ -1,4 +1,33 @@
 <!DOCTYPE html>
+<!-- Porsche Service Rio PWA — v3.7.6 — Build: 15/07/2026 -->
+<!-- v3.7.6: TIMER ACCURACY FIX. Root cause of a real discrepancy found
+             via the tech-hours report: a jobline logged started→
+             completed 409s apart by wall clock, but elapsed_seconds
+             only recorded 245s. startTimer() was doing seconds++ every
+             tick — a blind increment trusting setInterval to fire
+             exactly once per real second. Mobile browsers throttle or
+             suspend setInterval when a tab backgrounds or the screen
+             locks, so any such gap mid-task permanently undercounted,
+             with no way to recover it. Fixed: new taskStartedAtMs
+             (set in startTask() via Date.now(), and in
+             activeLockResume() via the real lock.started timestamp)
+             anchors the timer to true wall-clock time. startTimer()'s
+             tick now recomputes seconds = (Date.now() - taskStartedAtMs)
+             / 1000 every second instead of incrementing — even if
+             ticks get skipped while backgrounded, the next one that
+             fires self-corrects to the true elapsed value instead of
+             compounding the undercount forever. Confirmed this
+             doesn't need a matching fix at the pause/complete send
+             points (confirmarPausa etc.) — pauseTimer() already stops
+             the clock the moment the tech navigates to the confirm
+             screen (s6p/s6c), before any review/dwell time there, so
+             seconds is already frozen at the semantically correct
+             moment; recomputing it fresh at send-time would have
+             wrongly folded in that dwell time as if it were active
+             work. This is the root-cause fix for the "elapsed-time
+             discrepancy" flagged during tonight's tech-hours-report
+             testing — going forward, new sessions should report
+             accurate active-work time even through backgrounding. -->
 <!-- Porsche Service Rio PWA — v3.7.5 — Build: 15/07/2026 -->
 <!-- v3.7.5: VERSION NUMBER SYNC ONLY — no actual content changed in
              this file. Bumped to match Code.gs v3.7.5 (tech drill-down
@@ -1505,7 +1534,7 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.7.5';
+const APP_VERSION = '3.7.6';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1582,6 +1611,10 @@ let partsDetailCache  = {}; // { roNumber: [ {part_key, status, ...} ] }
 let pkgCurrentRO = null;
 let pkgDirtyParts = {}; // { partKey: true } — parts with unsaved changes
 let seconds = 0, timerIv = null, timerOn = false;
+// v3.7.6 — anchors the running timer to a real wall-clock moment
+// instead of trusting setInterval's tick count alone. See
+// startTimer()'s own comment for the full bug this fixes.
+let taskStartedAtMs = 0;
 let photoCount = 0, sessionHistory = [];
 let gpsStart = null, gpsCurrent = null;
 let videoStream = null;
@@ -1892,6 +1925,7 @@ function activeLockResume() {
 
   activeRO   = activeROFromLock(lock);
   activeTask = activeTaskFromLock(lock);
+  taskStartedAtMs = new Date(lock.started).getTime();
   seconds    = elapsedSecondsSince(lock.started);
   photoCount = 0;
   gpsStart   = gpsCurrent;
@@ -2521,6 +2555,7 @@ function startTask(j) {
   document.getElementById('ov-vehicle').textContent=activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
   document.getElementById('ov-tech').textContent=currentTech;
   seconds=0;
+  taskStartedAtMs=Date.now();
   document.getElementById('s4-remark-count').style.display='none';
   document.getElementById('s4-audio-count').style.display='none';
   logWork('started', 0);
@@ -2691,7 +2726,22 @@ async function logWork(event, pct) {
 }
 
 // ── Timer ─────────────────────────────────────────────────────────
-function startTimer(){ timerOn=true; timerIv=setInterval(()=>{seconds++;document.getElementById('timer-disp').textContent=fmtTime(seconds);},1000); }
+// v3.7.6 — FIX: was seconds++ every tick, a blind increment that
+// trusted setInterval to fire exactly once per real second. Mobile
+// browsers throttle or suspend setInterval when a tab is backgrounded
+// or the screen locks — confirmed real case: a jobline logged
+// started→completed 409s apart by wall clock, but elapsed_seconds
+// only recorded 245s, undercounting by ~164s from time the phone was
+// likely locked mid-task. Now recomputes seconds from taskStartedAtMs
+// (a real Date.now()/lock.started timestamp, set in startTask/
+// activeLockResume) on every tick instead — even if ticks get
+// skipped while backgrounded, the next one that DOES fire
+// self-corrects to the true elapsed time rather than compounding the
+// undercount forever. Needed because this same elapsed_seconds value
+// is what gets sent to the server on pause/complete, and now also
+// feeds the tech-hours report (Capacidade.gs v3.11+) — an inaccurate
+// timer here means inaccurate reported hours there.
+function startTimer(){ timerOn=true; timerIv=setInterval(()=>{seconds=Math.max(0,Math.floor((Date.now()-taskStartedAtMs)/1000));document.getElementById('timer-disp').textContent=fmtTime(seconds);},1000); }
 function pauseTimer(){ if(timerIv){clearInterval(timerIv);timerIv=null;timerOn=false;} }
 function clearTimer(){ pauseTimer(); seconds=0; document.getElementById('timer-disp').textContent='00:00'; }
 
