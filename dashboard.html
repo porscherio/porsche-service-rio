@@ -335,7 +335,7 @@
   <div class="header-left">
     <div class="title">
       Workshop floor — live status
-      <span class="version-badge">v1.3.3</span>
+      <span class="version-badge">v1.3.4</span>
     </div>
     <div class="subtitle" id="date-label"></div>
   </div>
@@ -566,7 +566,8 @@ function renderVehicleEtas(rows) {
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const label = r.plate ? `${r.vehicle} - ${r.plate}` : r.vehicle;
+    let label = r.plate ? `${r.vehicle} - ${r.plate}` : r.vehicle;
+    if (r.custName) label += ` - ${r.custName.split(' ')[0]}`;
     return `
     <tr>
       <td>${r.ro}</td>
