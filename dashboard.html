@@ -335,7 +335,7 @@
   <div class="header-left">
     <div class="title">
       Workshop floor — live status
-      <span class="version-badge">v1.3.2</span>
+      <span class="version-badge">v1.3.3</span>
     </div>
     <div class="subtitle" id="date-label"></div>
   </div>
@@ -566,7 +566,7 @@ function renderVehicleEtas(rows) {
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const label = r.plate ? `${r.vehicle}-${r.plate}` : r.vehicle;
+    const label = r.plate ? `${r.vehicle} - ${r.plate}` : r.vehicle;
     return `
     <tr>
       <td>${r.ro}</td>
@@ -585,18 +585,27 @@ function renderAllocReport(rows) {
     const firstName = r.tech.split(' ')[0];
     const horasTxt = r.horas != null ? r.horas + 'h' : '—';
     const rosTxt = r.totalROs != null ? r.totalROs : '—';
-    const ocupTxt = r.ocupacaoPct != null ? r.ocupacaoPct + '%' : '—';
+
+    let ocupHtml = '—';
+    if (r.ocupacaoPct != null) {
+      const ocupInt = Math.round(r.ocupacaoPct);
+      const ocupBg = ocupInt < 80 ? '#E24B4A' : (ocupInt > 120 ? '#639922' : '#E5FF00');
+      ocupHtml = `<span class="eff-pill" style="background:${ocupBg}">${ocupInt}%</span>`;
+    }
+
     let effHtml = '—';
     if (r.eficienciaMediaPct != null) {
-      const bg = r.eficienciaMediaPct < 80 ? '#E24B4A' : (r.eficienciaMediaPct < 100 ? '#E5FF00' : '#639922');
-      effHtml = `<span class="eff-pill" style="background:${bg}">${r.eficienciaMediaPct}%</span>`;
+      const effInt = Math.round(r.eficienciaMediaPct);
+      const effBg = effInt < 80 ? '#E24B4A' : (effInt < 100 ? '#E5FF00' : '#639922');
+      effHtml = `<span class="eff-pill" style="background:${effBg}">${effInt}%</span>`;
     }
+
     return `
     <tr>
       <td>${firstName}</td>
       <td>${horasTxt}</td>
       <td>${rosTxt}</td>
-      <td>${ocupTxt}</td>
+      <td>${ocupHtml}</td>
       <td>${effHtml}</td>
     </tr>`;
   }).join('');
