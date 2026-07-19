@@ -1,7 +1,6 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v3.7.11 — Build: 17/07/2026 -->
-<!-- v3.7.11: VERSION NUMBER SYNC ONLY — no actual content changed in
-              this file. Bumped to match Code.gs v3.7.11 (tech
+<!-- Porsche Service Rio PWA — v3.7.12 — Build: 19/07/2026 11:30 BRT -->
+<!-- v3.7.12: SERVICE INTELLIGENCE panel integrated · 19/07/2026 11:30 BRT
               efficiency column added to the Alocação do dia report
               panel — a Code.gs-only change), per the version-parity
               convention established at v3.7.0. -->
@@ -549,6 +548,338 @@ input:focus{outline:none;border-color:var(--black)}
 .edoc-scan-pop{display:flex;flex-direction:column;max-height:85vh;overflow:hidden}
 .edoc-scan-scroll{overflow-y:auto;flex:1;min-height:0}
 .edoc-scan-footer{flex-shrink:0;padding-top:8px}
+
+/* ── SERVICE INTELLIGENCE · v3.7.12 ── */
+/* ── SI Panel overlay ─────────────────────────────────────────────────────── */
+.si-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: #0A0A0A;
+  display: flex; flex-direction: column;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+.si-overlay.si-open { transform: translateX(0); }
+
+/* ── Panel top bar ────────────────────────────────────────────────────────── */
+.si-topbar {
+  flex-shrink: 0;
+  background: #000;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.si-topbar-brand {
+  display: flex; align-items: center; gap: 10px; flex: 1;
+}
+.si-topbar-crest {
+  width: 30px; height: 30px;
+  border: 1.5px solid #C8102E; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.si-topbar-title { color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0.15em; }
+.si-topbar-sub   { color: #C8102E; font-size: 7.5px; font-weight: 700; letter-spacing: 0.3em; margin-top: 2px; }
+.si-topbar-right { display: flex; align-items: center; gap: 10px; }
+.si-run-btn {
+  background: rgba(200,16,46,0.15);
+  border: 1px solid rgba(200,16,46,0.4);
+  color: #FF7191; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; padding: 6px 14px; border-radius: 3px;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.si-run-btn:hover { background: rgba(200,16,46,0.28); color: #fff; }
+.si-run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.si-close-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5);
+  width: 32px; height: 32px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+.si-close-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+/* ── Meta bar (last run + summary counts) ────────────────────────────────── */
+.si-metabar {
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 20px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.si-meta-run   { color: rgba(255,255,255,0.28); font-size: 10.5px; }
+.si-meta-count { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: rgba(255,255,255,0.35); }
+.si-meta-dot   { width: 6px; height: 6px; border-radius: 50%; }
+.si-meta-dot.red   { background: #DC2626; }
+.si-meta-dot.amber { background: #D97706; }
+.si-meta-dot.green { background: #059669; }
+.si-meta-count strong { font-weight: 700; }
+.si-meta-count strong.red   { color: #FCA5A5; }
+.si-meta-count strong.amber { color: #FCD34D; }
+.si-meta-count strong.green { color: #6EE7B7; }
+
+/* ── Filter tabs ──────────────────────────────────────────────────────────── */
+.si-filters {
+  flex-shrink: 0;
+  padding: 0 20px;
+  display: flex; gap: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: #0D0D0D;
+}
+.si-filter-btn {
+  background: none; border: none;
+  color: rgba(255,255,255,0.35);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  padding: 11px 14px 10px;
+  cursor: pointer; font-family: inherit;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.si-filter-btn:hover { color: rgba(255,255,255,0.65); }
+.si-filter-btn.active { color: #fff; border-bottom-color: #C8102E; }
+
+/* ── Vehicle list ─────────────────────────────────────────────────────────── */
+.si-list {
+  flex: 1; overflow-y: auto;
+  padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.si-list::-webkit-scrollbar { width: 4px; }
+.si-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ── Vehicle card (list item) ─────────────────────────────────────────────── */
+.si-veh-card {
+  background: #141414;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 4px;
+  padding: 12px 16px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  gap: 0 14px;
+  align-items: center;
+  transition: background 0.12s, border-color 0.12s;
+  border-left-width: 3px;
+}
+.si-veh-card:hover { background: #1a1a1a; border-color: rgba(255,255,255,0.13); }
+.si-veh-card.overdue    { border-left-color: #DC2626; }
+.si-veh-card.sem_reg    { border-left-color: #DC2626; }
+.si-veh-card.due_soon   { border-left-color: #D97706; }
+.si-veh-card.ok         { border-left-color: rgba(5,150,105,0.4); }
+.si-veh-stripe { width: 3px; }   /* filled by border-left */
+.si-veh-main { min-width: 0; }
+.si-veh-plate  { color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; }
+.si-veh-model  { color: rgba(255,255,255,0.42); font-size: 10.5px; margin-left: 8px; }
+.si-veh-name   { color: rgba(255,255,255,0.55); font-size: 11px; margin-top: 2px; }
+.si-veh-km     { color: rgba(255,255,255,0.3); font-size: 10px; margin-left: 6px; }
+.si-veh-right  { text-align: right; flex-shrink: 0; }
+.si-veh-badge  {
+  display: inline-block;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em;
+  padding: 3px 7px; border-radius: 2px; margin-bottom: 4px;
+}
+.si-veh-badge.overdue  { background: #7F1D1D; border: 1px solid #DC2626; color: #FCA5A5; }
+.si-veh-badge.sem_reg  { background: #7F1D1D; border: 1px solid #DC2626; color: #FCA5A5; }
+.si-veh-badge.due_soon { background: #78350F; border: 1px solid #D97706; color: #FDE68A; }
+.si-veh-badge.ok       { background: #064E3B; border: 1px solid #059669; color: #6EE7B7; }
+.si-veh-issue-count { color: rgba(255,255,255,0.25); font-size: 9.5px; }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.si-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; gap: 10px;
+  color: rgba(255,255,255,0.2); font-size: 13px; text-align: center;
+}
+.si-empty-icon { font-size: 36px; opacity: 0.3; }
+.si-spinner {
+  width: 28px; height: 28px;
+  border: 2px solid rgba(200,16,46,0.2);
+  border-top-color: #C8102E;
+  border-radius: 50%;
+  animation: si-spin 0.7s linear infinite;
+}
+@keyframes si-spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SI CARD MODAL
+   ══════════════════════════════════════════════════════════════════════════ */
+.si-card-overlay {
+  position: fixed; inset: 0; z-index: 1300;
+  background: rgba(0,0,0,0.75);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 24px 16px 40px;
+  overflow-y: auto;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.si-card-overlay.si-open { opacity: 1; pointer-events: auto; }
+
+.si-card {
+  width: 100%; max-width: 860px;
+  background: #111; border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 32px 64px rgba(0,0,0,0.85);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* Card close bar */
+.si-card-closebar {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 14px;
+  background: rgba(0,0,0,0.5);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.si-card-action-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em;
+  padding: 5px 14px; border-radius: 3px;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.si-card-action-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.si-card-action-btn.wpp {
+  background: rgba(37,211,102,0.1);
+  border-color: rgba(37,211,102,0.3);
+  color: #75e899;
+}
+.si-card-action-btn.wpp:hover { background: rgba(37,211,102,0.2); }
+
+/* Card top stripe */
+.si-card-stripe-top    { height: 3px; background: linear-gradient(90deg,#C8102E 0%,#FF1744 55%,transparent 100%); }
+.si-card-stripe-bottom { height: 2px; background: rgba(200,16,46,0.32); }
+
+/* Card header */
+.si-card-header {
+  background: #000; padding: 18px 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.si-card-brand { display: flex; align-items: center; gap: 12px; }
+.si-card-crest {
+  width: 38px; height: 38px;
+  border: 2px solid #C8102E; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.si-card-brand-main { color: #fff; font-size: 16px; font-weight: 700; letter-spacing: 0.22em; line-height: 1; }
+.si-card-brand-sub  { color: #C8102E; font-size: 7.5px; font-weight: 700; letter-spacing: 0.38em; margin-top: 4px; }
+.si-card-badge-label { display: block; color: #C8102E; font-size: 9px; font-weight: 700; letter-spacing: 0.3em; margin-bottom: 3px; }
+.si-card-badge-date  { color: rgba(255,255,255,0.28); font-size: 10px; text-align: right; }
+
+/* Card info section */
+.si-card-info {
+  display: grid; grid-template-columns: 1fr 1px 1fr;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.si-card-info-panel   { padding: 20px 28px; }
+.si-card-info-divider { background: rgba(255,255,255,0.07); margin: 14px 0; }
+.si-info-label  { color: rgba(255,255,255,0.26); font-size: 8px; font-weight: 700; letter-spacing: 0.3em; margin-bottom: 8px; }
+.si-info-name   { color: #fff; font-size: 18px; font-weight: 600; margin-bottom: 3px; }
+.si-info-phone  { color: rgba(255,255,255,0.42); font-size: 12.5px; }
+.si-info-model  { color: #fff; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.si-info-model span { color: rgba(255,255,255,0.32); font-weight: 400; }
+.si-meta-row    { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.si-license-tag { color: rgba(255,255,255,0.42); font-size: 12px; letter-spacing: 0.06em; }
+.si-km-badge    {
+  background: rgba(200,16,46,0.12); border: 1px solid rgba(200,16,46,0.36);
+  color: #FF7191; font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 2px; letter-spacing: 0.04em;
+}
+.si-km-bar { position: relative; height: 3px; background: rgba(255,255,255,0.07); border-radius: 2px; }
+.si-km-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg,#C8102E,#FF4444); border-radius: 2px; }
+.si-km-dot {
+  position: absolute; top: 50%; transform: translate(-50%,-50%);
+  width: 7px; height: 7px; background: #FF4444; border-radius: 50%;
+  box-shadow: 0 0 7px rgba(255,68,68,0.8);
+}
+.si-km-scale { display: flex; justify-content: space-between; margin-top: 4px; }
+.si-km-scale span { color: rgba(255,255,255,0.15); font-size: 8.5px; }
+
+/* Summary bar */
+.si-card-summary {
+  padding: 11px 28px;
+  display: flex; gap: 8px; align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.3);
+}
+.si-sum-dot   { width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; }
+.si-sum-item  { color: rgba(255,255,255,0.38); font-size: 11px; display: flex; align-items: center; }
+.si-sum-item strong.r { color: #FCA5A5; margin-right: 3px; }
+.si-sum-item strong.a { color: #FCD34D; margin-right: 3px; }
+.si-sum-item strong.g { color: #6EE7B7; margin-right: 3px; }
+.si-sum-sep   { color: rgba(255,255,255,0.1); margin: 0 6px; }
+
+/* Table */
+.si-tbl-head {
+  display: grid;
+  grid-template-columns: 1.9fr 0.95fr 1.75fr 0.85fr 80px;
+  padding: 9px 28px; gap: 8px;
+  background: rgba(0,0,0,0.42);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.si-th { color: rgba(255,255,255,0.2); font-size: 8px; font-weight: 700; letter-spacing: 0.22em; }
+
+.si-tbl-row {
+  display: grid;
+  grid-template-columns: 1.9fr 0.95fr 1.75fr 0.85fr 80px;
+  padding: 13px 28px; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  align-items: center;
+  border-left: 2px solid transparent;
+}
+.si-tbl-row:last-child { border-bottom: none; }
+.si-tbl-row.overdue    { border-left-color: #C8102E; background: rgba(200,16,46,0.04); }
+.si-tbl-row.sem_reg    { border-left-color: #C8102E; background: rgba(200,16,46,0.04); }
+.si-tbl-row.due_soon   { border-left-color: rgba(217,119,6,0.55); background: rgba(217,119,6,0.02); }
+
+.si-cell-name  { color: #fff; font-size: 12.5px; font-weight: 500; margin-bottom: 2px; }
+.si-cell-desc  { color: rgba(255,255,255,0.26); font-size: 10.5px; }
+.si-cell-intv  { color: rgba(255,255,255,0.4); font-size: 10.5px; line-height: 1.55; }
+.si-cell-ro    { color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 500; margin-bottom: 2px; }
+.si-cell-meta  { color: rgba(255,255,255,0.28); font-size: 10px; }
+.si-cell-none  { color: #FCA5A5; font-size: 10.5px; font-style: italic; }
+.si-cell-due   { font-size: 11.5px; }
+.si-cell-due.overdue  { color: #FCA5A5; font-weight: 700; }
+.si-cell-due.sem_reg  { color: rgba(255,255,255,0.3); }
+.si-cell-due.due_soon { color: #FCD34D; font-weight: 600; }
+.si-cell-due.ok       { color: rgba(255,255,255,0.4); }
+
+.si-pill {
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.12em;
+  padding: 3px 6px; border-radius: 2px;
+  text-align: center; display: inline-block; width: 100%;
+}
+.si-pill.overdue  { background: #7F1D1D; border: 1px solid #DC2626; color: #FCA5A5; }
+.si-pill.sem_reg  { background: #7F1D1D; border: 1px solid #DC2626; color: #FCA5A5; }
+.si-pill.due_soon { background: #78350F; border: 1px solid #D97706; color: #FDE68A; }
+.si-pill.ok       { background: #064E3B; border: 1px solid #059669; color: #6EE7B7; }
+
+/* Card footer */
+.si-card-footer {
+  padding: 14px 28px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(0,0,0,0.36);
+}
+.si-footer-note { color: rgba(255,255,255,0.16); font-size: 10px; }
+.si-footer-ver  { color: rgba(255,255,255,0.12); font-size: 10px; font-family: monospace; }
+
+/* Print styles */
+@media print {
+  body > *:not(.si-card-overlay) { display: none !important; }
+  .si-card-overlay {
+    position: static !important; padding: 0 !important;
+    background: none !important; overflow: visible !important;
+    opacity: 1 !important; pointer-events: auto !important;
+  }
+  .si-card-closebar { display: none !important; }
+  .si-card { box-shadow: none !important; }
+}
 </style>
 </head>
 
@@ -639,7 +970,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button class="ntab on" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
-      <button class="ntab" onclick="openSINav()">&#x26A1;<br>SI</button>
+      <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -1022,7 +1353,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button class="ntab" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
       <button class="ntab on">&#x1F4CB;<br>Histórico</button>
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
-      <button class="ntab" onclick="openSINav()">&#x26A1;<br>SI</button>
+      <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -1565,7 +1896,14 @@ input:focus{outline:none;border-color:var(--black)}
 
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
-const APP_VERSION = '3.7.11';
+// ═══════════════════════════════════════════════════════════════
+// Porsche Service Rio — PWA index.html v3.7.12 · 2026-07-19 11:28 BRT
+// v3.7.12: SERVICE INTELLIGENCE — SI nav button now approver-only.
+//           openSINav() and openSIForRO() use inline SI panel.
+//           SI panel CSS, HTML and JS integrated from SI_UI.html.
+//           Panel loads from ?action=getSICards and renders inline.
+// ═══════════════════════════════════════════════════════════════
+const APP_VERSION = '3.7.12';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -1791,6 +2129,7 @@ function doLogout() {
   document.getElementById('btn-approval').style.display='none';
   document.getElementById('btn-parts-admin').style.display='none';
   document.getElementById('btn-agenda').style.display='none';
+  const siNavBtn = document.getElementById('btn-si-nav'); if (siNavBtn) siNavBtn.style.display='none';
   // v3.6.3 — FIX: none of these were being reset on logout, so on a
   // shared device (multiple techs using the same phone/tablet through
   // the day) only the FIRST tech after a page load would ever see the
@@ -2971,6 +3310,10 @@ function openGanttNav() {
 }
 
 function openSINav() {
+  SI_openPanel();
+}
+
+function openSINav_OLD() {
   if (activeRO && activeRO.plate) {
     addSIRecentPlate(activeRO.plate);
     window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
@@ -2999,6 +3342,13 @@ function confirmSIInput() {
 }
 
 function openSIForRO() {
+  if (!activeRO || !activeRO.plate) return false;
+  SI_openPanel();
+  setTimeout(() => { if (typeof SI_openCard === 'function') SI_openCard(activeRO.plate); }, 700);
+  return false;
+}
+
+function openSIForRO_OLD() {
   if (!activeRO || !activeRO.plate) return false;
   addSIRecentPlate(activeRO.plate);
   window.open(SI_URL+'?placa='+encodeURIComponent(activeRO.plate), '_blank');
@@ -3078,6 +3428,7 @@ async function checkAndShowApprovalButton() {
       if (btnApv) btnApv.style.display = 'flex';
       if (btnPkg) btnPkg.style.display = 'flex';
       if (btnAgd) btnAgd.style.display = 'flex';
+      const btnSI = document.getElementById('btn-si-nav'); if (btnSI) btnSI.style.display = ''; // approver-only
     }
   } catch(e) { console.warn('isApprover check failed', e); }
 }
@@ -5699,6 +6050,410 @@ function fmtDateTime(d){return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.ge
 function fmtFileDate(d){return pad(d.getDate())+pad(d.getMonth()+1)+d.getFullYear()+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());}
 let _toastTm;
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_toastTm);_toastTm=setTimeout(()=>t.classList.remove('show'),3500);}
+
+// ── SERVICE INTELLIGENCE · v3.7.12 · 2026-07-19 11:28 BRT ──
+(function () {
+  'use strict';
+  'use strict';
+
+  // ── CONFIG ────────────────────────────────────────────────────────────────
+  // Point to the same deployed Apps Script URL that the rest of the PWA uses.
+  // If you already have a constant named SCRIPT_URL in this file, delete this
+  // line and the references below will pick it up automatically.
+  // ← CHANGE THIS if your variable has a different name:
+  const SI_API_URL = typeof API_URL !== 'undefined' ? API_URL : '';
+
+  // ── STATE ─────────────────────────────────────────────────────────────────
+  let siCards       = [];   // raw array from server
+  let siFilter      = 'ALL';
+
+  const PILL_LABEL = {
+    OVERDUE:      'VENCIDO',
+    SEM_REGISTRO: 'SEM REGISTRO',
+    DUE_SOON:     'A VENCER',
+    OK:           'EM DIA',
+  };
+  const STATUS_CSS = {
+    OVERDUE:      'overdue',
+    SEM_REGISTRO: 'sem_reg',
+    DUE_SOON:     'due_soon',
+    OK:           'ok',
+  };
+  const MN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // ── PANEL OPEN / CLOSE ────────────────────────────────────────────────────
+  window.SI_openPanel = function () {
+    document.getElementById('si-panel').classList.add('si-open');
+    if (!siCards.length) SI_loadCards();
+  };
+
+  window.SI_closePanel = function () {
+    document.getElementById('si-panel').classList.remove('si-open');
+  };
+
+  // ── LOAD DATA FROM SERVER ─────────────────────────────────────────────────
+  window.SI_loadCards = function () {
+    setListLoading_();
+    fetch(`${SI_API_URL}?action=getSICards`)
+      .then(r => r.json())
+      .then(res => {
+        siCards = (res.data || res || []).sort(byUrgency_);
+        SI_renderList();
+        SI_updateMeta();
+      })
+      .catch(err => {
+        console.error('[SI] load error', err);
+        setListError_('Não foi possível carregar os dados.');
+      });
+  };
+
+  // ── RUN ANALYSIS ──────────────────────────────────────────────────────────
+  window.SI_runAnalysis = function () {
+    const btn = document.getElementById('si-run-btn');
+    btn.disabled = true;
+    btn.textContent = 'ANALISANDO…';
+    setListLoading_('Executando análise…');
+
+    fetch(`${SI_API_URL}?action=runSI`)
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) throw new Error(res.error || 'Erro desconhecido');
+        return SI_loadCards();
+      })
+      .catch(err => {
+        console.error('[SI] run error', err);
+        setListError_(`Erro na análise: ${err.message}`);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'ANALISAR AGORA';
+      });
+  };
+
+  // ── FILTER ────────────────────────────────────────────────────────────────
+  window.SI_setFilter = function (el, filter) {
+    document.querySelectorAll('.si-filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    siFilter = filter;
+    SI_renderList();
+  };
+
+  // ── RENDER LIST ───────────────────────────────────────────────────────────
+  window.SI_renderList = function () {
+    const container = document.getElementById('si-list');
+    const filtered  = siCards.filter(c => {
+      if (siFilter === 'ALL')      return true;
+      if (siFilter === 'OVERDUE')  return c.statusCode === 'OVERDUE' || c.statusCode === 'SEM_REGISTRO';
+      if (siFilter === 'DUE_SOON') return c.statusCode === 'DUE_SOON';
+      if (siFilter === 'OK')       return c.statusCode === 'OK';
+      return true;
+    });
+
+    if (!filtered.length) {
+      container.innerHTML = `
+        <div class="si-empty">
+          <div class="si-empty-icon">✓</div>
+          <div>Nenhum veículo nesta categoria</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = filtered.map(v => {
+      const css     = STATUS_CSS[v.statusCode] || 'ok';
+      const label   = PILL_LABEL[v.statusCode] || v.statusCode;
+      const issues  = (v.items || []).filter(i => i.statusCode !== 'OK').length;
+      const yr      = v.modelo.match(/\b(20\d{2})\b/)?.[1] || '';
+      const model   = v.modelo.replace(/\s*\b(20\d{2})\b\s*/,'').trim();
+      return `
+        <div class="si-veh-card ${css}" onclick="SI_openCard('${v.placa}')">
+          <div class="si-veh-main">
+            <div>
+              <span class="si-veh-plate">${v.placa}</span>
+              <span class="si-veh-model">${model}${yr ? ` · ${yr}` : ''}</span>
+            </div>
+            <div>
+              <span class="si-veh-name">${v.cliente}</span>
+              ${v.kmEstimado ? `<span class="si-veh-km">· ~${v.kmEstimado.toLocaleString('pt-BR')} km</span>` : ''}
+            </div>
+          </div>
+          <div class="si-veh-right">
+            <div><span class="si-veh-badge ${css}">${label}</span></div>
+            ${issues > 0 ? `<div class="si-veh-issue-count">${issues} item${issues !== 1 ? 's' : ''}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  };
+
+  // ── UPDATE META BAR ───────────────────────────────────────────────────────
+  window.SI_updateMeta = function () {
+    const nOverdue = siCards.filter(c => c.statusCode === 'OVERDUE' || c.statusCode === 'SEM_REGISTRO').length;
+    const nSoon    = siCards.filter(c => c.statusCode === 'DUE_SOON').length;
+    const nOk      = siCards.filter(c => c.statusCode === 'OK').length;
+
+    // Last run date
+    const sample = siCards.find(c => c.lastUpdated);
+    if (sample) {
+      const d = new Date(sample.lastUpdated);
+      document.getElementById('si-last-run').textContent =
+        `Última análise: ${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} · ${siCards.length} veículos`;
+    }
+
+    const show = (id, n, countId) => {
+      const el = document.getElementById(id);
+      el.style.display = 'flex';
+      document.getElementById(countId).textContent = n;
+    };
+    show('si-count-overdue', nOverdue, 'si-n-overdue');
+    show('si-count-soon',    nSoon,    'si-n-soon');
+    show('si-count-ok',      nOk,      'si-n-ok');
+  };
+
+  // ── CARD MODAL ────────────────────────────────────────────────────────────
+  window.SI_openCard = function (placa) {
+    const vehicle = siCards.find(c => c.placa === placa);
+    if (!vehicle) return;
+    document.getElementById('si-card-inner').innerHTML = SI_renderCard(vehicle);
+    document.getElementById('si-card-overlay').classList.add('si-open');
+  };
+
+  window.SI_closeCard = function () {
+    document.getElementById('si-card-overlay').classList.remove('si-open');
+  };
+
+  window.SI_handleCardBackdrop = function (e) {
+    if (e.target === document.getElementById('si-card-overlay')) SI_closeCard();
+  };
+
+  window.SI_printCard = function () { window.print(); };
+
+  window.SI_whatsApp = function (telefone, placa, modelo) {
+    const num  = telefone.replace(/\D/g, '');
+    const text = encodeURIComponent(
+      `Olá! Seguem as sugestões de manutenção do seu ${modelo} (${placa}) da Porsche Service Rio. 🏎️`
+    );
+    window.open(`https://wa.me/55${num}?text=${text}`, '_blank');
+  };
+
+  // ── CARD RENDERER ─────────────────────────────────────────────────────────
+  function SI_renderCard(v) {
+    const now    = new Date();
+    const genStr = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()}`;
+    const items  = v.items || [];
+    const nOver  = items.filter(i => i.statusCode === 'OVERDUE' || i.statusCode === 'SEM_REGISTRO').length;
+    const nSoon  = items.filter(i => i.statusCode === 'DUE_SOON').length;
+    const nOk    = items.filter(i => i.statusCode === 'OK').length;
+
+    // Mileage bar (0-100 000 km scale, capped at 98%)
+    const pct   = v.kmEstimado ? Math.min((v.kmEstimado / 100000) * 100, 98) : 0;
+
+    // Sort items: worst first
+    const rank   = { OVERDUE: 4, SEM_REGISTRO: 3, DUE_SOON: 2, OK: 1 };
+    const sorted = [...items].sort((a, b) => rank[b.statusCode] - rank[a.statusCode]);
+
+    const rowsHtml = sorted.map(item => {
+      const css = STATUS_CSS[item.statusCode] || 'ok';
+      const lbl = PILL_LABEL[item.statusCode] || item.statusCode;
+      return `
+        <div class="si-tbl-row ${css}">
+          <div>
+            <div class="si-cell-name">${esc(item.grupo)}</div>
+            <div class="si-cell-desc">${esc(item.descricao)}</div>
+          </div>
+          <div class="si-cell-intv">${esc(item.intervalo)}</div>
+          <div>
+            ${item.lastRo
+              ? `<div class="si-cell-ro">RO #${esc(item.lastRo)}</div>
+                 <div class="si-cell-meta">${esc(item.lastData || '')}${item.lastKm ? ` · ${item.lastKm.toLocaleString('pt-BR')} km` : ''}</div>`
+              : `<div class="si-cell-none">Não localizado nos registros</div>`}
+          </div>
+          <div class="si-cell-due ${css}">${esc(item.dueBy)}</div>
+          <div><span class="si-pill ${css}">${lbl}</span></div>
+        </div>`;
+    }).join('');
+
+    const yr    = v.modelo.match(/\b(20\d{2})\b/)?.[1] || '';
+    const model = v.modelo.replace(/\s*\b(20\d{2})\b\s*/,'').trim();
+
+    return `
+      <!-- Action bar -->
+      <div class="si-card-closebar">
+        ${v.telefone ? `
+        <button class="si-card-action-btn wpp" onclick="SI_whatsApp('${v.telefone}','${v.placa}','${v.modelo}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+          </svg>
+          WHATSAPP
+        </button>` : ''}
+        <button class="si-card-action-btn" onclick="SI_printCard()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="8"/>
+          </svg>
+          IMPRIMIR
+        </button>
+        <button class="si-card-action-btn" onclick="SI_closeCard()">✕ FECHAR</button>
+      </div>
+
+      <div class="si-card-stripe-top"></div>
+
+      <!-- Header -->
+      <div class="si-card-header">
+        <div class="si-card-brand">
+          <div class="si-card-crest">
+            <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
+              <path d="M11 2L13.2 7.5H19L14.5 11L16.3 17L11 13.8L5.7 17L7.5 11L3 7.5H8.8Z" fill="#C8102E"/>
+            </svg>
+          </div>
+          <div>
+            <div class="si-card-brand-main">PORSCHE</div>
+            <div class="si-card-brand-sub">SERVICE · RIO DE JANEIRO</div>
+          </div>
+        </div>
+        <div>
+          <span class="si-card-badge-label">SERVICE INTELLIGENCE</span>
+          <div class="si-card-badge-date">Gerado em ${genStr}</div>
+        </div>
+      </div>
+
+      <!-- Customer / Vehicle -->
+      <div class="si-card-info">
+        <div class="si-card-info-panel">
+          <div class="si-info-label">CLIENTE</div>
+          <div class="si-info-name">${esc(v.cliente) || '—'}</div>
+          <div class="si-info-phone">${esc(v.telefone) || '—'}</div>
+        </div>
+        <div class="si-card-info-divider"></div>
+        <div class="si-card-info-panel">
+          <div class="si-info-label">VEÍCULO</div>
+          <div class="si-info-model">${esc(model)} <span>${esc(yr)}</span></div>
+          <div class="si-meta-row">
+            <span class="si-license-tag">${esc(v.placa)}</span>
+            ${v.kmEstimado ? `<span class="si-km-badge">~ ${v.kmEstimado.toLocaleString('pt-BR')} km estimado</span>` : ''}
+          </div>
+          ${pct > 0 ? `
+          <div class="si-km-bar">
+            <div class="si-km-fill" style="width:${pct}%"></div>
+            <div class="si-km-dot" style="left:${pct}%"></div>
+          </div>
+          <div class="si-km-scale">
+            <span>0</span><span>25.000</span><span>50.000</span><span>75.000</span><span>100.000 km</span>
+          </div>` : ''}
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="si-card-summary">
+        ${nOver > 0 ? `<div class="si-sum-item"><span class="si-sum-dot" style="background:#DC2626;margin-right:6px"></span><strong class="r">${nOver}</strong> vencido${nOver !== 1 ? 's' : ''}</div><span class="si-sum-sep">·</span>` : ''}
+        ${nSoon > 0 ? `<div class="si-sum-item"><span class="si-sum-dot" style="background:#D97706;margin-right:6px"></span><strong class="a">${nSoon}</strong> a vencer</div><span class="si-sum-sep">·</span>` : ''}
+        <div class="si-sum-item"><span class="si-sum-dot" style="background:#059669;margin-right:6px"></span><strong class="g">${nOk}</strong> em dia</div>
+      </div>
+
+      <!-- Table header -->
+      <div class="si-tbl-head">
+        <div class="si-th">SERVIÇO</div>
+        <div class="si-th">INTERVALO</div>
+        <div class="si-th">ÚLTIMA REALIZAÇÃO</div>
+        <div class="si-th">VENCIMENTO</div>
+        <div class="si-th">STATUS</div>
+      </div>
+
+      ${rowsHtml}
+
+      <!-- Footer -->
+      <div class="si-card-footer">
+        <span class="si-footer-note">Análise baseada em histórico de Ordens de Serviço · Porsche Service Rio de Janeiro</span>
+        <span class="si-footer-ver">SI · v1.0</span>
+      </div>
+      <div class="si-card-stripe-bottom"></div>
+    `;
+  }
+  window.SI_renderCard = SI_renderCard;
+
+  // ── SORTING ───────────────────────────────────────────────────────────────
+  function byUrgency_(a, b) {
+    const rank = { OVERDUE: 4, SEM_REGISTRO: 3, DUE_SOON: 2, OK: 1 };
+    const diff = (rank[b.statusCode] || 0) - (rank[a.statusCode] || 0);
+    if (diff !== 0) return diff;
+    return (a.placa || '').localeCompare(b.placa || '');
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  function setListLoading_(msg) {
+    document.getElementById('si-list').innerHTML =
+      `<div class="si-empty"><div class="si-spinner"></div>${msg ? `<div>${msg}</div>` : ''}</div>`;
+  }
+  function setListError_(msg) {
+    document.getElementById('si-list').innerHTML =
+      `<div class="si-empty"><div class="si-empty-icon">⚠</div><div>${msg}</div></div>`;
+  }
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
 </script>
+
+<!-- ── SERVICE INTELLIGENCE PANEL · v3.7.12 ── -->
+<!-- ── SI Panel ──────────────────────────────────────────────────────────── -->
+<div id="si-panel" class="si-overlay" role="dialog" aria-label="Service Intelligence">
+
+  <!-- Top bar -->
+  <div class="si-topbar">
+    <div class="si-topbar-brand">
+      <div class="si-topbar-crest">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2L12 7H18L13.5 10.5L15.3 16.5L10 13L4.7 16.5L6.5 10.5L2 7H8Z" fill="#C8102E"/>
+        </svg>
+      </div>
+      <div>
+        <div class="si-topbar-title">PORSCHE</div>
+        <div class="si-topbar-sub">SERVICE INTELLIGENCE</div>
+      </div>
+    </div>
+    <div class="si-topbar-right">
+      <button id="si-run-btn" class="si-run-btn" onclick="SI_runAnalysis()">ANALISAR AGORA</button>
+      <button class="si-close-btn" onclick="SI_closePanel()" aria-label="Fechar">✕</button>
+    </div>
+  </div>
+
+  <!-- Meta bar -->
+  <div class="si-metabar">
+    <span id="si-last-run" class="si-meta-run">Carregando…</span>
+    <span id="si-count-overdue" class="si-meta-count" style="display:none">
+      <span class="si-meta-dot red"></span>
+      <strong class="red" id="si-n-overdue">0</strong> vencido(s)
+    </span>
+    <span id="si-count-soon" class="si-meta-count" style="display:none">
+      <span class="si-meta-dot amber"></span>
+      <strong class="amber" id="si-n-soon">0</strong> a vencer
+    </span>
+    <span id="si-count-ok" class="si-meta-count" style="display:none">
+      <span class="si-meta-dot green"></span>
+      <strong class="green" id="si-n-ok">0</strong> em dia
+    </span>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="si-filters">
+    <button class="si-filter-btn active" data-filter="ALL"      onclick="SI_setFilter(this,'ALL')">Todos</button>
+    <button class="si-filter-btn"        data-filter="OVERDUE"  onclick="SI_setFilter(this,'OVERDUE')">Vencidos</button>
+    <button class="si-filter-btn"        data-filter="DUE_SOON" onclick="SI_setFilter(this,'DUE_SOON')">A Vencer</button>
+    <button class="si-filter-btn"        data-filter="OK"       onclick="SI_setFilter(this,'OK')">Em Dia</button>
+  </div>
+
+  <!-- Vehicle list -->
+  <div id="si-list" class="si-list">
+    <div class="si-empty">
+      <div class="si-spinner"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── SI Card modal ──────────────────────────────────────────────────────── -->
+<div id="si-card-overlay" class="si-card-overlay" onclick="SI_handleCardBackdrop(event)">
+  <div id="si-card-inner" class="si-card">
+    <!-- rendered dynamically by SI_renderCard() -->
+  </div>
+</div>
 </body>
 </html>
