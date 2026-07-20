@@ -6279,13 +6279,17 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     return `
       <!-- Action bar -->
       <div class="si-card-closebar">
-        <button class="si-card-action-btn wpp" onclick="SI_shareCard()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        <button class="si-card-action-btn wpp" id="si-btn-msg" onclick="SI_sendMessage()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0012.05 0z"/>
           </svg>
-          ENVIAR AO CLIENTE
+          MENSAGEM
+        </button>
+        <button class="si-card-action-btn wpp" id="si-btn-pdf" onclick="SI_sendPDF()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+          </svg>
+          PDF
         </button>
         <button class="si-card-action-btn" onclick="SI_printCard()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -6692,64 +6696,70 @@ window.SI_shareCard = async function() {
   // browser attach a file directly into a specific WhatsApp contact's chat
   // — that's a WhatsApp platform restriction, not something fixable from
   // here (true one-tap automated sending needs the WhatsApp Business
-  // Cloud API, a separate server-side integration). This gets as close as
-  // the web platform allows: the right chat opens pre-drafted, and the
-  // PDF is immediately offered via the share sheet (which lists WhatsApp
-  // as one tap) or downloaded — either way it's one manual attach away.
-  let _siPendingPDF = null; // { blob, placa } — armed after step 1's PDF build
-  window.SI_clearPendingShare_ = () => { _siPendingPDF = null; };
+  // Cloud API, a separate server-side integration). Also, WhatsApp's own
+  // share handler drops any caption text when a file is shared alongside
+  // it — confirmed by testing — so text and PDF are two separate buttons
+  // rather than one combined action.
 
-  window.SI_shareCard = async function() {
+  function SI_buildMessageText_(vehicle) {
+    const firstName = (vehicle.cliente || '').trim().split(/\s+/)[0] || '';
+    let text = `Oi ${firstName}, o seu Porsche ${vehicle.modelo} precisa de manutenção. De acordo com o Plano de Manutenção Porsche e com os registros dos serviços anteriormente executados no nosso Porsche Service Rio, segue a nossa recomendação:`;
+    if (SI_SCHEDULING_URL) {
+      text += `\n\nPara agendar, é só acessar: ${SI_SCHEDULING_URL}`;
+    }
+    return text;
+  }
+
+  // MENSAGEM button — single tap, opens the customer's WhatsApp chat with
+  // the recommendation text pre-filled. No PDF involved.
+  window.SI_sendMessage = function() {
     const cardOverlay = document.getElementById('si-card-overlay');
     const placa = cardOverlay ? cardOverlay.dataset.placa : null;
-    if (!placa) { console.warn('[SI] No placa for share'); return; }
+    if (!placa) { console.warn('[SI] No placa'); return; }
     const vehicle = (window._SI_cards||[]).find(c=>c.placa===placa);
     if (!vehicle) { console.warn('[SI] Vehicle not found:', placa); return; }
-    const btn = document.querySelector('.si-card-action-btn.wpp');
+    if (!vehicle.telefone) {
+      if (typeof showToast === 'function') showToast('Sem telefone cadastrado para este cliente');
+      return;
+    }
+    const num  = String(vehicle.telefone).replace(/\D/g, '');
+    const text = SI_buildMessageText_(vehicle);
+    window.open(`https://wa.me/55${num}?text=${encodeURIComponent(text)}`, '_blank');
+  };
 
-    // STEP 2 — PDF already built (previous tap). This click is a fresh user
-    // gesture, so window.open/navigator.share fire synchronously here,
-    // before any await — otherwise mobile browsers silently block them as
-    // no longer "user-initiated" once time has passed since the tap.
+  // PDF button — two-tap: tap 1 builds the PDF, tap 2 (a fresh gesture)
+  // sends it. Two taps because building takes ~2s and browsers block
+  // window.open/navigator.share once too much time has passed since the
+  // original click — they no longer count as user-initiated.
+  let _siPendingPDF = null; // { blob, placa }
+  window.SI_clearPendingShare_ = () => { _siPendingPDF = null; };
+
+  window.SI_sendPDF = async function() {
+    const cardOverlay = document.getElementById('si-card-overlay');
+    const placa = cardOverlay ? cardOverlay.dataset.placa : null;
+    if (!placa) { console.warn('[SI] No placa'); return; }
+    const vehicle = (window._SI_cards||[]).find(c=>c.placa===placa);
+    if (!vehicle) { console.warn('[SI] Vehicle not found:', placa); return; }
+    const btn = document.getElementById('si-btn-pdf');
+
+    // STEP 2 — PDF already built.
     if (_siPendingPDF && _siPendingPDF.placa === placa) {
       const { blob } = _siPendingPDF;
       const file = new File([blob], `porsche-rj-${placa}.pdf`, {type:'application/pdf'});
-      const firstName = (vehicle.cliente || '').trim().split(/\s+/)[0] || '';
-      let text = `Oi ${firstName}, o seu Porsche ${vehicle.modelo} precisa de manutenção. De acordo com o Plano de Manutenção Porsche e com os registros dos serviços anteriormente executados no nosso Porsche Service Rio, segue a nossa recomendação:`;
-      if (SI_SCHEDULING_URL) {
-        text += `\n\nPara agendar, é só acessar: ${SI_SCHEDULING_URL}`;
-      }
 
       if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-        // Mobile — WhatsApp's own share handler drops the caption text when
-        // a file is attached via the Web Share API (confirmed: file-only
-        // arrived, message didn't), so text and file have to be sent as two
-        // separate actions rather than one combined share. Both still fire
-        // synchronously within this same tap, so neither gets blocked as a
-        // stale/non-user-initiated action.
-        if (vehicle.telefone) {
-          const num = String(vehicle.telefone).replace(/\D/g, '');
-          window.open(`https://wa.me/55${num}?text=${encodeURIComponent(text)}`, '_blank');
-        }
         navigator.share({ files:[file], title:`Porsche RJ · ${vehicle.modelo} · ${placa}` })
           .catch(err => { if (err.name!=='AbortError') console.error('[SI] share error:', err); });
       } else {
-        // Desktop — no file-share API, so: open the right chat with the
-        // text ready, download the PDF, and make the attach step explicit
-        // (a toast is too easy to miss and not attaching it in time).
-        if (vehicle.telefone) {
-          const num = String(vehicle.telefone).replace(/\D/g, '');
-          window.open(`https://wa.me/55${num}?text=${encodeURIComponent(text)}`, '_blank');
-        }
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = `porsche-rj-${placa}.pdf`;
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
-        alert('PDF baixado.\n\nO navegador não permite anexar automaticamente — no WhatsApp Web que abriu, clique no clipe 📎 e selecione o PDF baixado antes de enviar.');
+        if (typeof showToast === 'function') showToast('PDF baixado — anexe no WhatsApp');
       }
       _siPendingPDF = null;
-      if (btn) btn.textContent = '↗ ENVIAR AO CLIENTE';
+      if (btn) btn.textContent = 'PDF';
       return;
     }
 
@@ -6758,15 +6768,15 @@ window.SI_shareCard = async function() {
       if (typeof showToast === 'function') showToast('A carregar bibliotecas...');
       return;
     }
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ A gerar PDF...'; }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ A gerar...'; }
     try {
       const blob = await SI_buildPortraitPDF_(vehicle);
       _siPendingPDF = { blob, placa };
-      if (btn) { btn.disabled = false; btn.textContent = '📎 Toque para anexar e enviar'; }
+      if (btn) { btn.disabled = false; btn.textContent = '📎 Toque p/ enviar'; }
     } catch (err) {
       console.error('[SI] PDF build error:', err);
       if (typeof showToast === 'function') showToast('Erro ao gerar PDF');
-      if (btn) { btn.disabled = false; btn.textContent = '↗ ENVIAR AO CLIENTE'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'PDF'; }
     }
   };
 
