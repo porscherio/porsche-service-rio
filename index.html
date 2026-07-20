@@ -1,5 +1,13 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v3.7.12 — Build: 2026-07-19 11:56 BRT -->
+<!-- Porsche Service Rio PWA — v3.7.13 — Build: 2026-07-19 BRT -->
+<!-- v3.7.13: Version-sync only, no frontend logic changed. Bumped to keep
+     both files' version numbers in lockstep with Code.gs v3.7.13, which
+     adds the durable PATIO tab as the source of truth for "in patio"
+     status — no pill/toggle UI changes needed, the existing Confirmar
+     Chegada and "Marcar no Pátio (manual)" controls already call the
+     right actions; they now just get a reliable answer back. NOTE for
+     Eytan: version number provisional, confirm against your own
+     tracking before deploying. -->
 <!-- v3.7.12: SERVICE INTELLIGENCE panel integrated · 19/07/2026 11:56 BRT
               efficiency column added to the Alocação do dia report
               panel — a Code.gs-only change), per the version-parity
@@ -1898,13 +1906,21 @@ input:focus{outline:none;border-color:var(--black)}
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
 // ═══════════════════════════════════════════════════════════════
+// Porsche Service Rio — PWA index.html v3.7.13 · 2026-07-19 BRT
+// v3.7.13: Version-sync only, no frontend logic changed — see the
+//           matching Code.gs v3.7.13 header for the real change (PATIO
+//           tab as durable source of truth for "in patio" status). The
+//           existing Confirmar Chegada / manual PATIO pill and their
+//           toggle calls are untouched; they just get a reliable answer
+//           back now.
+// ═══════════════════════════════════════════════════════════════
 // Porsche Service Rio — PWA index.html v3.7.12 · 2026-07-19 11:28 BRT
 // v3.7.12: SERVICE INTELLIGENCE — SI nav button now approver-only.
 //           openSINav() and openSIForRO() use inline SI panel.
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '3.7.12';
+const APP_VERSION = '3.7.13';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
