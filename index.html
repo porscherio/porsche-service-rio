@@ -1,13 +1,12 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v3.7.13A — Build: 2026-07-19 BRT -->
-<!-- v3.7.13: Version-sync only, no frontend logic changed. Bumped to keep
-     both files' version numbers in lockstep with Code.gs v3.7.13, which
-     adds the durable PATIO tab as the source of truth for "in patio"
-     status — no pill/toggle UI changes needed, the existing Confirmar
-     Chegada and "Marcar no Pátio (manual)" controls already call the
-     right actions; they now just get a reliable answer back. NOTE for
-     Eytan: version number provisional, confirm against your own
-     tracking before deploying. -->
+<!-- Porsche Service Rio PWA — v4.0.0 — Build: 2026-07-20 BRT -->
+<!-- v4.0.0: Service Intelligence (SI) — vehicle maintenance recommendation
+     cards analyzed from RO/jobline/parts history — promoted to a major
+     version bump. On-screen SI card modal now shares the same light
+     portrait design (real Porsche fonts + icons, per-item progress bars)
+     as the WhatsApp share image, instead of the earlier dark table.
+     Companion backend: SI.gs v4.0.0. NOTE for Eytan: version number
+     provisional, confirm against your own tracking before deploying. -->
 <!-- v3.7.12: SERVICE INTELLIGENCE panel integrated · 19/07/2026 11:56 BRT
               efficiency column added to the Alocação do dia report
               panel — a Code.gs-only change), per the version-parity
@@ -557,7 +556,7 @@ input:focus{outline:none;border-color:var(--black)}
 .edoc-scan-scroll{overflow-y:auto;flex:1;min-height:0}
 .edoc-scan-footer{flex-shrink:0;padding-top:8px}
 
-/* ── SERVICE INTELLIGENCE · v3.7.12 ── */
+/* ── SERVICE INTELLIGENCE · v4.0.0 ── */
 /* ── SI Panel overlay ─────────────────────────────────────────────────────── */
 .si-overlay {
   position: fixed; inset: 0; z-index: 1200;
@@ -726,9 +725,8 @@ input:focus{outline:none;border-color:var(--black)}
 .si-card-overlay.si-open { opacity: 1; pointer-events: auto; }
 
 .si-card {
-  width: 100%; max-width: 860px;
-  background: #111; border-radius: 4px;
-  overflow: hidden;
+  width: 600px; max-width: 100%; margin: 0 auto;
+  background: #fff; overflow: hidden;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 32px 64px rgba(0,0,0,0.85);
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
@@ -759,6 +757,11 @@ input:focus{outline:none;border-color:var(--black)}
 .si-card-action-btn.wpp:hover { background: rgba(37,211,102,0.2); }
 
 /* Card top stripe */
+/* NOTE 2026-07-20: si-card-header/info/summary/tbl-*/cell-*/pill/footer below
+   are no longer used — SI_renderCard() now delegates to
+   SI_generatePortraitHTML() (inline-styled portrait card), same markup used
+   for the WhatsApp share image. Left in place in case anything else still
+   references them; safe to remove in a future cleanup pass. */
 .si-card-stripe-top    { height: 3px; background: linear-gradient(90deg,#C8102E 0%,#FF1744 55%,transparent 100%); }
 .si-card-stripe-bottom { height: 2px; background: rgba(200,16,46,0.32); }
 
@@ -1906,13 +1909,11 @@ input:focus{outline:none;border-color:var(--black)}
 <script>
 const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
 // ═══════════════════════════════════════════════════════════════
-// Porsche Service Rio — PWA index.html v3.7.13 · 2026-07-19 BRT
-// v3.7.13: Version-sync only, no frontend logic changed — see the
-//           matching Code.gs v3.7.13 header for the real change (PATIO
-//           tab as durable source of truth for "in patio" status). The
-//           existing Confirmar Chegada / manual PATIO pill and their
-//           toggle calls are untouched; they just get a reliable answer
-//           back now.
+// Porsche Service Rio — PWA index.html v4.0.0 · 2026-07-20 BRT
+// v4.0.0: Service Intelligence promoted to major version — on-screen SI
+//           card modal now shares the same light portrait design as the
+//           WhatsApp share image. See SI section header further down for
+//           detail. Matching backend: SI.gs v4.0.0.
 // ═══════════════════════════════════════════════════════════════
 // Porsche Service Rio — PWA index.html v3.7.12 · 2026-07-19 11:28 BRT
 // v3.7.12: SERVICE INTELLIGENCE — SI nav button now approver-only.
@@ -6068,7 +6069,10 @@ function fmtFileDate(d){return pad(d.getDate())+pad(d.getMonth()+1)+d.getFullYea
 let _toastTm;
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_toastTm);_toastTm=setTimeout(()=>t.classList.remove('show'),3500);}
 
-// ── SERVICE INTELLIGENCE · v3.7.12 · 2026-07-19 11:28 BRT ──
+// ── SERVICE INTELLIGENCE · v4.0.0 · 2026-07-20 BRT ──
+// v4.0.0: On-screen card modal now delegates to SI_generatePortraitHTML()
+//   (the same light portrait design already used for the WhatsApp share
+//   image) instead of the old dark table — see SI_renderCard() below.
 (function () {
   'use strict';
   'use strict';
@@ -6253,44 +6257,23 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   };
 
   // ── CARD RENDERER ─────────────────────────────────────────────────────────
+  // Delegates to window.SI_generatePortraitHTML (defined further down in this
+  // file), which already builds the correctly-designed light portrait card —
+  // it was previously only used to render the WhatsApp share image. This
+  // keeps the on-screen modal and the shared PNG pixel-identical instead of
+  // maintaining two diverging card designs.
   function SI_renderCard(v) {
-    const now    = new Date();
-    const genStr = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()}`;
-    const items  = v.items || [];
-    const nOver  = items.filter(i => i.statusCode === 'OVERDUE' || i.statusCode === 'SEM_REGISTRO').length;
-    const nSoon  = items.filter(i => i.statusCode === 'DUE_SOON').length;
-    const nOk    = items.filter(i => i.statusCode === 'OK').length;
+    if (typeof window.SI_generatePortraitHTML !== 'function') {
+      // Portrait generator not loaded yet (shouldn't happen — it's defined
+      // later in this same file) — fail loudly rather than show a stale UI.
+      return `<div style="padding:40px;color:#DC2626;font-family:sans-serif;">
+        Erro: gerador de card não encontrado.</div>`;
+    }
+    if (typeof window.SI_ensurePortraitFonts_ === 'function') window.SI_ensurePortraitFonts_();
 
-    // Mileage bar (0-100 000 km scale, capped at 98%)
-    const pct   = v.kmEstimado ? Math.min((v.kmEstimado / 100000) * 100, 98) : 0;
-
-    // Sort items: worst first
-    const rank   = { OVERDUE: 4, SEM_REGISTRO: 3, DUE_SOON: 2, OK: 1 };
-    const sorted = [...items].sort((a, b) => rank[b.statusCode] - rank[a.statusCode]);
-
-    const rowsHtml = sorted.map(item => {
-      const css = STATUS_CSS[item.statusCode] || 'ok';
-      const lbl = PILL_LABEL[item.statusCode] || item.statusCode;
-      return `
-        <div class="si-tbl-row ${css}">
-          <div>
-            <div class="si-cell-name">${esc(item.grupo)}</div>
-            <div class="si-cell-desc">${esc(item.descricao)}</div>
-          </div>
-          <div class="si-cell-intv">${esc(item.intervalo)}</div>
-          <div>
-            ${item.lastRo
-              ? `<div class="si-cell-ro">RO #${esc(item.lastRo)}</div>
-                 <div class="si-cell-meta">${esc(item.lastData || '')}${item.lastKm ? ` · ${item.lastKm.toLocaleString('pt-BR')} km` : ''}</div>`
-              : `<div class="si-cell-none">Não localizado nos registros</div>`}
-          </div>
-          <div class="si-cell-due ${css}">${esc(item.dueBy)}</div>
-          <div><span class="si-pill ${css}">${lbl}</span></div>
-        </div>`;
-    }).join('');
-
-    const yr    = v.modelo.match(/\b(20\d{2})\b/)?.[1] || '';
-    const model = v.modelo.replace(/\s*\b(20\d{2})\b\s*/,'').trim();
+    const fullDoc = window.SI_generatePortraitHTML(v);
+    const bodyMatch = fullDoc.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    const cardInner = bodyMatch ? bodyMatch[1] : fullDoc;
 
     return `
       <!-- Action bar -->
@@ -6312,78 +6295,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
         </button>
         <button class="si-card-action-btn" onclick="SI_closeCard()">✕ FECHAR</button>
       </div>
-
-      <div class="si-card-stripe-top"></div>
-
-      <!-- Header -->
-      <div class="si-card-header">
-        <div class="si-card-brand">
-          <div class="si-card-crest">
-            <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
-              <path d="M11 2L13.2 7.5H19L14.5 11L16.3 17L11 13.8L5.7 17L7.5 11L3 7.5H8.8Z" fill="#C8102E"/>
-            </svg>
-          </div>
-          <div>
-            <div class="si-card-brand-main">PORSCHE</div>
-            <div class="si-card-brand-sub">SERVICE · RIO DE JANEIRO</div>
-          </div>
-        </div>
-        <div>
-          <span class="si-card-badge-label">SERVICE INTELLIGENCE</span>
-          <div class="si-card-badge-date">Gerado em ${genStr}</div>
-        </div>
-      </div>
-
-      <!-- Customer / Vehicle -->
-      <div class="si-card-info">
-        <div class="si-card-info-panel">
-          <div class="si-info-label">CLIENTE</div>
-          <div class="si-info-name">${esc(v.cliente) || '—'}</div>
-          <div class="si-info-phone">${esc(v.telefone) || '—'}</div>
-        </div>
-        <div class="si-card-info-divider"></div>
-        <div class="si-card-info-panel">
-          <div class="si-info-label">VEÍCULO</div>
-          <div class="si-info-model">${esc(model)} <span>${esc(yr)}</span></div>
-          <div class="si-meta-row">
-            <span class="si-license-tag">${esc(v.placa)}</span>
-            ${v.kmEstimado ? `<span class="si-km-badge">~ ${v.kmEstimado.toLocaleString('pt-BR')} km estimado</span>` : ''}
-          </div>
-          ${pct > 0 ? `
-          <div class="si-km-bar">
-            <div class="si-km-fill" style="width:${pct}%"></div>
-            <div class="si-km-dot" style="left:${pct}%"></div>
-          </div>
-          <div class="si-km-scale">
-            <span>0</span><span>25.000</span><span>50.000</span><span>75.000</span><span>100.000 km</span>
-          </div>` : ''}
-        </div>
-      </div>
-
-      <!-- Summary -->
-      <div class="si-card-summary">
-        ${nOver > 0 ? `<div class="si-sum-item"><span class="si-sum-dot" style="background:#DC2626;margin-right:6px"></span><strong class="r">${nOver}</strong> vencido${nOver !== 1 ? 's' : ''}</div><span class="si-sum-sep">·</span>` : ''}
-        ${nSoon > 0 ? `<div class="si-sum-item"><span class="si-sum-dot" style="background:#D97706;margin-right:6px"></span><strong class="a">${nSoon}</strong> a vencer</div><span class="si-sum-sep">·</span>` : ''}
-        <div class="si-sum-item"><span class="si-sum-dot" style="background:#059669;margin-right:6px"></span><strong class="g">${nOk}</strong> em dia</div>
-      </div>
-
-      <!-- Table header -->
-      <div class="si-tbl-head">
-        <div class="si-th">SERVIÇO</div>
-        <div class="si-th">INTERVALO</div>
-        <div class="si-th">ÚLTIMA REALIZAÇÃO</div>
-        <div class="si-th">VENCIMENTO</div>
-        <div class="si-th">STATUS</div>
-      </div>
-
-      ${rowsHtml}
-
-      <!-- Footer -->
-      <div class="si-card-footer">
-        <span class="si-footer-note">Análise baseada em histórico de Ordens de Serviço · Porsche Service Rio de Janeiro</span>
-        <span class="si-footer-ver">SI · v1.0</span>
-      </div>
-      <div class="si-card-stripe-bottom"></div>
+      ${cardInner}
     `;
   }
   window.SI_renderCard = SI_renderCard;
@@ -6500,6 +6412,24 @@ window.SI_shareCard = async function() {
 
   const MN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+  // Static — same font-face rules used by the iframe export doc AND injected
+  // once into the main page's <head> so the on-screen modal (SI_renderCard)
+  // renders with the real Porsche fonts too, not just the shared PNG.
+  const fontFace = `
+      @font-face{font-family:'PorscheNext';font-weight:700;src:url('${_SF.bold}') format('truetype');}
+      @font-face{font-family:'PorscheNext';font-weight:400;src:url('${_SF.reg}') format('truetype');}
+      @font-face{font-family:'PorscheLogo';font-weight:400;src:url('${_SF.logo}') format('truetype');}
+    `;
+
+  window.SI_ensurePortraitFonts_ = function () {
+    if (document.getElementById('si-portrait-fonts')) return;
+    const s = document.createElement('style');
+    s.id = 'si-portrait-fonts';
+    s.textContent = fontFace;
+    document.head.appendChild(s);
+  };
+  window.SI_ensurePortraitFonts_(); // inject immediately — modal shouldn't wait on first open
+
   window.SI_generatePortraitHTML = function(vehicle) {
     const v = vehicle;
     const items = (v.items || []).slice().sort((a,b) => {
@@ -6515,12 +6445,6 @@ window.SI_shareCard = async function() {
     const yr    = (v.modelo||'').match(/\b(20\d{2})\b/)?.[1]||'';
     const model = (v.modelo||'').replace(/\s*\b20\d{2}\b\s*/,'').trim();
 
-    const fontFace = `
-      @font-face{font-family:'PorscheNext';font-weight:700;src:url('${_SF.bold}') format('truetype');}
-      @font-face{font-family:'PorscheNext';font-weight:400;src:url('${_SF.reg}') format('truetype');}
-      @font-face{font-family:'PorscheLogo';font-weight:400;src:url('${_SF.logo}') format('truetype');}
-    `;
-
     const itemsHTML = items.map(item => {
       const sc    = item.statusCode;
       const col   = STATUS_COLOR[sc]||'#000';
@@ -6528,10 +6452,15 @@ window.SI_shareCard = async function() {
       const bg    = STATUS_BG[sc]||'#fff';
       const iconKey = _GI[item.grupo];
       const iconImg = iconKey ? `<img src="${_SI[iconKey]}" width="22" height="22" style="flex-shrink:0;object-fit:contain;margin-top:1px"/>` : '';
-      // Progress bar pct: try to derive from dueBy vs lastData (simplified: use statusCode)
-      let pct = 0;
-      if(sc==='OVERDUE'||sc==='SEM_REGISTRO') pct=100;
-      else if(sc==='DUE_SOON') {
+      // Progress bar pct: prefer the real value from SI.gs (v2.3.0+ — computed
+      // server-side from actual interval/date/km math). Fall back to the old
+      // estimate only for cache rows written before that backend was deployed.
+      let pct;
+      if (Number.isFinite(item.pct)) {
+        pct = item.pct;
+      } else if (sc==='OVERDUE'||sc==='SEM_REGISTRO') {
+        pct = 100;
+      } else if (sc==='DUE_SOON') {
         // estimate from lastData to now vs interval
         if(item.lastData && item.intervalo) {
           try {
