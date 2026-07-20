@@ -6413,6 +6413,10 @@ window.SI_shareCard = async function() {
 
   const MN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+  // TODO(Eytan): set this once the scheduling page/link exists — left blank
+  // for now, and the WhatsApp message simply omits the line while it's empty.
+  const SI_SCHEDULING_URL = '';
+
   // Static — same font-face rules used by the iframe export doc AND injected
   // once into the main page's <head> so the on-screen modal (SI_renderCard)
   // renders with the real Porsche fonts too, not just the shared PNG.
@@ -6710,7 +6714,11 @@ window.SI_shareCard = async function() {
     if (_siPendingPDF && _siPendingPDF.placa === placa) {
       const { blob } = _siPendingPDF;
       const file = new File([blob], `porsche-rj-${placa}.pdf`, {type:'application/pdf'});
-      const text = `Olá! Segue em anexo a análise de manutenção do seu ${vehicle.modelo} (${placa}) — Porsche Service Rio. 🏎️`;
+      const firstName = (vehicle.cliente || '').trim().split(/\s+/)[0] || '';
+      let text = `Oi ${firstName}, o seu Porsche ${vehicle.modelo} precisa de manutenção. De acordo com o Plano de Manutenção Porsche e com os registros dos serviços anteriormente executados no nosso Porsche Service Rio, segue a nossa recomendação:`;
+      if (SI_SCHEDULING_URL) {
+        text += `\n\nPara agendar, é só acessar: ${SI_SCHEDULING_URL}`;
+      }
 
       if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
         // Mobile — one native share carries the text AND the PDF together,
