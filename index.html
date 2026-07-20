@@ -6240,6 +6240,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
   window.SI_closeCard = function () {
     document.getElementById('si-card-overlay').classList.remove('si-open');
+    if (typeof window.SI_clearPendingShare_ === 'function') window.SI_clearPendingShare_();
   };
 
   window.SI_handleCardBackdrop = function (e) {
@@ -6691,53 +6692,65 @@ window.SI_shareCard = async function() {
   // the web platform allows: the right chat opens pre-drafted, and the
   // PDF is immediately offered via the share sheet (which lists WhatsApp
   // as one tap) or downloaded — either way it's one manual attach away.
+  let _siPendingPDF = null; // { blob, placa } — armed after step 1's PDF build
+  window.SI_clearPendingShare_ = () => { _siPendingPDF = null; };
+
   window.SI_shareCard = async function() {
     const cardOverlay = document.getElementById('si-card-overlay');
     const placa = cardOverlay ? cardOverlay.dataset.placa : null;
     if (!placa) { console.warn('[SI] No placa for share'); return; }
     const vehicle = (window._SI_cards||[]).find(c=>c.placa===placa);
     if (!vehicle) { console.warn('[SI] Vehicle not found:', placa); return; }
+    const btn = document.querySelector('.si-card-action-btn.wpp');
 
+    // STEP 2 — PDF already built (previous tap). This click is a fresh user
+    // gesture, so window.open/navigator.share fire synchronously here,
+    // before any await — otherwise mobile browsers silently block them as
+    // no longer "user-initiated" once time has passed since the tap.
+    if (_siPendingPDF && _siPendingPDF.placa === placa) {
+      const { blob } = _siPendingPDF;
+      const file = new File([blob], `porsche-rj-${placa}.pdf`, {type:'application/pdf'});
+      const text = `Olá! Segue em anexo a análise de manutenção do seu ${vehicle.modelo} (${placa}) — Porsche Service Rio. 🏎️`;
+
+      if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+        // Mobile — one native share carries the text AND the PDF together,
+        // so picking WhatsApp there attaches both, not just text.
+        navigator.share({ files:[file], text, title:`Porsche RJ · ${vehicle.modelo} · ${placa}` })
+          .catch(err => { if (err.name!=='AbortError') console.error('[SI] share error:', err); });
+      } else {
+        // Desktop — no file-share API, so: open the right chat with the
+        // text ready, download the PDF, and make the attach step explicit
+        // (a toast is too easy to miss and not attaching it in time).
+        if (vehicle.telefone) {
+          const num = String(vehicle.telefone).replace(/\D/g, '');
+          window.open(`https://wa.me/55${num}?text=${encodeURIComponent(text)}`, '_blank');
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `porsche-rj-${placa}.pdf`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+        alert('PDF baixado.\n\nO navegador não permite anexar automaticamente — no WhatsApp Web que abriu, clique no clipe 📎 e selecione o PDF baixado antes de enviar.');
+      }
+      _siPendingPDF = null;
+      if (btn) btn.textContent = '↗ ENVIAR AO CLIENTE';
+      return;
+    }
+
+    // STEP 1 — build the PDF, then arm the button for the second tap.
     if (typeof html2canvas === 'undefined' || !window.jspdf) {
       if (typeof showToast === 'function') showToast('A carregar bibliotecas...');
       return;
     }
-
-    const btn = document.querySelector('.si-card-action-btn.wpp');
-    if (btn) { btn.disabled=true; btn.textContent='⏳ A gerar PDF...'; }
-
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ A gerar PDF...'; }
     try {
-      // Open the customer's WhatsApp chat immediately — must happen before
-      // any `await` or mobile browsers treat it as a blocked popup instead
-      // of a user-initiated action.
-      if (vehicle.telefone) {
-        const num  = String(vehicle.telefone).replace(/\D/g, '');
-        const text = encodeURIComponent(
-          `Olá! Segue em anexo a análise de manutenção do seu ${vehicle.modelo} (${placa}) — Porsche Service Rio. 🏎️`
-        );
-        window.open(`https://wa.me/55${num}?text=${text}`, '_blank');
-      }
-
       const blob = await SI_buildPortraitPDF_(vehicle);
-      const file = new File([blob], `porsche-rj-${placa}.pdf`, {type:'application/pdf'});
-
-      if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-        await navigator.share({ files:[file], title:`Porsche RJ · ${vehicle.modelo} · ${placa}` });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href=url; a.download=`porsche-rj-${placa}.pdf`;
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
-        if (typeof showToast === 'function') showToast('PDF baixado — anexe no chat que abriu');
-      }
-    } catch(err) {
-      if (err.name!=='AbortError') {
-        console.error('[SI] share error:', err);
-        if (typeof showToast === 'function') showToast('Erro ao gerar PDF');
-      }
-    } finally {
-      if (btn) { btn.disabled=false; btn.textContent='↗ ENVIAR AO CLIENTE'; }
+      _siPendingPDF = { blob, placa };
+      if (btn) { btn.disabled = false; btn.textContent = '📎 Toque para anexar e enviar'; }
+    } catch (err) {
+      console.error('[SI] PDF build error:', err);
+      if (typeof showToast === 'function') showToast('Erro ao gerar PDF');
+      if (btn) { btn.disabled = false; btn.textContent = '↗ ENVIAR AO CLIENTE'; }
     }
   };
 
