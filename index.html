@@ -6284,7 +6284,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
-          COMPARTILHAR
+          ENVIAR AO CLIENTE
         </button>
         <button class="si-card-action-btn" onclick="SI_printCard()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -6491,7 +6491,7 @@ window.SI_shareCard = async function() {
       }
 
       return `
-      <div style="border:1px solid #EBEBEB;border-left:4px solid ${col};background:${bg};padding:12px 14px 10px;font-family:'PorscheNext',sans-serif;">
+      <div data-si-item="1" style="border:1px solid #EBEBEB;border-left:4px solid ${col};background:${bg};padding:12px 14px 10px;font-family:'PorscheNext',sans-serif;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
           <div style="display:flex;align-items:flex-start;gap:8px;flex:1;">
             ${iconImg}
@@ -6570,7 +6570,7 @@ window.SI_shareCard = async function() {
         <div style="display:flex;align-items:center;font-size:12px;color:#000;"><span style="width:7px;height:7px;border-radius:50%;background:#16A34A;display:inline-block;margin-right:5px;"></span><strong style="color:#16A34A;margin-right:3px;">${nOk}</strong> em dia</div>
       </div>
       <!-- SERVICE ITEMS -->
-      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px;">
+      <div data-si-items-container="1" style="padding:10px 14px;display:flex;flex-direction:column;gap:8px;">
         ${itemsHTML}
       </div>
       <!-- FOOTER -->
@@ -6583,81 +6583,161 @@ window.SI_shareCard = async function() {
     </body></html>`;
   };
 
-  // Updated SI_shareCard — generates proper portrait card, captures, shares
-  window.SI_shareCard = async function() {
-    // Find current vehicle from open card
-    const cardOverlay = document.getElementById('si-card-overlay');
-    const placa = cardOverlay ? cardOverlay.dataset.placa : null;
-    if (!placa) { console.warn('[SI] No placa for share'); return; }
+  // Build a multi-page PDF from the portrait card, splitting only between
+  // service items (never mid-item) and between the header/summary block and
+  // the first item. Returns a Blob.
+  async function SI_buildPortraitPDF_(vehicle) {
+    const { jsPDF } = window.jspdf;
 
-    const vehicle = (window._SI_cards||[]).find(c=>c.placa===placa);
-    if (!vehicle) { console.warn('[SI] Vehicle not found:', placa); return; }
-
-    if (typeof html2canvas === 'undefined') {
-      if (typeof showToast === 'function') showToast('A carregar...');
-      return;
-    }
-
-    // Show loading on button
-    const btn = document.querySelector('.si-card-action-btn.wpp');
-    if (btn) { btn.disabled=true; btn.textContent='⏳ A gerar...'; }
-
+    // Render the card off-screen (same approach as before)
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;height:1px;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
     try {
-      // Create off-screen iframe to render the portrait card
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;height:1px;border:none;visibility:hidden;';
-      document.body.appendChild(iframe);
-
       const cardHTML = window.SI_generatePortraitHTML(vehicle);
       iframe.contentDocument.open();
       iframe.contentDocument.write(cardHTML);
       iframe.contentDocument.close();
-
-      // Wait for fonts and images to load
-      await new Promise(res => setTimeout(res, 1800));
+      await new Promise(res => setTimeout(res, 1800)); // fonts/images
 
       const cardEl = iframe.contentDocument.getElementById('si-portrait-card');
       if (!cardEl) throw new Error('Card element not found in iframe');
-
-      // Size iframe to card height
-      const h = cardEl.scrollHeight;
-      iframe.style.height = h + 'px';
+      const cardTotalCss = cardEl.scrollHeight;
+      iframe.style.height = cardTotalCss + 'px';
       await new Promise(res => setTimeout(res, 200));
 
-      const canvas = await html2canvas(cardEl, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: 600,
-        windowWidth: 600,
+      // Find the natural break points: top of the items container (end of
+      // header/customer/vehicle/summary block) and the top/bottom of each
+      // individual service item.
+      const cardRect  = cardEl.getBoundingClientRect();
+      const itemsWrap = cardEl.querySelector('[data-si-items-container]');
+      const headerEndCss = itemsWrap
+        ? itemsWrap.getBoundingClientRect().top - cardRect.top
+        : 0;
+      const itemEls = Array.from(cardEl.querySelectorAll('[data-si-item]')).map(el => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top - cardRect.top, bottom: r.bottom - cardRect.top };
       });
 
-      document.body.removeChild(iframe);
+      // Capture the whole card once at 2x, then slice per page — cheaper
+      // and more consistent than re-capturing per page.
+      const RASTER_SCALE = 2;
+      const bigCanvas = await html2canvas(cardEl, {
+        scale: RASTER_SCALE, useCORS: true, allowTaint: true,
+        backgroundColor: '#ffffff', logging: false,
+        width: 600, windowWidth: 600,
+      });
 
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 1.0));
-      const file = new File([blob], `porsche-rj-${placa}.png`, {type:'image/png'});
+      // A4 page geometry (points)
+      const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 24, RUNNING_HEAD_H = 16;
+      const imgWidthPt   = PAGE_W - MARGIN * 2;
+      const cssToPt       = imgWidthPt / 600;
+      const pageBodyCssPx = (PAGE_H - MARGIN * 2 - RUNNING_HEAD_H) / cssToPt;
+
+      // Greedily pack items into pages of pageBodyCssPx each, page 1 always
+      // starting with the full header/summary block, never splitting an item.
+      const pages = [];
+      let pageStart = 0, cursor = headerEndCss;
+      for (const it of itemEls) {
+        if ((it.bottom - pageStart) > pageBodyCssPx && cursor > pageStart) {
+          pages.push({ start: pageStart, end: cursor });
+          pageStart = cursor;
+        }
+        cursor = it.bottom;
+      }
+      if ((cardTotalCss - pageStart) <= pageBodyCssPx) {
+        pages.push({ start: pageStart, end: cardTotalCss });
+      } else {
+        pages.push({ start: pageStart, end: cursor });
+        pages.push({ start: cursor, end: cardTotalCss });
+      }
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      for (let i = 0; i < pages.length; i++) {
+        if (i > 0) pdf.addPage('a4', 'portrait');
+        const { start, end } = pages[i];
+        const sliceH = Math.round((end - start) * RASTER_SCALE);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width  = bigCanvas.width;
+        sliceCanvas.height = sliceH;
+        sliceCanvas.getContext('2d').drawImage(
+          bigCanvas, 0, Math.round(start * RASTER_SCALE), bigCanvas.width, sliceH,
+          0, 0, bigCanvas.width, sliceH
+        );
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(140, 140, 140);
+        pdf.text(
+          `Porsche RJ · Service Intelligence · ${vehicle.placa} · Pág. ${i + 1}/${pages.length}`,
+          MARGIN, MARGIN - 8
+        );
+        const imgHeightPt = sliceH / RASTER_SCALE * cssToPt;
+        pdf.addImage(sliceCanvas.toDataURL('image/png', 1.0), 'PNG', MARGIN, MARGIN, imgWidthPt, imgHeightPt);
+      }
+      return pdf.output('blob');
+    } finally {
+      document.body.removeChild(iframe);
+    }
+  }
+
+  // Opens the specific customer's WhatsApp chat (their number, taken from
+  // this card — not a generic share sheet) with a message drafted, and
+  // hands over the PDF to attach.
+  //
+  // IMPORTANT LIMITATION: neither wa.me links nor navigator.share let a
+  // browser attach a file directly into a specific WhatsApp contact's chat
+  // — that's a WhatsApp platform restriction, not something fixable from
+  // here (true one-tap automated sending needs the WhatsApp Business
+  // Cloud API, a separate server-side integration). This gets as close as
+  // the web platform allows: the right chat opens pre-drafted, and the
+  // PDF is immediately offered via the share sheet (which lists WhatsApp
+  // as one tap) or downloaded — either way it's one manual attach away.
+  window.SI_shareCard = async function() {
+    const cardOverlay = document.getElementById('si-card-overlay');
+    const placa = cardOverlay ? cardOverlay.dataset.placa : null;
+    if (!placa) { console.warn('[SI] No placa for share'); return; }
+    const vehicle = (window._SI_cards||[]).find(c=>c.placa===placa);
+    if (!vehicle) { console.warn('[SI] Vehicle not found:', placa); return; }
+
+    if (typeof html2canvas === 'undefined' || !window.jspdf) {
+      if (typeof showToast === 'function') showToast('A carregar bibliotecas...');
+      return;
+    }
+
+    const btn = document.querySelector('.si-card-action-btn.wpp');
+    if (btn) { btn.disabled=true; btn.textContent='⏳ A gerar PDF...'; }
+
+    try {
+      // Open the customer's WhatsApp chat immediately — must happen before
+      // any `await` or mobile browsers treat it as a blocked popup instead
+      // of a user-initiated action.
+      if (vehicle.telefone) {
+        const num  = String(vehicle.telefone).replace(/\D/g, '');
+        const text = encodeURIComponent(
+          `Olá! Segue em anexo a análise de manutenção do seu ${vehicle.modelo} (${placa}) — Porsche Service Rio. 🏎️`
+        );
+        window.open(`https://wa.me/55${num}?text=${text}`, '_blank');
+      }
+
+      const blob = await SI_buildPortraitPDF_(vehicle);
+      const file = new File([blob], `porsche-rj-${placa}.pdf`, {type:'application/pdf'});
 
       if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-        await navigator.share({
-          files: [file],
-          title: `Porsche RJ · ${vehicle.modelo} · ${placa}`,
-        });
+        await navigator.share({ files:[file], title:`Porsche RJ · ${vehicle.modelo} · ${placa}` });
       } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href=url; a.download=`porsche-rj-${placa}.png`;
+        a.href=url; a.download=`porsche-rj-${placa}.pdf`;
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
+        if (typeof showToast === 'function') showToast('PDF baixado — anexe no chat que abriu');
       }
     } catch(err) {
       if (err.name!=='AbortError') {
         console.error('[SI] share error:', err);
-        if (typeof showToast === 'function') showToast('Erro ao gerar imagem');
+        if (typeof showToast === 'function') showToast('Erro ao gerar PDF');
       }
     } finally {
-      if (btn) { btn.disabled=false; btn.textContent='↗ COMPARTILHAR'; }
+      if (btn) { btn.disabled=false; btn.textContent='↗ ENVIAR AO CLIENTE'; }
     }
   };
 
