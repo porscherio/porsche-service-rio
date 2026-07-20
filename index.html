@@ -6721,9 +6721,17 @@ window.SI_shareCard = async function() {
       }
 
       if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-        // Mobile — one native share carries the text AND the PDF together,
-        // so picking WhatsApp there attaches both, not just text.
-        navigator.share({ files:[file], text, title:`Porsche RJ · ${vehicle.modelo} · ${placa}` })
+        // Mobile — WhatsApp's own share handler drops the caption text when
+        // a file is attached via the Web Share API (confirmed: file-only
+        // arrived, message didn't), so text and file have to be sent as two
+        // separate actions rather than one combined share. Both still fire
+        // synchronously within this same tap, so neither gets blocked as a
+        // stale/non-user-initiated action.
+        if (vehicle.telefone) {
+          const num = String(vehicle.telefone).replace(/\D/g, '');
+          window.open(`https://wa.me/55${num}?text=${encodeURIComponent(text)}`, '_blank');
+        }
+        navigator.share({ files:[file], title:`Porsche RJ · ${vehicle.modelo} · ${placa}` })
           .catch(err => { if (err.name!=='AbortError') console.error('[SI] share error:', err); });
       } else {
         // Desktop — no file-share API, so: open the right chat with the
