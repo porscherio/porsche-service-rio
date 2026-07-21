@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!--
+  Porsche Service Rio — branded booking redirect page
+  ═══════════════════════════════════════════════════
+
+  WHY THIS FILE EXISTS
+  ─────────────────────
+  The actual booking page lives at your Apps Script /exec URL — but
+  sharing that raw URL in WhatsApp looks unofficial (script.google.com,
+  a long token) and, more importantly, WhatsApp's link-preview crawler
+  reads Open Graph tags from whatever URL is in the message BEFORE any
+  redirect — it does not execute JavaScript, so tags placed on the
+  Apps Script page itself never actually got used for the preview that
+  matters. Putting this page (with the same tags) on your own domain
+  fixes both: the visible link is your own domain, and the preview
+  card comes from a page WhatsApp can actually read.
+
+  WHERE THIS GOES
+  ─────────────────
+  Commit this file to the porsche-service-rio repo at:
+      /agendar/index.html
+  so it's served at:
+      https://porscherio.github.io/porsche-service-rio/agendar/
+  (or your custom domain, if porscherio.github.io isn't what actually
+  serves this repo — swap it in below either way).
+
+  Then in Code.gs, set SI_BOOKING_REDIRECT_BASE (near si_bookingUrl_)
+  to that exact URL, so new links get generated pointing here instead
+  of straight at script.google.com. Already-sent links keep working
+  either way — this only changes what NEW links look like.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agendar Manutenção — Porsche Service Rio</title>
+
+<!-- Open Graph tags — this is what WhatsApp actually reads for the
+     preview card. Update the logo path if it ever moves. -->
+<meta property="og:title" content="Agendar Manutenção — Porsche Service Rio">
+<meta property="og:description" content="Toque para escolher o melhor dia e horário para a manutenção do seu Porsche.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://raw.githubusercontent.com/porscherio/porsche-service-rio/main/assets/logo.png">
+
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    background:#111;color:#fff;
+    height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:24px;
+  }
+  img{width:64px;height:64px;object-fit:contain;margin-bottom:18px;}
+  .brand{font-size:15px;font-weight:700;letter-spacing:.18em;}
+  .sub{color:#C8102E;font-size:9px;font-weight:700;letter-spacing:.25em;margin-top:6px;margin-bottom:26px;}
+  .spinner{width:22px;height:22px;border:2px solid rgba(255,255,255,.2);border-top-color:#C8102E;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .msg{font-size:12px;color:rgba(255,255,255,.5);}
+  a{color:#C8102E;}
+</style>
+</head>
+<body>
+  <img src="https://raw.githubusercontent.com/porscherio/porsche-service-rio/main/assets/logo.png" alt="Porsche Service Rio">
+  <div class="brand">PORSCHE</div>
+  <div class="sub">SERVICE · RIO DE JANEIRO</div>
+  <div class="spinner"></div>
+  <div class="msg" id="msg">Abrindo agendamento...</div>
+
+<script>
+  // TODO(Eytan): confirm this matches your actual deployed Apps Script
+  // Web App /exec URL (same one used elsewhere in Code.gs/index.html).
+  const EXEC_URL = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56ftTxud5RxNJdVgwJq5F4k4uGsJqqiVNDzTbR1JpaFktfAmshq/exec';
+
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+
+  if (!token) {
+    document.getElementById('msg').innerHTML =
+      'Link inválido. <a href="https://wa.me/">Entre em contato com a Porsche Service Rio.</a>';
+  } else {
+    const dest = EXEC_URL + '?action=agendar&token=' + encodeURIComponent(token);
+    window.location.replace(dest);
+    // Fallback in case replace() is blocked for any reason
+    setTimeout(() => {
+      document.getElementById('msg').innerHTML =
+        'Se a página não abrir automaticamente, <a href="' + dest + '">toque aqui</a>.';
+    }, 2500);
+  }
+</script>
+</body>
+</html>
