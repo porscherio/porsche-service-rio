@@ -479,6 +479,10 @@ input:focus{outline:none;border-color:var(--black)}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
 .entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#F5D300;color:#1a1a1a}
 .entregue-pill.clickable{cursor:pointer}
+/* v4.1.2 — Marcar Entregue Sem Agendamento pill (Aprovador-only) */
+.marcar-entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#CC0000;color:#fff;cursor:pointer;border:none;font-family:inherit}
+.marcar-entregue-pill:hover{background:#ff1a1a}
+.marcar-entregue-pill.already{background:#FF6600;color:#fff}
 .edoc-reentry-icon{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.03em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--black);color:#fff;cursor:pointer}
 .mileage-pill-blink{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--amber);color:#fff;cursor:pointer;animation:mileage-blink 1.4s ease-in-out infinite}
 @keyframes mileage-blink{0%,100%{opacity:1}50%{opacity:.45}}
@@ -2569,6 +2573,7 @@ function renderROList(ros) {
     ev.stopPropagation();
     openPartsPopover(b.dataset.ro);
   }));
+  // marcar-entregue pills use inline onclick — no extra listener needed here.
   el.querySelectorAll('.mileage-pill-blink').forEach(p => p.addEventListener('click', (ev)=>{
     ev.stopPropagation();
     openMileageModal(p.dataset.mileageRo);
@@ -2604,6 +2609,13 @@ function roCard(r) {
   // inside Agendamento Management, never from this list, so there's
   // only ever one place controlling the flag.
   const chegadaPill = r.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
+  // v4.1.2 — Marcar Entregue Sem Agendamento pill (Aprovador-only).
+  const _meKey = 'manual_entrega_' + r.ro_number;
+  const manualEntregaEventId = isApproverTech ? (localStorage.getItem(_meKey) || '') : '';
+  const marcarEntregaPill = !isApproverTech ? ''
+    : manualEntregaEventId
+      ? '<button class="marcar-entregue-pill already" data-ro="' + r.ro_number + '" data-evt="' + manualEntregaEventId + '" onclick="revertEntregaManual(event,this)">&#x21A9; REVERTER ENTREGA</button>'
+      : '<button class="marcar-entregue-pill" data-ro="' + r.ro_number + '" data-plate="' + r.plate + '" data-mobile="' + (r.mobile||'') + '" data-cliente="' + escapeHtml(r.cust_name||'') + '" data-modelo="' + escapeHtml(r.vehicle||'') + '" data-year="' + (r.year||'') + '" data-vin="' + (r.vin||'') + '" data-servicos-evt="' + (r.servicos_event_id||'') + '" onclick="marcarEntregaManual(event,this)">&#x1F6D1; ENTREGAR AGORA</button>';
   // Mileage check (v2.7.6) — blinking pill when missing/placeholder
   // (blank or exactly 1, meaning an Approver never checked the real
   // odometer reading when opening the RO); plain text next to the
@@ -2644,7 +2656,7 @@ function roCard(r) {
       (r.suggested === currentTech ? ' sugerida' : '') +
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + chegadaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
+        '<div class="cro">RO #' + r.ro_number + chegadaPill + marcarEntregaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
         '<div class="cjob">Placa: ' + r.plate + mileageHtml + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
@@ -2697,6 +2709,80 @@ function renderManualPatioRow(ro) {
   row.innerHTML = ro.manual_patio
     ? '<span class="chegada-pill clickable" style="background:#E8DEF8;color:#4A2E7A" onclick="toggleManualPatio(\''+escapeHtml(String(ro.ro_number))+'\',true)">&#x1F4CD; NO P&#xC1;TIO (manual) &mdash; toque para remover</span>'
     : '<span class="chegada-chip-off" style="margin-left:0" onclick="toggleManualPatio(\''+escapeHtml(String(ro.ro_number))+'\',false)">&#x1F4CD; Marcar no P&#xC1;tio (manual)</span>';
+}
+
+// ── v4.1.2: Marcar Entregue Sem Agendamento ─────────────────────────
+// Acid-red pill click — confirms and calls markEntregaSemAgendamento.
+async function marcarEntregaManual(ev, btn) {
+  ev.stopPropagation();
+  const ro        = btn.dataset.ro;
+  const plate     = btn.dataset.plate || '';
+  const mobile    = btn.dataset.mobile || '';
+  const cliente   = btn.dataset.cliente || '';
+  const modelo    = btn.dataset.modelo || '';
+  const year      = btn.dataset.year || '';
+  const vin       = btn.dataset.vin || '';
+  const svcEvt    = btn.dataset.servicosEvt || '';
+  if (!confirm('Marcar RO #' + ro + ' (' + plate + ') como ENTREGUE agora?\n\nIsso irá:\n• Criar evento de Entrega\n• Remover do pátio\n• Enviar confirmação ao cliente\n• Atualizar status no sistema')) return;
+  btn.textContent = 'Processando…';
+  btn.disabled = true;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'markEntregaSemAgendamento',
+        tech: currentTech,
+        ro_number: ro,
+        plate: plate,
+        mobile: mobile,
+        client_name: cliente,
+        modelo: modelo,
+        year: year,
+        vin: vin,
+        linked_servicos_event_id: svcEvt,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
+    // Persist event_id so the revert pill appears on next render
+    localStorage.setItem('manual_entrega_' + ro, data.event_id);
+    await loadROList();
+  } catch (e) {
+    alert('Erro ao marcar entrega: ' + e.message);
+    btn.textContent = '\uD83D\uDED1 ENTREGAR AGORA';
+    btn.disabled = false;
+  }
+}
+
+// Orange pill click — red warning, then calls revertEntregaSemAgendamento.
+async function revertEntregaManual(ev, btn) {
+  ev.stopPropagation();
+  const ro      = btn.dataset.ro;
+  const eventId = btn.dataset.evt;
+  if (!confirm('\u26A0\uFE0F ATEN\u00C7\u00C3O\n\nReverter entrega da RO #' + ro + '?\n\nIsso irá:\n• Deletar o evento de Entrega criado manualmente\n• Reabrir a RO no sistema\n\nEssa ação não pode ser desfeita automaticamente.')) return;
+  btn.textContent = 'Revertendo…';
+  btn.disabled = true;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'revertEntregaSemAgendamento',
+        tech: currentTech,
+        ro_number: ro,
+        event_id: eventId,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
+    localStorage.removeItem('manual_entrega_' + ro);
+    await loadROList();
+  } catch (e) {
+    alert('Erro ao reverter entrega: ' + e.message);
+    btn.textContent = '\u21A9 REVERTER ENTREGA';
+    btn.disabled = false;
+  }
 }
 
 function toggleManualPatio(roNumber, currentlyOn) {
