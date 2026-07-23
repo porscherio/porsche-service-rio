@@ -560,6 +560,36 @@ input:focus{outline:none;border-color:var(--black)}
 .edoc-scan-scroll{overflow-y:auto;flex:1;min-height:0}
 .edoc-scan-footer{flex-shrink:0;padding-top:8px}
 
+/* ── POLARIS — parts price lookup (Aprovadores-only) ── */
+.polaris-overlay{position:fixed;inset:0;z-index:1200;background:#fff;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden}
+.polaris-overlay.polaris-open{transform:translateX(0)}
+.polaris-topbar{flex-shrink:0;background:var(--black);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.polaris-topbar-title{color:#fff;font-size:13px;font-weight:700;letter-spacing:.1em}
+.polaris-topbar-sub{color:var(--red);font-size:9px;font-weight:700;letter-spacing:.15em;margin-top:2px}
+.polaris-close-btn{margin-left:auto;background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;padding:4px 8px}
+.polaris-body{flex:1;overflow-y:auto;padding:16px}
+.polaris-search-row{display:flex;gap:8px}
+.polaris-input{flex:1;padding:12px;font-size:15px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+.polaris-search-btn{padding:0 18px;font-size:14px;font-weight:600;border:none;border-radius:6px;background:var(--red);color:#fff;cursor:pointer}
+.polaris-factors{display:flex;gap:10px;margin-top:10px;font-size:11.5px;color:#888}
+.polaris-factors label{display:flex;flex-direction:column;gap:3px}
+.polaris-factors input{width:64px;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px}
+.polaris-status{margin-top:14px;color:#999;font-size:13px;text-align:center}
+.polaris-banner{border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12.5px}
+.polaris-banner-warn{background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber)}
+.polaris-banner-danger{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)}
+.polaris-card{border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:14px}
+.polaris-part{font-size:19px;font-weight:700;color:var(--black)}
+.polaris-desc{color:#444;font-size:13px;margin-top:4px;line-height:1.4}
+.polaris-desc-alt{color:#999}
+.polaris-tbl{width:100%;margin-top:12px;font-size:13.5px;border-collapse:collapse}
+.polaris-tbl td{padding:5px 0}
+.polaris-tbl td:first-child{color:#888}
+.polaris-tbl td:last-child{text-align:right;font-weight:600}
+.polaris-sale{margin-top:16px;background:var(--red);color:#fff;border-radius:8px;padding:14px;text-align:center}
+.polaris-sale-label{font-size:10.5px;letter-spacing:.05em;opacity:.85}
+.polaris-sale-value{font-size:26px;font-weight:800;margin-top:3px}
+
 /* ── SERVICE INTELLIGENCE · v4.0.0 ── */
 /* ── SI Panel overlay ─────────────────────────────────────────────────────── */
 .si-overlay {
@@ -992,6 +1022,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
       <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
+      <button class="ntab" id="btn-polaris-nav" style="display:none" onclick="openPolarisNav()">&#x1F50D;<br>Polaris</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -1375,6 +1406,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button class="ntab on">&#x1F4CB;<br>Histórico</button>
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
       <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
+      <button class="ntab" id="btn-polaris-nav" style="display:none" onclick="openPolarisNav()">&#x1F50D;<br>Polaris</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -1930,7 +1962,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.1.3';
+const APP_VERSION = '4.2.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2157,6 +2189,7 @@ function doLogout() {
   document.getElementById('btn-parts-admin').style.display='none';
   document.getElementById('btn-agenda').style.display='none';
   const siNavBtn = document.getElementById('btn-si-nav'); if (siNavBtn) siNavBtn.style.display='none';
+  const polarisNavBtn = document.getElementById('btn-polaris-nav'); if (polarisNavBtn) polarisNavBtn.style.display='none';
   // v3.6.3 — FIX: none of these were being reset on logout, so on a
   // shared device (multiple techs using the same phone/tablet through
   // the day) only the FIRST tech after a page load would ever see the
@@ -3422,6 +3455,10 @@ function openSINav() {
   SI_openPanel();
 }
 
+function openPolarisNav() {
+  Polaris_openPanel();
+}
+
 function openSINav_OLD() {
   if (activeRO && activeRO.plate) {
     addSIRecentPlate(activeRO.plate);
@@ -3538,6 +3575,7 @@ async function checkAndShowApprovalButton() {
       if (btnPkg) btnPkg.style.display = 'flex';
       if (btnAgd) btnAgd.style.display = 'flex';
       const btnSI = document.getElementById('btn-si-nav'); if (btnSI) btnSI.style.display = ''; // approver-only
+      const btnPolaris = document.getElementById('btn-polaris-nav'); if (btnPolaris) btnPolaris.style.display = ''; // approver-only
     }
   } catch(e) { console.warn('isApprover check failed', e); }
 }
@@ -7016,6 +7054,142 @@ window.SI_shareCard = async function() {
 
 <!-- ── SERVICE INTELLIGENCE PANEL · v3.7.12 ── -->
 <!-- ── SI Panel ──────────────────────────────────────────────────────────── -->
+<script>
+// ── POLARIS — parts price lookup panel (v1.0.0, Aprovadores-only) ──
+// Server-side gate lives in polarisSearch()/isApproverSync() in
+// Code.gs; the footer icon (btn-polaris-nav) is a UX convenience,
+// not the security boundary.
+let polarisLastRec = null;
+
+function Polaris_openPanel() {
+  document.getElementById('polaris-panel').classList.add('polaris-open');
+  document.getElementById('polaris-q').focus();
+}
+
+function Polaris_closePanel() {
+  document.getElementById('polaris-panel').classList.remove('polaris-open');
+}
+
+function Polaris_search() {
+  const q = document.getElementById('polaris-q').value.trim();
+  if (!q) return;
+  const btn = document.getElementById('polaris-search-btn');
+  const status = document.getElementById('polaris-status');
+  btn.disabled = true;
+  status.textContent = 'Buscando…';
+  document.getElementById('polaris-result').innerHTML = '';
+  polarisLastRec = null;
+
+  fetch(API_URL + '?action=polarisSearch&q=' + encodeURIComponent(q) + '&tech=' + encodeURIComponent(currentTech))
+    .then(r => r.json())
+    .then(Polaris_render)
+    .catch(e => {
+      btn.disabled = false;
+      status.textContent = 'Erro na busca.';
+      console.warn('polarisSearch failed', e);
+    });
+}
+
+function Polaris_render(res) {
+  document.getElementById('polaris-search-btn').disabled = false;
+  const status = document.getElementById('polaris-status');
+  const out = document.getElementById('polaris-result');
+
+  if (!res || !res.ok) {
+    status.textContent = res && res.error === 'not_approver'
+      ? 'Acesso restrito a Aprovadores.' : 'Erro na busca.';
+    return;
+  }
+  if (!res.results.length) {
+    status.textContent = 'Peça não encontrada: ' + res.query;
+    return;
+  }
+
+  const r = res.results[0];
+  polarisLastRec = r;
+  status.textContent = '';
+
+  let banner = '';
+  if (res.redirected) {
+    banner = '<div class="polaris-banner polaris-banner-warn">Substituída: <b>' +
+      escapeHtml(res.redirected.from) + '</b> &#8594; <b>' + escapeHtml(res.redirected.to) + '</b></div>';
+  } else if (r.finalMissing) {
+    banner = '<div class="polaris-banner polaris-banner-danger">Substituída por <b>' +
+      escapeHtml(r.final_part || '') + '</b>, que não consta na lista atual. Dados abaixo são da peça antiga.</div>';
+  }
+
+  const descLine = r.desc_pt
+    ? escapeHtml(r.desc_pt) + (r.desc_en ? ' <span class="polaris-desc-alt">(' + escapeHtml(r.desc_en) + ')</span>' : '')
+    : escapeHtml(r.desc_en || '—');
+
+  out.innerHTML = banner +
+    '<div class="polaris-card">' +
+      '<div class="polaris-part">' + escapeHtml(r.part) + '</div>' +
+      '<div class="polaris-desc">' + descLine + '</div>' +
+      '<table class="polaris-tbl">' +
+        Polaris_row('Custo', Polaris_brl(r.cost)) +
+        Polaris_row('MSRP', Polaris_brl(r.msrp)) +
+        Polaris_row('NCM', r.ncm || '—') +
+        Polaris_row('Categoria', r.category || '—') +
+        Polaris_row('Data preço', r.price_date || '—') +
+      '</table>' +
+      '<div id="polaris-sale"></div>' +
+    '</div>';
+  Polaris_recalc();
+}
+
+function Polaris_recalc() {
+  const el = document.getElementById('polaris-sale');
+  if (!el) return;
+  if (!polarisLastRec || polarisLastRec.cost == null) { el.innerHTML = ''; return; }
+  const ncmF = parseFloat(document.getElementById('polaris-ncm-f').value) || 1.4;
+  const marF = parseFloat(document.getElementById('polaris-mar-f').value) || 0.56;
+  if (!marF) { el.innerHTML = ''; return; }
+  const sale = (polarisLastRec.cost * ncmF) / marF;
+  el.innerHTML = '<div class="polaris-sale">' +
+    '<div class="polaris-sale-label">PREÇO DE VENDA (custo &times; ' + ncmF + ' &divide; ' + marF + ')</div>' +
+    '<div class="polaris-sale-value">' + Polaris_brl(sale) + '</div>' +
+  '</div>';
+}
+
+function Polaris_row(k, v) {
+  return '<tr><td>' + k + '</td><td>' + v + '</td></tr>';
+}
+function Polaris_brl(n) {
+  if (n == null || n === '') return '—';
+  return Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+</script>
+
+<!-- ── POLARIS panel (Aprovadores-only, footer icon btn-polaris-nav) ── -->
+<div id="polaris-panel" class="polaris-overlay" role="dialog" aria-label="Polaris">
+  <div class="polaris-topbar">
+    <div>
+      <div class="polaris-topbar-title">POLARIS</div>
+      <div class="polaris-topbar-sub">CONSULTA DE PEÇAS</div>
+    </div>
+    <button class="polaris-close-btn" onclick="Polaris_closePanel()" aria-label="Fechar">&#x2715;</button>
+  </div>
+  <div class="polaris-body">
+    <div class="polaris-search-row">
+      <input type="text" id="polaris-q" class="polaris-input" placeholder="Nº da peça (ex: 000 951 06)"
+        autocomplete="off" autocapitalize="characters"
+        onkeydown="if(event.key==='Enter')Polaris_search()">
+      <button class="polaris-search-btn" id="polaris-search-btn" onclick="Polaris_search()">Buscar</button>
+    </div>
+    <div class="polaris-factors">
+      <label>Fator NCM
+        <input type="number" step="0.01" id="polaris-ncm-f" value="1.4" onchange="Polaris_recalc()">
+      </label>
+      <label>Margem
+        <input type="number" step="0.01" id="polaris-mar-f" value="0.56" onchange="Polaris_recalc()">
+      </label>
+    </div>
+    <div id="polaris-status" class="polaris-status"></div>
+    <div id="polaris-result"></div>
+  </div>
+</div>
+
 <div id="si-panel" class="si-overlay" role="dialog" aria-label="Service Intelligence">
 
   <!-- Top bar -->
