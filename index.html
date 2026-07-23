@@ -7097,7 +7097,8 @@ function Polaris_render(res) {
 
   if (!res || !res.ok) {
     status.textContent = res && res.error === 'not_approver'
-      ? 'Acesso restrito a Aprovadores.' : 'Erro na busca.';
+      ? 'Acesso restrito a Aprovadores.'
+      : 'Erro na busca' + (res && res.error ? ': ' + res.error : '.');
     return;
   }
   if (!res.results.length) {
@@ -7172,8 +7173,9 @@ function Polaris_brl(n) {
   </div>
   <div class="polaris-body">
     <div class="polaris-search-row">
-      <input type="text" id="polaris-q" class="polaris-input" placeholder="Nº da peça (ex: 000 951 06)"
+      <input type="text" id="polaris-q" class="polaris-input" style="text-transform:uppercase" placeholder="Nº da peça (ex: 000 951 06)"
         autocomplete="off" autocapitalize="characters"
+        oninput="this.value=this.value.toUpperCase()"
         onkeydown="if(event.key==='Enter')Polaris_search()">
       <button class="polaris-search-btn" id="polaris-search-btn" onclick="Polaris_search()">Buscar</button>
     </div>
