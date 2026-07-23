@@ -2088,6 +2088,7 @@ async function doLogin() {
   document.getElementById('t1-greet').textContent = saudacao;
   document.getElementById('sug-greet').textContent = saudacao;
   checkAndShowApprovalButton();
+  checkAndShowPolarisButton();
   checkAndShowDisponibilidadeIcon();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
   // v3.6.0 — REVERTED the v3.5.0 change that awaited loadROs()/
@@ -3575,9 +3576,23 @@ async function checkAndShowApprovalButton() {
       if (btnPkg) btnPkg.style.display = 'flex';
       if (btnAgd) btnAgd.style.display = 'flex';
       const btnSI = document.getElementById('btn-si-nav'); if (btnSI) btnSI.style.display = ''; // approver-only
-      const btnPolaris = document.getElementById('btn-polaris-nav'); if (btnPolaris) btnPolaris.style.display = ''; // approver-only
     }
   } catch(e) { console.warn('isApprover check failed', e); }
+}
+
+// POLARIS access is broader than full Aprovador rights — some techs
+// (e.g. Sebastiao Neto) get the price lookup without jobline-approval
+// or parts-admin rights, so this is checked separately from
+// checkAndShowApprovalButton() above via polarisCheckAccess (backed
+// by polarisHasAccess_ in Polaris.gs, not just isApprover).
+async function checkAndShowPolarisButton() {
+  const btnPolaris = document.getElementById('btn-polaris-nav');
+  if (btnPolaris) btnPolaris.style.display = 'none';
+  try {
+    const res  = await fetch(API_URL + '?action=polarisCheckAccess&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (data.ok && data.hasAccess && btnPolaris) btnPolaris.style.display = '';
+  } catch(e) { console.warn('polarisCheckAccess failed', e); }
 }
 
 // v3.4.5 — mesmo padrão de checkAndShowApprovalButton, mas para o
@@ -7057,7 +7072,8 @@ window.SI_shareCard = async function() {
 <script>
 // ── POLARIS — parts price lookup panel (v1.0.0, Aprovadores-only) ──
 // Server-side gate lives in polarisSearch()/isApproverSync() in
-// Code.gs; the footer icon (btn-polaris-nav) is a UX convenience,
+// Code.gs (via polarisHasAccess_ — Aprovadores + POLARIS_EXTRA_ACCESS);
+// the footer icon (btn-polaris-nav) is a UX convenience,
 // not the security boundary.
 let polarisLastRec = null;
 
@@ -7189,7 +7205,7 @@ function Polaris_brl(n) {
 }
 </script>
 
-<!-- ── POLARIS panel (Aprovadores-only, footer icon btn-polaris-nav) ── -->
+<!-- ── POLARIS panel (Aprovadores + POLARIS_EXTRA_ACCESS, footer icon btn-polaris-nav) ── -->
 <div id="polaris-panel" class="polaris-overlay" role="dialog" aria-label="Polaris">
   <div class="polaris-topbar">
     <div>
