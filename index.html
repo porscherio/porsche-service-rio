@@ -573,7 +573,7 @@ input:focus{outline:none;border-color:var(--black)}
 .polaris-search-btn{padding:0 18px;font-size:14px;font-weight:600;border:none;border-radius:6px;background:var(--red);color:#fff;cursor:pointer}
 .polaris-factors{display:flex;gap:10px;margin-top:10px;font-size:11.5px;color:#888}
 .polaris-factors label{display:flex;flex-direction:column;gap:3px}
-.polaris-factors input{width:64px;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px}
+.polaris-factors input,.polaris-factors select{width:64px;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;background:#fff}
 .polaris-status{margin-top:14px;color:#999;font-size:13px;text-align:center}
 .polaris-banner{border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12.5px}
 .polaris-banner-warn{background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber)}
@@ -7137,6 +7137,32 @@ function Polaris_render(res) {
       '<div id="polaris-sale"></div>' +
     '</div>';
   Polaris_recalc();
+  document.getElementById('polaris-recalc-btn').style.display = 'none';
+}
+
+// Show the "Recalcular" button whenever a factor is edited, instead of
+// recalculating on every keystroke — Eytan wants an explicit action so
+// the displayed sale price doesn't silently drift while typing a new
+// margin/NCM value.
+function Polaris_markDirty() {
+  if (!polarisLastRec) return;
+  document.getElementById('polaris-recalc-btn').style.display = 'block';
+}
+
+// Margem select: presets 0.70/0.63/0.56 write straight into the hidden
+// polaris-mar-f field; "Outro…" reveals it for manual entry.
+function Polaris_marSelectChange() {
+  const sel = document.getElementById('polaris-mar-select');
+  const wrap = document.getElementById('polaris-mar-custom-wrap');
+  const marInput = document.getElementById('polaris-mar-f');
+  if (sel.value === 'custom') {
+    wrap.style.display = 'flex';
+    marInput.focus();
+  } else {
+    wrap.style.display = 'none';
+    marInput.value = sel.value;
+  }
+  Polaris_markDirty();
 }
 
 function Polaris_recalc() {
@@ -7151,6 +7177,7 @@ function Polaris_recalc() {
     '<div class="polaris-sale-label">PREÇO DE VENDA (custo &times; ' + ncmF + ' &divide; ' + marF + ')</div>' +
     '<div class="polaris-sale-value">' + Polaris_brl(sale) + '</div>' +
   '</div>';
+  document.getElementById('polaris-recalc-btn').style.display = 'none';
 }
 
 function Polaris_row(k, v) {
@@ -7181,12 +7208,21 @@ function Polaris_brl(n) {
     </div>
     <div class="polaris-factors">
       <label>Fator NCM
-        <input type="number" step="0.01" id="polaris-ncm-f" value="1.4" onchange="Polaris_recalc()">
+        <input type="number" step="0.01" id="polaris-ncm-f" value="1.4" oninput="Polaris_markDirty()">
       </label>
       <label>Margem
-        <input type="number" step="0.01" id="polaris-mar-f" value="0.56" onchange="Polaris_recalc()">
+        <select id="polaris-mar-select" onchange="Polaris_marSelectChange()">
+          <option value="0.70">0.70</option>
+          <option value="0.63">0.63</option>
+          <option value="0.56" selected>0.56</option>
+          <option value="custom">Outro…</option>
+        </select>
+      </label>
+      <label id="polaris-mar-custom-wrap" style="display:none">Valor
+        <input type="number" step="0.01" id="polaris-mar-f" value="0.56" oninput="Polaris_markDirty()">
       </label>
     </div>
+    <button id="polaris-recalc-btn" class="polaris-search-btn" style="display:none;width:100%;margin-top:8px" onclick="Polaris_recalc()">Recalcular</button>
     <div id="polaris-status" class="polaris-status"></div>
     <div id="polaris-result"></div>
   </div>
