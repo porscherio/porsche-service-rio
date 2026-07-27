@@ -474,6 +474,16 @@ input:focus{outline:none;border-color:var(--black)}
 .pill-gantt{background:var(--green);color:#fff}
 .pill-si{background:var(--red);color:#fff}
 .priority-pill{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;letter-spacing:.02em;padding:3px 9px;border-radius:20px;white-space:nowrap;background:#1a1a1a;color:#fff}
+/* EM_ESPERA — amber, never blinking. The blinking treatments belong
+   to ENTREGA and RISCO, things needing action today; a hold is the
+   opposite, a deliberate pause. If it blinked it would compete for
+   attention with the ROs actually still in the queue. */
+.hold-pill{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;letter-spacing:.02em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;background:#F5C518;color:#4A3800}
+/* The card stays in the list — a held RO must never vanish — but
+   stops competing visually with the ones being worked on. */
+.card.em-espera{opacity:.55}
+.card.em-espera .cdesc{text-decoration:line-through}
+.hold-reason-line{font-size:12px;color:#7A6000;margin-top:4px}
 .chegada-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#9EFF00;color:#1a1a1a}
 .chegada-pill.clickable{cursor:pointer}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
@@ -1059,6 +1069,10 @@ input:focus{outline:none;border-color:var(--black)}
            shown only for Aprovadores via openRO(). Mirrors the
            manual-patio-row pattern above. -->
       <div id="s2-priority-row" style="display:none;margin-bottom:14px"></div>
+      <!-- EM_ESPERA: sits directly under the priority row on purpose —
+           they are the two levers on the same queue, and whoever
+           touches one usually wants to see the other. -->
+      <div id="s2-hold-row" style="display:none;margin-bottom:14px"></div>
       <div id="jobline-list-content">
         <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar joblines...</div></div>
       </div>
@@ -1962,7 +1976,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.3.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2665,6 +2679,14 @@ function roCard(r) {
   const priorityPill = (r.priority !== null && r.priority !== undefined)
     ? '<span class="priority-pill" title="Prioridade '+r.priority+'">#' + r.priority + '</span>'
     : '';
+  // EM_ESPERA pill. Without it a held RO is indistinguishable in the
+  // list and the backlog of postponed cars becomes invisible until
+  // someone opens them one by one. The day counter has no upper bound
+  // deliberately: a 45-day hold should look wrong at a glance.
+  const holdPill = r.hold_flag
+    ? '<span class="hold-pill" title="' + escapeHtml(String(r.hold_reason || 'Em espera')) + '">&#x23F8; EM ESPERA' +
+      ((r.hold_days === 0 || r.hold_days) ? ' &middot; ' + r.hold_days + 'd' : '') + '</span>'
+    : '';
   // v3.2.1: Created / Entrega date line. Created date (r.opened_date)
   // always shows as plain text when present. Entrega date
   // (r.entrega_date) only shows — as a blinking acid-green pill, to
@@ -2688,6 +2710,7 @@ function roCard(r) {
       (isLocked ? ' locked' : '') +
       (isPaused ? ' pausado' : '') +
       (r.suggested === currentTech ? ' sugerida' : '') +
+      (r.hold_flag ? ' em-espera' : '') +
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
         '<div class="cro">RO #' + r.ro_number + chegadaPill + marcarEntregaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
@@ -2695,7 +2718,7 @@ function roCard(r) {
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
         datesLine +
-      '</div><div class="cright"><span class="badge ' + bc + '">' + bt + '</span>' + priorityPill + '</div></div>' +
+      '</div><div class="cright"><span class="badge ' + bc + '">' + bt + '</span>' + priorityPill + holdPill + '</div></div>' +
       authTag + partsBadge +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
       '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:' + pct + '%"></div></div>' +
@@ -2726,6 +2749,7 @@ function openRO(roNumber) {
   document.getElementById('s2-complaint').textContent = ro.complaint;
   renderManualPatioRow(ro);
   renderPriorityRow(ro);
+  renderHoldRow(ro);
   goTo('s2');
   loadJoblines(roNumber);
   attachMileagePillHandlers();
@@ -2912,6 +2936,132 @@ function setPriorityForRO(roNumber) {
       renderPriorityRow(activeRO); // re-fetch to reflect any reorder that happened server-side
     }
   }).catch(() => showToast('Erro ao definir prioridade.'));
+}
+
+
+// ── EM_ESPERA (hold) ──────────────────────────────────────────────
+// Aprovador-only, same as renderPriorityRow/renderManualPatioRow.
+// Unlike priority (an on-demand lookup), hold_flag already rides in
+// the action=ros payload, so no extra fetch is needed here.
+
+// Copy of the canonical list in Code.gs (HOLD_REASONS). If they drift,
+// the server rejects with invalid_reason — a visible error, not dirty
+// data written silently. "Aguardando peça" is absent on purpose: the
+// parts gate already lives in the Parts tab, and two mechanisms for the
+// same fact will eventually disagree.
+const HOLD_REASONS = [
+  'Aguardando aprovação do cliente',
+  'Aguardando pagamento',
+  'Aguardando informação técnica (Porsche / PIWIS / TSB)',
+  'Aguardando autorização de garantia',
+  'Aguardando seguradora',
+  'Aguardando terceiro (funilaria, retífica, tapeçaria, vidros)',
+  'Veículo indisponível / cliente com o carro',
+  'Aguardando decisão interna',
+  'Outro',
+];
+
+function renderHoldRow(ro) {
+  const row = document.getElementById('s2-hold-row');
+  if (!row) return;
+  if (!isApproverTech) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+
+  const roEsc = escapeHtml(String(ro.ro_number));
+
+  if (ro.hold_flag) {
+    const dias = (ro.hold_days === 0 || ro.hold_days) ? ro.hold_days + 'd' : '';
+    const nota = ro.hold_note
+      ? '<div class="hold-reason-line">Nota: ' + escapeHtml(String(ro.hold_note)) + '</div>' : '';
+    const quem = ro.hold_by
+      ? '<div class="hold-reason-line">Marcada por ' + escapeHtml(String(ro.hold_by)) + '</div>' : '';
+    row.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span class="hold-pill">&#x23F8; EM ESPERA' + (dias ? ' &middot; ' + dias : '') + '</span>' +
+        '<button class="pill-btn" style="background:#4A3800;color:#fff;border:none;cursor:pointer" ' +
+          'onclick="clearHold(\'' + roEsc + '\')">Retirar da espera</button>' +
+      '</div>' +
+      '<div class="hold-reason-line">' + escapeHtml(String(ro.hold_reason || '')) + '</div>' +
+      nota + quem;
+    return;
+  }
+
+  const opts = '<option value="">Motivo da espera...</option>' +
+    HOLD_REASONS.map(function(m){
+      return '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>';
+    }).join('');
+
+  row.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      '<select id="s2-hold-reason" ' +
+        'style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px">' +
+        opts +
+      '</select>' +
+      '<input type="text" id="s2-hold-note" placeholder="Nota (opcional)" ' +
+        'style="flex:1;min-width:140px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px">' +
+      '<button class="pill-btn" style="background:#F5C518;color:#4A3800;border:none;cursor:pointer;font-weight:700" ' +
+        'onclick="setHoldForRO(\'' + roEsc + '\')">Colocar em espera</button>' +
+    '</div>';
+}
+
+function setHoldForRO(roNumber) {
+  const reason = document.getElementById('s2-hold-reason');
+  const note   = document.getElementById('s2-hold-note');
+  if (!reason || !reason.value) { showToast('Selecione um motivo para a espera.'); return; }
+  // Same rule the server enforces, checked here only for immediate
+  // feedback — the server rejects it regardless.
+  if (reason.value === 'Outro' && !note.value.trim()) {
+    showToast('Para "Outro", a nota é obrigatória.'); return;
+  }
+  const reasonVal = reason.value;
+  const noteVal   = note.value.trim();
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({
+      action: 'setHold', ro_number: roNumber, on: true,
+      reason: reasonVal, note: noteVal, tech: currentTech,
+    }),
+  }).then(function(){
+    showToast('&#x23F8; RO colocada em espera.');
+    applyHoldLocally(roNumber, true, reasonVal, noteVal);
+  }).catch(function(){ showToast('Erro ao colocar em espera.'); });
+}
+
+function clearHold(roNumber) {
+  if (!confirm('Retirar esta RO da espera? Ela volta para a fila de alocação.')) return;
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'setHold', ro_number: roNumber, on: false, tech: currentTech }),
+  }).then(function(){
+    showToast('&#x2705; RO retirada da espera.');
+    applyHoldLocally(roNumber, false, '', '');
+  }).catch(function(){ showToast('Erro ao retirar da espera.'); });
+}
+
+// Optimistic update — mode:'no-cors' gives no readable response body,
+// so the rest of the codebase already works this way (see
+// toggleManualPatio). Note the toast deliberately does not claim the RO
+// was "removed from the queue": the engine only reacts on its next
+// hourly run, and not at all on weekends. The screen changes now; the
+// allocation does not.
+function applyHoldLocally(roNumber, on, reason, note) {
+  const patch = function(r) {
+    r.hold_flag   = on;
+    r.hold_reason = on ? reason : '';
+    r.hold_note   = on ? note : '';
+    r.hold_by     = on ? currentTech : '';
+    r.hold_days   = on ? 0 : null;
+  };
+  const ro = (typeof liveROs !== 'undefined' && liveROs)
+    ? liveROs.find(function(r){ return String(r.ro_number) === String(roNumber); })
+    : null;
+  if (ro) patch(ro);
+  if (activeRO && String(activeRO.ro_number) === String(roNumber)) {
+    patch(activeRO);
+    renderHoldRow(activeRO);
+  }
+  if (typeof liveROs !== 'undefined' && liveROs) renderROList(liveROs);
 }
 
 
