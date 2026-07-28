@@ -1,5 +1,17 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.4.0 — Build: 2026-07-28 BRT -->
+<!-- Porsche Service Rio PWA — v4.4.2 — Build: 2026-07-28 BRT -->
+<!-- v4.4.2: ORÇAMENTO — preço de venda passa a ser o MAIOR entre o valor
+     calculado (custo x fator NCM / margem) e o MSRP. O MSRP virou piso, não
+     teto. O painel mostra qual dos dois prevaleceu e quanto daria o outro;
+     a base ('calculado' / 'msrp' / 'manual') fica gravada por item no
+     itens_json. Edição manual do unitário continua tendo prioridade. -->
+<!-- v4.4.1: ORÇAMENTO — busca de cliente/veículo por placa, nome, CPF ou
+     nº do RO reaproveitando ?action=searchCustomers (preenche cliente,
+     modelo+ano, placa e VIN de uma vez; vários resultados viram lista de
+     escolha). Campo PRAZO novo no cabeçalho, condicional como os demais —
+     some do documento se ficar em branco — e gravado na aba Orcamentos.
+     Corpos de texto do painel aumentados para leitura em tela de celular;
+     inputs a 16px, que também evita o zoom automático do iOS. -->
 <!-- v4.4.0: ORÇAMENTO RO — gerador de estimativas para o cliente. Ícone
      🧾 na nav (ambas as barras), ao lado do Polaris, com o MESMO gate do
      POLARIS: Aprovadores + POLARIS_EXTRA_ACCESS, resolvido server-side
@@ -1995,7 +2007,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.4.0';
+const APP_VERSION = '4.4.2';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -7508,38 +7520,42 @@ function Polaris_brl(n) {
 
 <style>
 .orc-sec{margin-top:18px}
-.orc-sec-t{font-size:10px;font-weight:700;letter-spacing:.14em;color:#888;text-transform:uppercase;padding-bottom:5px;border-bottom:2px solid var(--black);margin-bottom:10px}
+.orc-sec-t{font-size:11.5px;font-weight:700;letter-spacing:.14em;color:#888;text-transform:uppercase;padding-bottom:5px;border-bottom:2px solid var(--black);margin-bottom:10px}
 .orc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .orc-grid .orc-wide{grid-column:1/-1}
-.orc-f label{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;color:#888;text-transform:uppercase;margin-bottom:4px}
-.orc-f input,.orc-f select,.orc-f textarea{width:100%;padding:10px;font-size:15px;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:inherit}
+.orc-f label{display:block;font-size:11.5px;font-weight:700;letter-spacing:.08em;color:#888;text-transform:uppercase;margin-bottom:4px}
+.orc-f input,.orc-f select,.orc-f textarea{width:100%;padding:12px;font-size:16px;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:inherit}
 .orc-f textarea{min-height:56px;resize:vertical}
 .orc-f input[readonly]{opacity:.6}
 .orc-found{display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
 .orc-found.on{display:block}
-.orc-found-d{font-weight:700;font-size:14px;margin-bottom:8px}
-.orc-kv{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#888}
+.orc-found-d{font-weight:700;font-size:16px;margin-bottom:8px}
+.orc-kv{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;color:#888}
 .orc-kv b{color:inherit}
 .orc-calc{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
 .orc-calc .orc-f{flex:1;min-width:88px}
-.orc-price{font-size:19px;font-weight:800;padding-bottom:8px;white-space:nowrap}
-.orc-ok{width:46px;height:42px;flex-shrink:0;border:none;border-radius:6px;background:#0a7a3d;color:#fff;font-size:19px;cursor:pointer}
-.orc-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
-.orc-tbl th{text-align:left;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#888;padding:6px 6px 6px 0;border-bottom:1px solid var(--border)}
+.orc-basis{flex-basis:100%;font-size:12.5px;color:#888;margin-top:2px}
+.orc-price{font-size:21px;font-weight:800;padding-bottom:8px;white-space:nowrap}
+.orc-ok{width:50px;height:48px;flex-shrink:0;border:none;border-radius:6px;background:#0a7a3d;color:#fff;font-size:19px;cursor:pointer}
+.orc-tbl{width:100%;border-collapse:collapse;font-size:14.5px;margin-top:4px}
+.orc-tbl th{text-align:left;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#888;padding:6px 6px 6px 0;border-bottom:1px solid var(--border)}
 .orc-tbl td{padding:8px 6px 8px 0;border-bottom:1px solid var(--border);vertical-align:top}
 .orc-tbl .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .orc-tbl tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--black)}
-.orc-x{border:none;background:none;color:#bbb;font-size:17px;cursor:pointer;padding:0 2px}
-.orc-none{color:#999;font-size:13px;padding:6px 0}
+.orc-x{border:none;background:none;color:#bbb;font-size:19px;cursor:pointer;padding:0 2px}
+.orc-none{color:#999;font-size:14px;padding:6px 0}
+.orc-hit{border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:6px;cursor:pointer;background:var(--bg)}
+.orc-hit b{display:block;font-size:14.5px}
+.orc-hit span{font-size:12.5px;color:#888}
 .orc-total{display:flex;justify-content:space-between;align-items:baseline;background:var(--black);color:#fff;border-radius:8px;padding:14px 16px;margin-top:18px}
-.orc-total span{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
-.orc-total b{font-size:25px;font-variant-numeric:tabular-nums}
+.orc-total span{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.orc-total b{font-size:27px;font-variant-numeric:tabular-nums}
 .orc-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.orc-btn{padding:11px 16px;font-size:14px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid var(--black);background:none;color:inherit;font-family:inherit}
+.orc-btn{padding:13px 18px;font-size:15px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid var(--black);background:none;color:inherit;font-family:inherit}
 .orc-btn.pri{background:var(--black);color:#fff}
 .orc-btn.go{background:#0a7a3d;border-color:#0a7a3d;color:#fff}
 .orc-btn:disabled{opacity:.4;cursor:not-allowed}
-.orc-st{font-size:12.5px;color:#888;margin-top:10px;min-height:16px}
+.orc-st{font-size:13.5px;color:#888;margin-top:10px;min-height:16px}
 .orc-st.err{color:var(--red)}
 /* --- documento gerado (fora da tela) --- */
 #orcDoc{
@@ -7613,6 +7629,13 @@ function Polaris_brl(n) {
 
     <div class="orc-sec">
       <div class="orc-sec-t">Cliente e veículo</div>
+      <div class="polaris-search-row" style="margin-bottom:10px">
+        <input type="text" id="orc-busca" class="polaris-input" autocomplete="off"
+               placeholder="Placa, nome, CPF ou nº do RO"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();Orcamento_buscarCliente()}">
+        <button class="polaris-search-btn" id="orc-busca-btn" onclick="Orcamento_buscarCliente()">Buscar</button>
+      </div>
+      <div id="orc-busca-res"></div>
       <div class="orc-grid">
         <div class="orc-f orc-wide"><label for="orc-cli">Cliente (opcional)</label><input id="orc-cli" autocomplete="off"></div>
         <div class="orc-f"><label for="orc-mod">Modelo</label><input id="orc-mod" autocomplete="off" placeholder="911 Carrera S"></div>
@@ -7620,6 +7643,7 @@ function Polaris_brl(n) {
         <div class="orc-f orc-wide"><label for="orc-vin">Chassi (VIN)</label><input id="orc-vin" maxlength="17" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
         <div class="orc-f"><label for="orc-dt">Data</label><input id="orc-dt" type="date" onchange="Orcamento_validade()"></div>
         <div class="orc-f"><label for="orc-val">Válido até</label><input id="orc-val" type="date" readonly></div>
+        <div class="orc-f orc-wide"><label for="orc-prz">Prazo</label><input id="orc-prz" autocomplete="off" placeholder="5 dias úteis"></div>
         <div class="orc-f orc-wide"><label for="orc-obs">Observação</label><textarea id="orc-obs"></textarea></div>
       </div>
     </div>
@@ -7658,6 +7682,7 @@ function Polaris_brl(n) {
             <input id="orc-unit" type="number" step="0.01" min="0" oninput="Orcamento_manual()"></div>
           <div class="orc-price" id="orc-sub-item">R$ 0,00</div>
           <button class="orc-ok" onclick="Orcamento_addPeca()" aria-label="Incluir peça">&#10003;</button>
+          <div class="orc-basis" id="orc-base"></div>
         </div>
       </div>
       <div class="orc-st" id="orc-st-peca"></div>
@@ -7728,6 +7753,7 @@ function Polaris_brl(n) {
     <div id="dcModelo"><div class="k">Modelo</div><div class="v" id="dModelo"></div></div>
     <div id="dcPlaca"><div class="k">Placa</div><div class="v" id="dPlaca"></div></div>
     <div id="dcVin"><div class="k">Chassi</div><div class="v" id="dVin"></div></div>
+    <div id="dcPrazo"><div class="k">Prazo</div><div class="v" id="dPrazo"></div></div>
     <div><div class="k">Data</div><div class="v" id="dData"></div></div>
     <div><div class="k">Válido até</div><div class="v" id="dValidade"></div></div>
   </div>
@@ -7783,7 +7809,7 @@ function Polaris_brl(n) {
 (function () {
 'use strict';
 
-var estado = { itens: [], peca: null, manual: false, numero: null, res: null };
+var estado = { itens: [], peca: null, manual: false, base: 'calculado', numero: null, res: null };
 
 function $(id){ return document.getElementById(id); }
 function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -7841,7 +7867,8 @@ function st(id,txt,erro){ var n=$(id); n.textContent=txt||''; n.className='orc-s
           ['Placa', $('orc-pla').value.trim()],
           ['Chassi', $('orc-vin').value.trim()],
           ['Data', dataBR($('orc-dt').value)],
-          ['Válido até', dataBR($('orc-val').value)]
+          ['Válido até', dataBR($('orc-val').value)],
+          ['Prazo', $('orc-prz').value.trim()]
         ].filter(function (c) { return c[1]; });
 
         var y = 37;
@@ -8009,6 +8036,46 @@ function carregarContexto() {
     .catch(function(e){ st('orc-st','Falha ao carregar aprovadores: '+e.message, true); });
 }
 
+// ── busca de cliente/veículo (reusa o searchCustomers existente) ──
+function Orcamento_buscarCliente() {
+  var q = $('orc-busca').value.trim();
+  var res = $('orc-busca-res');
+  if (!q) { res.innerHTML = ''; return; }
+  $('orc-busca-btn').disabled = true;
+  res.innerHTML = '<div class="orc-none">A buscar…</div>';
+
+  fetch(API_URL + '?action=searchCustomers&query=' + encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      $('orc-busca-btn').disabled = false;
+      if (!d.ok || !d.results || !d.results.length) {
+        res.innerHTML = '<div class="orc-none">Nada encontrado — preencha à mão abaixo.</div>';
+        return;
+      }
+      if (d.results.length === 1) { preencherCliente(d.results[0]); res.innerHTML = ''; return; }
+      res.innerHTML = '<div class="orc-none">Vários resultados — selecione:</div>' +
+        d.results.map(function(c, i){
+          return '<div class="orc-hit" data-i="'+i+'"><b>'+esc(c['Client Name']||'(sem nome)')+'</b>'+
+                 '<span>'+esc(c['License']||'')+' — '+esc(c['Modelo']||'')+' '+esc(String(c['Year']||''))+'</span></div>';
+        }).join('');
+      res.querySelectorAll('[data-i]').forEach(function(card){
+        card.addEventListener('click', function(){
+          preencherCliente(d.results[Number(card.dataset.i)]);
+          res.innerHTML = '';
+        });
+      });
+    })
+    .catch(function(){ $('orc-busca-btn').disabled = false; res.innerHTML = '<div class="orc-none">Erro na busca.</div>'; });
+}
+
+function preencherCliente(c) {
+  $('orc-cli').value = c['Client Name'] || '';
+  $('orc-mod').value = [c['Modelo'], c['Year']].filter(Boolean).join(' ').trim();
+  $('orc-pla').value = c['License'] || '';
+  $('orc-vin').value = c['VIN'] || '';
+  if (typeof showToast === 'function') showToast('Dados do veículo preenchidos.');
+}
+
 function Orcamento_validade() {
   var b = $('orc-dt').value; if (!b) return;
   var d = new Date(b + 'T12:00:00'); d.setDate(d.getDate() + 7);
@@ -8062,11 +8129,22 @@ function Orcamento_margem() {
 }
 function margemAtual(){ return parseFloat($('orc-marf').value) || 0.56; }
 
+// Preço de venda = o MAIOR entre o calculado (custo x fator NCM / margem)
+// e o MSRP. O MSRP passa a ser piso, nunca teto.
 function Orcamento_preco() {
   if (!estado.peca) return;
   if (!estado.manual) {
     var ncmF = parseFloat($('orc-ncmf').value) || 1.4;
-    $('orc-unit').value = (((estado.peca.cost||0) * ncmF) / margemAtual()).toFixed(2);
+    var calc = ((estado.peca.cost || 0) * ncmF) / margemAtual();
+    var msrp = Number(estado.peca.msrp) || 0;
+    estado.base = msrp > calc ? 'msrp' : 'calculado';
+    $('orc-unit').value = Math.max(calc, msrp).toFixed(2);
+    $('orc-base').textContent = msrp > calc
+      ? 'Usando o MSRP — o calculado daria ' + moeda(calc) + '.'
+      : (msrp ? 'Usando o calculado — acima do MSRP de ' + moeda(msrp) + '.' : 'Usando o calculado.');
+  } else {
+    estado.base = 'manual';
+    $('orc-base').textContent = 'Preço definido à mão.';
   }
   $('orc-sub-item').textContent = moeda((parseFloat($('orc-qtd').value)||0) * (parseFloat($('orc-unit').value)||0));
 }
@@ -8079,9 +8157,11 @@ function Orcamento_addPeca() {
   estado.itens.push({ grupo:'peca', codigo: estado.peca.part,
     descricao: estado.peca.desc_pt || estado.peca.desc_en || '',
     qtd: qtd, unitario: unit, custo: estado.peca.cost, msrp: estado.peca.msrp,
+    base: estado.base || 'calculado',
     margem: estado.manual ? null : margemAtual() });
   estado.peca = null;
-  $('orc-found').classList.remove('on'); $('orc-pn').value=''; $('orc-pn').focus();
+  $('orc-found').classList.remove('on'); $('orc-base').textContent='';
+  $('orc-pn').value=''; $('orc-pn').focus();
   st('orc-st-peca','Peça incluída.'); desenhar();
 }
 
@@ -8137,7 +8217,8 @@ function grupoHTML(grupo, alvo, rc, rq) {
 // ── documento HTML (fonte do JPG) ─────────────────────────
 function montarDocumento(numero) {
   $('dNumero').textContent = numero || '—';
-  [['Cliente','orc-cli'],['Modelo','orc-mod'],['Placa','orc-pla'],['Vin','orc-vin']].forEach(function(p){
+  [['Cliente','orc-cli'],['Modelo','orc-mod'],['Placa','orc-pla'],['Vin','orc-vin'],
+   ['Prazo','orc-prz']].forEach(function(p){
     var v = $(p[1]).value.trim();
     $('d'+p[0]).textContent = v;
     $('dc'+p[0]).style.display = v ? '' : 'none';
@@ -8251,7 +8332,8 @@ async function Orcamento_gerar() {
         action:'orcSalvar', tech: currentTech, numero: numero,
         cliente: $('orc-cli').value.trim(), modelo: $('orc-mod').value.trim(),
         placa: $('orc-pla').value.trim(), vin: $('orc-vin').value.trim(),
-        observacao: $('orc-obs').value.trim(), taxaMO: taxaAtual(),
+        observacao: $('orc-obs').value.trim(), prazo: $('orc-prz').value.trim(),
+        taxaMO: taxaAtual(),
         itens: estado.itens, aprovadorId: $('orc-apv').value,
         dropboxPath: caminhoFinal, dropboxLink: link
       })
@@ -8274,6 +8356,7 @@ function Orcamento_wpp(){ if (estado.res && estado.res.whatsapp) window.open(est
 window.Orcamento_openNav  = Orcamento_openNav;
 window.Orcamento_close    = Orcamento_close;
 window.Orcamento_validade = Orcamento_validade;
+window.Orcamento_buscarCliente = Orcamento_buscarCliente;
 window.Orcamento_buscar   = Orcamento_buscar;
 window.Orcamento_margem   = Orcamento_margem;
 window.Orcamento_preco    = Orcamento_preco;
