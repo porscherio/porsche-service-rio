@@ -1033,6 +1033,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
       <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" id="btn-polaris-nav" style="display:none" onclick="openPolarisNav()">&#x1F50D;<br>Polaris</button>
+      <button class="ntab" id="btn-orcamento-nav" style="display:none" onclick="Orcamento_openNav()">&#x1F9FE;<br>Orçamento</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -1421,6 +1422,7 @@ input:focus{outline:none;border-color:var(--black)}
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
       <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" id="btn-polaris-nav" style="display:none" onclick="openPolarisNav()">&#x1F50D;<br>Polaris</button>
+      <button class="ntab" id="btn-orcamento-nav" style="display:none" onclick="Orcamento_openNav()">&#x1F9FE;<br>Orçamento</button>
       <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
     </div>
   </div>
@@ -2103,6 +2105,7 @@ async function doLogin() {
   document.getElementById('sug-greet').textContent = saudacao;
   checkAndShowApprovalButton();
   checkAndShowPolarisButton();
+  checkAndShowOrcamentoButton();
   checkAndShowDisponibilidadeIcon();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
   // v3.6.0 — REVERTED the v3.5.0 change that awaited loadROs()/
@@ -2205,6 +2208,7 @@ function doLogout() {
   document.getElementById('btn-agenda').style.display='none';
   const siNavBtn = document.getElementById('btn-si-nav'); if (siNavBtn) siNavBtn.style.display='none';
   const polarisNavBtn = document.getElementById('btn-polaris-nav'); if (polarisNavBtn) polarisNavBtn.style.display='none';
+  const orcNavBtn = document.getElementById('btn-orcamento-nav'); if (orcNavBtn) orcNavBtn.style.display='none';
   // v3.6.3 — FIX: none of these were being reset on logout, so on a
   // shared device (multiple techs using the same phone/tablet through
   // the day) only the FIRST tech after a page load would ever see the
@@ -7455,5 +7459,820 @@ function Polaris_brl(n) {
     <!-- rendered dynamically by SI_renderCard() -->
   </div>
 </div>
+
+<!-- ═══ ORÇAMENTO RO v2.0.0 — bloco autocontido ═══ -->
+<!--
+  orcamento.html — Orçamento RO · v2.0.0
+  Porsche Service Rio
+
+  Reescrito para o index.html v4.1.3 real.
+    · a busca de peça usa o polarisSearch que já existe (não duplica lookup)
+    · o Dropbox recebe o arquivo direto do browser, com o token de
+      ?action=get_dropbox_token, igual às fotos e vídeos
+    · o chrome reaproveita as classes .polaris-* que já estão no CSS
+
+  INSTALAÇÃO
+    1) cole este bloco inteiro no index.html, antes de </body>
+    2) nas DUAS navs (por volta das linhas 1035 e 1423), depois do Polaris:
+         <button class="ntab" id="btn-orcamento-nav" style="display:none"
+                 onclick="Orcamento_openNav()">&#x1F9FE;<br>Orçamento</button>
+    3) em doLogin(), junto de checkAndShowPolarisButton():
+         checkAndShowOrcamentoButton();
+    4) em doLogout(), junto dos outros:
+         var b=document.getElementById('btn-orcamento-nav');
+         if(b) b.style.display='none';
+    5) no Code.gs: orcRotearGet(e.parameter) no doGet e
+       orcRotearPost(dados) no doPost
+-->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+.orc-sec{margin-top:18px}
+.orc-sec-t{font-size:10px;font-weight:700;letter-spacing:.14em;color:#888;text-transform:uppercase;padding-bottom:5px;border-bottom:2px solid var(--black);margin-bottom:10px}
+.orc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.orc-grid .orc-wide{grid-column:1/-1}
+.orc-f label{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;color:#888;text-transform:uppercase;margin-bottom:4px}
+.orc-f input,.orc-f select,.orc-f textarea{width:100%;padding:10px;font-size:15px;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:inherit}
+.orc-f textarea{min-height:56px;resize:vertical}
+.orc-f input[readonly]{opacity:.6}
+.orc-found{display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.orc-found.on{display:block}
+.orc-found-d{font-weight:700;font-size:14px;margin-bottom:8px}
+.orc-kv{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#888}
+.orc-kv b{color:inherit}
+.orc-calc{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.orc-calc .orc-f{flex:1;min-width:88px}
+.orc-price{font-size:19px;font-weight:800;padding-bottom:8px;white-space:nowrap}
+.orc-ok{width:46px;height:42px;flex-shrink:0;border:none;border-radius:6px;background:#0a7a3d;color:#fff;font-size:19px;cursor:pointer}
+.orc-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+.orc-tbl th{text-align:left;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#888;padding:6px 6px 6px 0;border-bottom:1px solid var(--border)}
+.orc-tbl td{padding:8px 6px 8px 0;border-bottom:1px solid var(--border);vertical-align:top}
+.orc-tbl .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.orc-tbl tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--black)}
+.orc-x{border:none;background:none;color:#bbb;font-size:17px;cursor:pointer;padding:0 2px}
+.orc-none{color:#999;font-size:13px;padding:6px 0}
+.orc-total{display:flex;justify-content:space-between;align-items:baseline;background:var(--black);color:#fff;border-radius:8px;padding:14px 16px;margin-top:18px}
+.orc-total span{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.orc-total b{font-size:25px;font-variant-numeric:tabular-nums}
+.orc-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.orc-btn{padding:11px 16px;font-size:14px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid var(--black);background:none;color:inherit;font-family:inherit}
+.orc-btn.pri{background:var(--black);color:#fff}
+.orc-btn.go{background:#0a7a3d;border-color:#0a7a3d;color:#fff}
+.orc-btn:disabled{opacity:.4;cursor:not-allowed}
+.orc-st{font-size:12.5px;color:#888;margin-top:10px;min-height:16px}
+.orc-st.err{color:var(--red)}
+/* --- documento gerado (fora da tela) --- */
+#orcDoc{
+  position:fixed; left:-99999px; top:0;
+  width:794px; min-height:1123px; padding:52px 56px 40px;
+  background:#fff; color:#0b0b0c;
+  font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  display:flex; flex-direction:column;
+}
+#orcDoc .d-topo{
+  display:flex; justify-content:space-between; align-items:flex-start;
+  padding-bottom:16px; border-bottom:3px solid #0b0b0c;
+}
+#orcDoc .d-marca{font-size:19px; font-weight:700; letter-spacing:.2em; text-transform:uppercase}
+#orcDoc .d-marca em{font-style:normal; color:#d5001c}
+#orcDoc .d-tipo{font-size:10px; letter-spacing:.22em; color:#6c7075; margin-top:6px; text-transform:uppercase}
+#orcDoc .d-numero{text-align:right}
+#orcDoc .d-numero b{font-size:16px; font-variant-numeric:tabular-nums}
+#orcDoc .d-numero div{font-size:10px; letter-spacing:.16em; color:#6c7075; text-transform:uppercase}
+
+#orcDoc .d-cab{
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:14px 24px; padding:20px 0; border-bottom:1px solid #dcdee1;
+}
+#orcDoc .d-cab .k{font-size:9px; letter-spacing:.14em; color:#6c7075; text-transform:uppercase}
+#orcDoc .d-cab .v{font-size:14px; font-weight:600; margin-top:3px; min-height:17px}
+#orcDoc .d-obs{padding:14px 0; border-bottom:1px solid #dcdee1; font-size:13px; line-height:1.5}
+#orcDoc .d-obs .k{font-size:9px; letter-spacing:.14em; color:#6c7075; text-transform:uppercase; margin-bottom:4px}
+
+#orcDoc .d-grupo{margin-top:22px}
+#orcDoc .d-grupo h3{
+  font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+  margin:0 0 8px; padding-bottom:5px; border-bottom:2px solid #0b0b0c;
+}
+#orcDoc table{width:100%; border-collapse:collapse; font-size:12px}
+#orcDoc th{
+  text-align:left; font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  color:#6c7075; padding:5px 6px 5px 0; border-bottom:1px solid #dcdee1;
+}
+#orcDoc td{padding:6px 6px 6px 0; border-bottom:1px solid #eceef0}
+#orcDoc .n{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+#orcDoc .d-sub td{font-weight:700; border-top:1px solid #0b0b0c; border-bottom:none; padding-top:8px}
+#orcDoc .d-total{
+  margin-top:26px; display:flex; justify-content:space-between; align-items:baseline;
+  background:#0b0b0c; color:#fff; padding:14px 18px;
+}
+#orcDoc .d-total span{font-size:10px; letter-spacing:.2em; text-transform:uppercase}
+#orcDoc .d-total b{font-size:22px; font-variant-numeric:tabular-nums}
+
+#orcDoc .d-pe{
+  margin-top:auto; padding-top:22px; border-top:1px solid #dcdee1;
+  display:flex; justify-content:space-between; align-items:flex-end;
+  font-size:10px; color:#6c7075; line-height:1.6;
+}
+#orcDoc .d-pill{
+  border:1px solid #dcdee1; border-radius:999px; padding:3px 10px;
+  font-size:9px; letter-spacing:.1em; color:#6c7075; white-space:nowrap;
+}
+</style>
+
+<div id="orc-panel" class="polaris-overlay" role="dialog" aria-label="Orçamento">
+  <div class="polaris-topbar">
+    <div>
+      <div class="polaris-topbar-title">ORÇAMENTO</div>
+      <div class="polaris-topbar-sub">ESTIMATIVA AO CLIENTE</div>
+    </div>
+    <button class="polaris-close-btn" onclick="Orcamento_close()" aria-label="Fechar">&#x2715;</button>
+  </div>
+
+  <div class="polaris-body">
+
+    <div class="orc-sec">
+      <div class="orc-sec-t">Cliente e veículo</div>
+      <div class="orc-grid">
+        <div class="orc-f orc-wide"><label for="orc-cli">Cliente (opcional)</label><input id="orc-cli" autocomplete="off"></div>
+        <div class="orc-f"><label for="orc-mod">Modelo</label><input id="orc-mod" autocomplete="off" placeholder="911 Carrera S"></div>
+        <div class="orc-f"><label for="orc-pla">Placa</label><input id="orc-pla" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="orc-f orc-wide"><label for="orc-vin">Chassi (VIN)</label><input id="orc-vin" maxlength="17" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="orc-f"><label for="orc-dt">Data</label><input id="orc-dt" type="date" onchange="Orcamento_validade()"></div>
+        <div class="orc-f"><label for="orc-val">Válido até</label><input id="orc-val" type="date" readonly></div>
+        <div class="orc-f orc-wide"><label for="orc-obs">Observação</label><textarea id="orc-obs"></textarea></div>
+      </div>
+    </div>
+
+    <div class="orc-sec">
+      <div class="orc-sec-t">Adicionar peça</div>
+      <div class="polaris-search-row">
+        <input type="text" id="orc-pn" class="polaris-input" style="text-transform:uppercase"
+               placeholder="Nº da peça (ex: 000 951 06)" autocomplete="off" autocapitalize="characters"
+               oninput="this.value=this.value.toUpperCase()"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();Orcamento_buscar()}">
+        <button class="polaris-search-btn" id="orc-pn-btn" onclick="Orcamento_buscar()">Buscar</button>
+      </div>
+
+      <div class="orc-found" id="orc-found">
+        <div class="orc-found-d" id="orc-desc"></div>
+        <div class="orc-kv">
+          <div>PN <b id="orc-pn-f">—</b></div>
+          <div>Custo <b id="orc-custo">—</b></div>
+          <div>MSRP <b id="orc-msrp">—</b></div>
+          <div>NCM <b id="orc-ncm">—</b></div>
+        </div>
+        <div class="orc-calc">
+          <div class="orc-f"><label for="orc-ncmf">Fator NCM</label>
+            <input id="orc-ncmf" type="number" step="0.01" value="1.4" oninput="Orcamento_preco()"></div>
+          <div class="orc-f"><label for="orc-mar">Margem</label>
+            <select id="orc-mar" onchange="Orcamento_margem()">
+              <option value="0.70">0.70</option><option value="0.63">0.63</option>
+              <option value="0.56" selected>0.56</option><option value="custom">Outro…</option>
+            </select></div>
+          <div class="orc-f" id="orc-mar-wrap" style="display:none"><label for="orc-marf">Valor</label>
+            <input id="orc-marf" type="number" step="0.01" value="0.56" oninput="Orcamento_preco()"></div>
+          <div class="orc-f" style="max-width:70px"><label for="orc-qtd">Qtd</label>
+            <input id="orc-qtd" type="number" step="1" min="1" value="1" oninput="Orcamento_preco()"></div>
+          <div class="orc-f"><label for="orc-unit">Unitário</label>
+            <input id="orc-unit" type="number" step="0.01" min="0" oninput="Orcamento_manual()"></div>
+          <div class="orc-price" id="orc-sub-item">R$ 0,00</div>
+          <button class="orc-ok" onclick="Orcamento_addPeca()" aria-label="Incluir peça">&#10003;</button>
+        </div>
+      </div>
+      <div class="orc-st" id="orc-st-peca"></div>
+    </div>
+
+    <div class="orc-sec">
+      <div class="orc-sec-t">Adicionar mão de obra</div>
+      <div class="orc-grid">
+        <div class="orc-f"><label for="orc-taxa">Taxa horária</label>
+          <select id="orc-taxa" onchange="Orcamento_taxa()">
+            <option value="545">R$ 545,00</option><option value="635" selected>R$ 635,00</option>
+            <option value="custom">Outro…</option>
+          </select></div>
+        <div class="orc-f" id="orc-taxa-wrap" style="display:none"><label for="orc-taxaf">Valor da hora</label>
+          <input id="orc-taxaf" type="number" step="0.01" value="635" oninput="Orcamento_mo()"></div>
+        <div class="orc-f"><label for="orc-cod">Código</label><input id="orc-cod" autocomplete="off" placeholder="MO-001"></div>
+        <div class="orc-f orc-wide"><label for="orc-dmo">Serviço</label><input id="orc-dmo" autocomplete="off" placeholder="Revisão de 60.000 km"></div>
+        <div class="orc-f" style="max-width:90px"><label for="orc-hrs">Horas</label>
+          <input id="orc-hrs" type="number" step="0.1" min="0.1" value="1" oninput="Orcamento_mo()"></div>
+        <div style="display:flex;align-items:flex-end;gap:10px">
+          <div class="orc-price" id="orc-sub-mo">R$ 0,00</div>
+          <button class="orc-ok" onclick="Orcamento_addMO()" aria-label="Incluir serviço">&#10003;</button>
+        </div>
+      </div>
+      <div class="orc-st" id="orc-st-mo"></div>
+    </div>
+
+    <div class="orc-sec">
+      <div class="orc-sec-t">Peças</div><div id="orc-t-pecas"></div>
+      <div class="orc-sec-t" style="margin-top:20px">Mão de obra</div><div id="orc-t-mo"></div>
+    </div>
+
+    <div class="orc-total"><span>Total geral</span><b id="orc-total">R$ 0,00</b></div>
+
+    <div class="orc-sec">
+      <div class="orc-sec-t">Gerar e enviar</div>
+      <div class="orc-grid">
+        <div class="orc-f"><label for="orc-fmt">Formato</label>
+          <select id="orc-fmt"><option value="ambos" selected>PDF e JPG</option>
+            <option value="pdf">Só PDF</option><option value="jpg">Só JPG</option></select></div>
+        <div class="orc-f"><label for="orc-apv">Enviar para</label><select id="orc-apv"></select></div>
+      </div>
+      <div class="orc-acts">
+        <button class="orc-btn" onclick="Orcamento_previa()">Pré-visualizar</button>
+        <button class="orc-btn pri" id="orc-gerar" onclick="Orcamento_gerar()">Gerar e salvar</button>
+        <button class="orc-btn go" id="orc-wpp" style="display:none" onclick="Orcamento_wpp()">Enviar no WhatsApp</button>
+      </div>
+      <div class="orc-st" id="orc-st"></div>
+    </div>
+
+  </div>
+</div>
+<!-- documento renderizado (offscreen) -->
+<div id="orcDoc" aria-hidden="true">
+  <div class="d-topo">
+    <div>
+      <div class="d-marca">Porsche <em>|</em> RJ</div>
+      <div class="d-tipo">Orçamento de serviço</div>
+    </div>
+    <div class="d-numero">
+      <div>Número</div>
+      <b id="dNumero">—</b>
+    </div>
+  </div>
+
+  <div class="d-cab">
+    <div id="dcCliente"><div class="k">Cliente</div><div class="v" id="dCliente"></div></div>
+    <div id="dcModelo"><div class="k">Modelo</div><div class="v" id="dModelo"></div></div>
+    <div id="dcPlaca"><div class="k">Placa</div><div class="v" id="dPlaca"></div></div>
+    <div id="dcVin"><div class="k">Chassi</div><div class="v" id="dVin"></div></div>
+    <div><div class="k">Data</div><div class="v" id="dData"></div></div>
+    <div><div class="k">Válido até</div><div class="v" id="dValidade"></div></div>
+  </div>
+
+  <div class="d-obs" id="dObsBox">
+    <div class="k">Observação</div>
+    <div id="dObs"></div>
+  </div>
+
+  <div class="d-grupo" id="dGrupoPecas">
+    <h3>Peças</h3>
+    <table>
+      <thead><tr>
+        <th style="width:32px">#</th><th style="width:120px">Part number</th>
+        <th>Descrição</th><th class="n" style="width:46px">Qtd</th>
+        <th class="n" style="width:96px">Unitário</th><th class="n" style="width:104px">Subtotal</th>
+      </tr></thead>
+      <tbody id="dPecas"></tbody>
+      <tfoot><tr class="d-sub">
+        <td colspan="5">Subtotal peças</td><td class="n" id="dSubPecas"></td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+  <div class="d-grupo" id="dGrupoMO">
+    <h3>Mão de obra</h3>
+    <table>
+      <thead><tr>
+        <th style="width:32px">#</th><th style="width:120px">Código</th>
+        <th>Descrição</th><th class="n" style="width:46px">Horas</th>
+        <th class="n" style="width:96px">Hora</th><th class="n" style="width:104px">Subtotal</th>
+      </tr></thead>
+      <tbody id="dMO"></tbody>
+      <tfoot><tr class="d-sub">
+        <td colspan="5">Subtotal mão de obra</td><td class="n" id="dSubMO"></td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+  <div class="d-total"><span>Total geral</span><b id="dTotal"></b></div>
+
+  <div class="d-pe">
+    <div>
+      <b style="color:#0b0b0c">Porsche Service Rio</b> · 21 3032-0911<br>
+      Estrada do Itanhangá 1079 · Itanhangá · 22753-005 · Rio de Janeiro RJ
+    </div>
+    <div class="d-pill" id="dVersao">v1.1.0</div>
+  </div>
+</div>
+
+
+<script>
+(function () {
+'use strict';
+
+var estado = { itens: [], peca: null, manual: false, numero: null, res: null };
+
+function $(id){ return document.getElementById(id); }
+function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function dataBR(iso){ if(!iso) return ''; var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function st(id,txt,erro){ var n=$(id); n.textContent=txt||''; n.className='orc-st'+(erro?' err':''); }
+
+  // PDF vetorial paginado. Texto real, não imagem.
+  function construirPDF(numero) {
+      var TINTA = [11, 11, 12], CINZA = [108, 112, 117],
+          FINA = [220, 222, 225], MAIS_FINA = [236, 238, 240];
+      var L = 18, R = 192, LARG = R - L, RODAPE = 262;
+
+      var doc = new window.jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+      function brl(v) {
+        return (Number(v) || 0).toFixed(2)
+          .replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+      function micro(txto, x, y, alinha) {
+        doc.setFont('helvetica', 'normal').setFontSize(6.5);
+        doc.setTextColor(CINZA[0], CINZA[1], CINZA[2]);
+        doc.text(String(txto).toUpperCase(), x, y, { charSpace: 0.5, align: alinha || 'left' });
+      }
+      function corpo(txto, x, y, tamanho, negrito, alinha) {
+        doc.setFont('helvetica', negrito ? 'bold' : 'normal').setFontSize(tamanho || 9.5);
+        doc.setTextColor(TINTA[0], TINTA[1], TINTA[2]);
+        doc.text(String(txto), x, y, { align: alinha || 'left' });
+      }
+      function regua(y, espessura, cor) {
+        doc.setLineWidth(espessura);
+        doc.setDrawColor(cor[0], cor[1], cor[2]);
+        doc.line(L, y, R, y);
+      }
+
+      // ---- cabeçalho completo (página 1) ----
+      function cabecalhoCompleto() {
+        doc.setFont('helvetica', 'bold').setFontSize(13);
+        doc.setTextColor(TINTA[0], TINTA[1], TINTA[2]);
+        doc.text('PORSCHE', L, 21, { charSpace: 0.9 });
+        var larguraMarca = doc.getTextWidth('PORSCHE') + 0.9 * 8;
+        doc.setDrawColor(213, 0, 28).setLineWidth(0.7);
+        doc.line(L + larguraMarca + 3, 17.5, L + larguraMarca + 3, 21.5);
+        doc.text('RJ', L + larguraMarca + 7, 21, { charSpace: 0.9 });
+        micro('Orçamento de serviço', L, 26);
+
+        micro('Número', R, 18, 'right');
+        corpo(numero, R, 23.5, 11, true, 'right');
+
+        regua(29.5, 1.1, TINTA);
+
+        var campos = [
+          ['Cliente', $('orc-cli').value.trim()],
+          ['Modelo', $('orc-mod').value.trim()],
+          ['Placa', $('orc-pla').value.trim()],
+          ['Chassi', $('orc-vin').value.trim()],
+          ['Data', dataBR($('orc-dt').value)],
+          ['Válido até', dataBR($('orc-val').value)]
+        ].filter(function (c) { return c[1]; });
+
+        var y = 37;
+        campos.forEach(function (campo, i) {
+          var coluna = i % 3;
+          if (coluna === 0 && i > 0) y += 12;
+          var x = L + coluna * (LARG / 3);
+          micro(campo[0], x, y);
+          corpo(campo[1], x, y + 4.8, 9.5, true);
+        });
+        y += 9;
+        regua(y, 0.2, FINA);
+
+        var obs = $('orc-obs').value.trim();
+        if (obs) {
+          y += 6;
+          micro('Observação', L, y);
+          doc.setFont('helvetica', 'normal').setFontSize(8.5);
+          doc.setTextColor(TINTA[0], TINTA[1], TINTA[2]);
+          var linhas = doc.splitTextToSize(obs, LARG);
+          doc.text(linhas, L, y + 4.6);
+          y += 4.6 + linhas.length * 4 + 3;
+          regua(y, 0.2, FINA);
+        }
+        return y + 8;
+      }
+
+      // ---- cabeçalho reduzido (páginas 2+) ----
+      function cabecalhoCurto() {
+        doc.setFont('helvetica', 'bold').setFontSize(8);
+        doc.setTextColor(TINTA[0], TINTA[1], TINTA[2]);
+        doc.text('PORSCHE | RJ', L, 16, { charSpace: 0.6 });
+        var etiqueta = numero;
+        var placa = $('orc-pla').value.trim();
+        if (placa) etiqueta += '  ·  ' + placa;
+        micro(etiqueta, R, 16, 'right');
+        regua(19, 0.4, TINTA);
+      }
+
+      function pagina() {
+        return doc.internal.getCurrentPageInfo().pageNumber;
+      }
+
+      function tabela(grupo, titulo, rotuloCodigo, rotuloQtd, inicioY) {
+        var linhas = [], soma = 0, n = 0;
+        estado.itens.forEach(function (i) {
+          if (i.grupo !== grupo) return;
+          n++;
+          var sub = i.qtd * i.unitario;
+          soma += sub;
+          linhas.push([n, i.codigo, i.descricao, String(i.qtd),
+                       brl(i.unitario), brl(sub)]);
+        });
+        if (!n) return { y: inicioY, soma: 0, vazio: true };
+
+        micro(titulo, L, inicioY);
+        doc.setLineWidth(0.5).setDrawColor(TINTA[0], TINTA[1], TINTA[2]);
+        doc.line(L, inicioY + 2.5, R, inicioY + 2.5);
+
+        doc.autoTable({
+          theme: 'plain',
+          startY: inicioY + 5,
+          margin: { left: L, right: 18, top: 26, bottom: 38 },
+          head: [['#', rotuloCodigo, 'Descrição', rotuloQtd, 'Unitário', 'Subtotal']],
+          body: linhas,
+          foot: [['', '', '', '', 'Subtotal ' + titulo.toLowerCase(), brl(soma)]],
+          styles: { font: 'helvetica', fontSize: 8, cellPadding: { top: 1.8, bottom: 1.8, left: 0, right: 2 }, textColor: TINTA },
+          headStyles: { fontSize: 6.5, textColor: CINZA, fontStyle: 'normal', cellPadding: { top: 1, bottom: 2, left: 0, right: 2 } },
+          footStyles: { fontSize: 8, fontStyle: 'bold', textColor: TINTA, cellPadding: { top: 2.6, bottom: 0, left: 0, right: 2 } },
+          columnStyles: {
+            0: { cellWidth: 8, halign: 'right' },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 66 },
+            3: { cellWidth: 14, halign: 'right' },
+            4: { cellWidth: 26, halign: 'right' },
+            5: { cellWidth: 30, halign: 'right' }
+          },
+          didDrawPage: function () {
+            if (pagina() > 1) cabecalhoCurto();
+          },
+          didDrawCell: function (dados) {
+            var c = dados.cell;
+            if (dados.section === 'head') {
+              doc.setLineWidth(0.2).setDrawColor(FINA[0], FINA[1], FINA[2]);
+              doc.line(c.x, c.y + c.height, c.x + c.width, c.y + c.height);
+            } else if (dados.section === 'body') {
+              doc.setLineWidth(0.1).setDrawColor(MAIS_FINA[0], MAIS_FINA[1], MAIS_FINA[2]);
+              doc.line(c.x, c.y + c.height, c.x + c.width, c.y + c.height);
+            } else if (dados.section === 'foot' && dados.column.index === 0) {
+              doc.setLineWidth(0.3).setDrawColor(TINTA[0], TINTA[1], TINTA[2]);
+              doc.line(L, c.y, R, c.y);
+            }
+          }
+        });
+
+        return { y: doc.lastAutoTable.finalY, soma: soma, vazio: false };
+      }
+
+      var y = cabecalhoCompleto();
+      var pecas = tabela('peca', 'Peças', 'Part number', 'Qtd', y);
+      var mo = tabela('mo', 'Mão de obra', 'Código', 'Horas',
+                      pecas.vazio ? y : pecas.y + 12);
+      y = mo.vazio ? pecas.y : mo.y;
+
+      // ---- total geral ----
+      if (y + 24 > RODAPE) { doc.addPage(); cabecalhoCurto(); y = 26; }
+      y += 12;
+      doc.setFillColor(TINTA[0], TINTA[1], TINTA[2]);
+      doc.rect(L, y, LARG, 14, 'F');
+      doc.setFont('helvetica', 'normal').setFontSize(6.5).setTextColor(255, 255, 255);
+      doc.text('TOTAL GERAL', L + 5, y + 8.6, { charSpace: 0.5 });
+      doc.setFont('helvetica', 'bold').setFontSize(14);
+      doc.text('R$ ' + brl(pecas.soma + mo.soma), R - 5, y + 9.6, { align: 'right' });
+
+      // ---- rodapé em todas as páginas ----
+      var total = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= total; p++) {
+        doc.setPage(p);
+        regua(272, 0.2, FINA);
+        corpo('Porsche Service Rio', L, 277, 7.5, true);
+        doc.setFont('helvetica', 'normal').setFontSize(7.5);
+        doc.setTextColor(CINZA[0], CINZA[1], CINZA[2]);
+        doc.text(' · 21 3032-0911', L + doc.getTextWidth('Porsche Service Rio') + 1.5, 277);
+        doc.setFontSize(7);
+        doc.text('Estrada do Itanhangá 1079 · Itanhangá · 22753-005 · Rio de Janeiro RJ', L, 281);
+        doc.roundedRect(R - 34, 273.5, 34, 5.5, 2.75, 2.75, 'S');
+        micro('Pág ' + p + '/' + total + ' · ' + ($('dVersao').textContent || 'v1.1.0'),
+              R - 17, 277.3, 'center');
+      }
+
+    return doc;
+    }
+
+// ── acesso ────────────────────────────────────────────────
+async function checkAndShowOrcamentoButton() {
+  var b = $('btn-orcamento-nav');
+  if (b) b.style.display = 'none';
+  try {
+    var r = await fetch(API_URL + '?action=orcCheckAccess&tech=' + encodeURIComponent(currentTech));
+    var d = await r.json();
+    if (d.ok && d.hasAccess && b) b.style.display = '';
+  } catch (e) { console.warn('orcCheckAccess failed', e); }
+}
+window.checkAndShowOrcamentoButton = checkAndShowOrcamentoButton;
+
+// ── abrir / fechar ────────────────────────────────────────
+function Orcamento_openNav() {
+  $('orc-panel').classList.add('polaris-open');
+  if (!$('orc-dt').value) { $('orc-dt').value = new Date().toISOString().slice(0,10); Orcamento_validade(); }
+  if (!$('orc-apv').options.length) carregarContexto();
+  desenhar();
+}
+function Orcamento_close(){ $('orc-panel').classList.remove('polaris-open'); }
+
+function carregarContexto() {
+  fetch(API_URL + '?action=orcContexto&tech=' + encodeURIComponent(currentTech))
+    .then(function(r){ return r.json(); })
+    .then(function(c){
+      var sel = $('orc-apv'); sel.innerHTML = '';
+      (c.aprovadores||[]).forEach(function(nome){
+        var o=document.createElement('option'); o.value=nome; o.textContent=nome; sel.appendChild(o);
+      });
+      $('dVersao').textContent = c.versao || 'v2.0.0';
+    })
+    .catch(function(e){ st('orc-st','Falha ao carregar aprovadores: '+e.message, true); });
+}
+
+function Orcamento_validade() {
+  var b = $('orc-dt').value; if (!b) return;
+  var d = new Date(b + 'T12:00:00'); d.setDate(d.getDate() + 7);
+  $('orc-val').value = d.toISOString().slice(0,10);
+}
+
+// ── peças (reusa o polarisSearch já existente) ────────────
+function Orcamento_buscar() {
+  var q = $('orc-pn').value.trim();
+  if (!q) { st('orc-st-peca','Digite o número da peça.', true); return; }
+  st('orc-st-peca','A procurar…'); $('orc-found').classList.remove('on');
+  $('orc-pn-btn').disabled = true;
+
+  fetch(API_URL + '?action=polarisSearch&q=' + encodeURIComponent(q) + '&tech=' + encodeURIComponent(currentTech))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      $('orc-pn-btn').disabled = false;
+      if (!res || !res.ok) {
+        st('orc-st-peca', res && res.error === 'not_approver'
+          ? 'Acesso restrito a Aprovadores.' : 'Erro na busca.', true);
+        return;
+      }
+      if (!res.results || !res.results.length) { st('orc-st-peca','Peça não encontrada: '+q, true); return; }
+
+      var r = res.results[0];
+      estado.peca = r; estado.manual = false;
+      $('orc-desc').textContent = r.desc_pt || r.desc_en || '(sem descrição)';
+      $('orc-pn-f').textContent = r.part;
+      $('orc-custo').textContent = moeda(r.cost);
+      $('orc-msrp').textContent = moeda(r.msrp);
+      $('orc-ncm').textContent = r.ncm || '—';
+
+      if (res.redirected) st('orc-st-peca', res.redirected.from + ' → ' + res.redirected.to + ' (substituída)');
+      else if (r.finalMissing) st('orc-st-peca', 'Substituída por ' + (r.final_part||'?') + ', que não consta na lista. Dados são da peça antiga.', true);
+      else st('orc-st-peca','');
+
+      $('orc-qtd').value = 1;
+      $('orc-found').classList.add('on');
+      Orcamento_preco();
+    })
+    .catch(function(e){ $('orc-pn-btn').disabled=false; st('orc-st-peca','Erro na busca: '+e.message, true); });
+}
+
+function Orcamento_margem() {
+  var sel = $('orc-mar');
+  var custom = sel.value === 'custom';
+  $('orc-mar-wrap').style.display = custom ? '' : 'none';
+  if (!custom) $('orc-marf').value = sel.value;
+  estado.manual = false;
+  Orcamento_preco();
+}
+function margemAtual(){ return parseFloat($('orc-marf').value) || 0.56; }
+
+function Orcamento_preco() {
+  if (!estado.peca) return;
+  if (!estado.manual) {
+    var ncmF = parseFloat($('orc-ncmf').value) || 1.4;
+    $('orc-unit').value = (((estado.peca.cost||0) * ncmF) / margemAtual()).toFixed(2);
+  }
+  $('orc-sub-item').textContent = moeda((parseFloat($('orc-qtd').value)||0) * (parseFloat($('orc-unit').value)||0));
+}
+function Orcamento_manual(){ estado.manual = true; Orcamento_preco(); }
+
+function Orcamento_addPeca() {
+  if (!estado.peca) return;
+  var qtd = parseFloat($('orc-qtd').value)||0, unit = parseFloat($('orc-unit').value)||0;
+  if (qtd <= 0 || unit <= 0) { st('orc-st-peca','Quantidade e preço têm de ser maiores que zero.', true); return; }
+  estado.itens.push({ grupo:'peca', codigo: estado.peca.part,
+    descricao: estado.peca.desc_pt || estado.peca.desc_en || '',
+    qtd: qtd, unitario: unit, custo: estado.peca.cost, msrp: estado.peca.msrp,
+    margem: estado.manual ? null : margemAtual() });
+  estado.peca = null;
+  $('orc-found').classList.remove('on'); $('orc-pn').value=''; $('orc-pn').focus();
+  st('orc-st-peca','Peça incluída.'); desenhar();
+}
+
+// ── mão de obra ───────────────────────────────────────────
+function Orcamento_taxa() {
+  var sel = $('orc-taxa'), custom = sel.value === 'custom';
+  $('orc-taxa-wrap').style.display = custom ? '' : 'none';
+  if (!custom) $('orc-taxaf').value = sel.value;
+  Orcamento_mo();
+}
+function taxaAtual(){ return parseFloat($('orc-taxaf').value) || 0; }
+function Orcamento_mo(){ $('orc-sub-mo').textContent = moeda((parseFloat($('orc-hrs').value)||0) * taxaAtual()); }
+
+function Orcamento_addMO() {
+  var hrs = parseFloat($('orc-hrs').value)||0, taxa = taxaAtual(), d = $('orc-dmo').value.trim();
+  if (!d) { st('orc-st-mo','Descreva o serviço.', true); return; }
+  if (hrs <= 0 || taxa <= 0) { st('orc-st-mo','Horas e taxa têm de ser maiores que zero.', true); return; }
+  estado.itens.push({ grupo:'mo', codigo: $('orc-cod').value.trim() || 'MO', descricao: d, qtd: hrs, unitario: taxa });
+  $('orc-cod').value=''; $('orc-dmo').value=''; $('orc-hrs').value=1;
+  Orcamento_mo(); st('orc-st-mo','Serviço incluído.'); desenhar();
+}
+
+function Orcamento_remover(i){ estado.itens.splice(i,1); desenhar(); }
+
+// ── tabelas ───────────────────────────────────────────────
+function totais() {
+  var t = { pecas:0, mo:0 };
+  estado.itens.forEach(function(i){ var v=i.qtd*i.unitario; if(i.grupo==='mo') t.mo+=v; else t.pecas+=v; });
+  t.total = t.pecas + t.mo; return t;
+}
+function desenhar() {
+  grupoHTML('peca','orc-t-pecas','Part number','Qtd');
+  grupoHTML('mo','orc-t-mo','Código','Horas');
+  $('orc-total').textContent = moeda(totais().total);
+}
+function grupoHTML(grupo, alvo, rc, rq) {
+  var linhas = [];
+  estado.itens.forEach(function(it,i){ if(it.grupo===grupo) linhas.push({it:it,i:i}); });
+  if (!linhas.length) { $(alvo).innerHTML = '<div class="orc-none">Nenhum item.</div>'; return; }
+  var soma = 0;
+  var corpo = linhas.map(function(l,n){
+    var sub = l.it.qtd * l.it.unitario; soma += sub;
+    return '<tr><td class="n">'+(n+1)+'</td><td>'+esc(l.it.codigo)+'</td><td>'+esc(l.it.descricao)+
+      '</td><td class="n">'+l.it.qtd+'</td><td class="n">'+moeda(l.it.unitario)+'</td><td class="n">'+moeda(sub)+
+      '</td><td><button class="orc-x" onclick="Orcamento_remover('+l.i+')" aria-label="Remover">&times;</button></td></tr>';
+  }).join('');
+  $(alvo).innerHTML = '<table class="orc-tbl"><thead><tr><th style="width:26px">#</th><th style="width:96px">'+rc+
+    '</th><th>Descrição</th><th class="n" style="width:46px">'+rq+'</th><th class="n" style="width:84px">Unitário</th>'+
+    '<th class="n" style="width:90px">Subtotal</th><th style="width:24px"></th></tr></thead><tbody>'+corpo+
+    '</tbody><tfoot><tr><td colspan="5">Subtotal</td><td class="n">'+moeda(soma)+'</td><td></td></tr></tfoot></table>';
+}
+
+// ── documento HTML (fonte do JPG) ─────────────────────────
+function montarDocumento(numero) {
+  $('dNumero').textContent = numero || '—';
+  [['Cliente','orc-cli'],['Modelo','orc-mod'],['Placa','orc-pla'],['Vin','orc-vin']].forEach(function(p){
+    var v = $(p[1]).value.trim();
+    $('d'+p[0]).textContent = v;
+    $('dc'+p[0]).style.display = v ? '' : 'none';
+  });
+  $('dData').textContent = dataBR($('orc-dt').value);
+  $('dValidade').textContent = dataBR($('orc-val').value);
+  var obs = $('orc-obs').value.trim();
+  $('dObs').textContent = obs; $('dObsBox').style.display = obs ? '' : 'none';
+
+  ['peca','mo'].forEach(function(grupo){
+    var alvo = grupo==='peca'?'dPecas':'dMO', caixa = grupo==='peca'?'dGrupoPecas':'dGrupoMO',
+        soma = grupo==='peca'?'dSubPecas':'dSubMO', n=0, tot=0, html='';
+    estado.itens.forEach(function(i){
+      if (i.grupo!==grupo) return;
+      n++; var sub=i.qtd*i.unitario; tot+=sub;
+      html += '<tr><td class="n">'+n+'</td><td>'+esc(i.codigo)+'</td><td>'+esc(i.descricao)+
+        '</td><td class="n">'+i.qtd+'</td><td class="n">'+moeda(i.unitario)+'</td><td class="n">'+moeda(sub)+'</td></tr>';
+    });
+    $(caixa).style.display = n ? '' : 'none';
+    $(alvo).innerHTML = html; $(soma).textContent = moeda(tot);
+  });
+  $('dTotal').textContent = moeda(totais().total);
+}
+
+function Orcamento_previa() {
+  if (!estado.itens.length) { st('orc-st','Inclua pelo menos um item.', true); return; }
+  try {
+    var d = construirPDF(estado.numero || 'PRÉVIA');
+    if (!window.open(d.output('bloburl'), '_blank')) st('orc-st','O navegador bloqueou a nova aba.', true);
+    else st('orc-st','');
+  } catch (e) { st('orc-st','Falha na pré-visualização: '+e.message, true); }
+}
+
+// ── Dropbox direto do browser (mesmo padrão das fotos) ────
+function caminhoDropbox(numero) {
+  var d = new Date();
+  var mes = ('0'+(d.getMonth()+1)).slice(-2);
+  var limpa = function(x){ return String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
+  var pla = limpa($('orc-pla').value) || 'SEMPLACA';
+  var vin = limpa($('orc-vin').value).slice(-8) || 'SEMVIN';
+  return '/CTPRJ_NEW/vag ros/estimativa/' + d.getFullYear() + '/' + mes + '_' + pla + '_' + vin + '_' + numero;
+}
+
+async function subirDropbox(token, caminho, blob) {
+  var r = await fetch('https://content.dropboxapi.com/2/files/upload', {
+    method: 'POST',
+    headers: { 'Authorization':'Bearer '+token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ path: caminho, mode:'add', autorename:true, mute:true }) },
+    body: blob
+  });
+  var j = await r.json();
+  if (j.error_summary) throw new Error(j.error_summary);
+  return j.path_display || caminho;
+}
+
+async function linkDropbox(token, caminho) {
+  try {
+    var r = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+      method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body: JSON.stringify({ path: caminho })
+    });
+    var j = await r.json();
+    if (j.url) return j.url.replace('?dl=0','?dl=1');
+    var l = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
+      method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body: JSON.stringify({ path: caminho, direct_only: true })
+    });
+    var lj = await l.json();
+    return (lj.links && lj.links[0]) ? lj.links[0].url.replace('?dl=0','?dl=1') : '';
+  } catch (e) { return ''; }
+}
+
+// ── gerar ─────────────────────────────────────────────────
+async function Orcamento_gerar() {
+  if (!estado.itens.length) { st('orc-st','Inclua pelo menos um item antes de gerar.', true); return; }
+  var fmt = $('orc-fmt').value;
+  $('orc-gerar').disabled = true; $('orc-wpp').style.display = 'none';
+
+  try {
+    st('orc-st','A reservar o número…');
+    var rr = await fetch(API_URL + '?action=orcReservarNumero&tech=' + encodeURIComponent(currentTech)).then(function(r){return r.json();});
+    if (!rr.ok) throw new Error(rr.error === 'not_approver' ? 'Acesso restrito a Aprovadores.' : rr.error);
+    var numero = rr.numero;
+    estado.numero = numero;
+
+    st('orc-st','A gerar ' + numero + '…');
+    var base = caminhoDropbox(numero), pdfBlob = null, jpgBlob = null;
+
+    if (fmt !== 'jpg') pdfBlob = construirPDF(numero).output('blob');
+    if (fmt !== 'pdf') {
+      montarDocumento(numero);
+      var canvas = await html2canvas($('orcDoc'), { scale: 2, backgroundColor: '#ffffff' });
+      jpgBlob = await new Promise(function(res){ canvas.toBlob(res, 'image/jpeg', 0.92); });
+    }
+
+    st('orc-st','A enviar para o Dropbox…');
+    var tk = await fetch(API_URL + '?action=get_dropbox_token').then(function(r){return r.json();});
+    if (!tk.ok) throw new Error('Falha ao obter o token do Dropbox.');
+
+    var caminhoFinal = '', link = '';
+    if (pdfBlob) { caminhoFinal = await subirDropbox(tk.token, base + '.pdf', pdfBlob); link = await linkDropbox(tk.token, caminhoFinal); }
+    if (jpgBlob) {
+      var cj = await subirDropbox(tk.token, base + '.jpg', jpgBlob);
+      if (!caminhoFinal) { caminhoFinal = cj; link = await linkDropbox(tk.token, cj); }
+    }
+
+    st('orc-st','A registar…');
+    var sv = await fetch(API_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({
+        action:'orcSalvar', tech: currentTech, numero: numero,
+        cliente: $('orc-cli').value.trim(), modelo: $('orc-mod').value.trim(),
+        placa: $('orc-pla').value.trim(), vin: $('orc-vin').value.trim(),
+        observacao: $('orc-obs').value.trim(), taxaMO: taxaAtual(),
+        itens: estado.itens, aprovadorId: $('orc-apv').value,
+        dropboxPath: caminhoFinal, dropboxLink: link
+      })
+    }).then(function(r){ return r.json(); });
+
+    if (!sv.ok) throw new Error(sv.error);
+    estado.res = sv;
+    st('orc-st', 'Guardado como ' + numero + ' em ' + caminhoFinal);
+    if (typeof showToast === 'function') showToast('Orçamento ' + numero + ' guardado.');
+    if (sv.whatsapp) $('orc-wpp').style.display = '';
+  } catch (e) {
+    st('orc-st','Falhou: ' + e.message, true);
+  } finally {
+    $('orc-gerar').disabled = false;
+  }
+}
+
+function Orcamento_wpp(){ if (estado.res && estado.res.whatsapp) window.open(estado.res.whatsapp, '_blank'); }
+
+window.Orcamento_openNav  = Orcamento_openNav;
+window.Orcamento_close    = Orcamento_close;
+window.Orcamento_validade = Orcamento_validade;
+window.Orcamento_buscar   = Orcamento_buscar;
+window.Orcamento_margem   = Orcamento_margem;
+window.Orcamento_preco    = Orcamento_preco;
+window.Orcamento_manual   = Orcamento_manual;
+window.Orcamento_addPeca  = Orcamento_addPeca;
+window.Orcamento_taxa     = Orcamento_taxa;
+window.Orcamento_mo       = Orcamento_mo;
+window.Orcamento_addMO    = Orcamento_addMO;
+window.Orcamento_remover  = Orcamento_remover;
+window.Orcamento_previa   = Orcamento_previa;
+window.Orcamento_gerar    = Orcamento_gerar;
+window.Orcamento_wpp      = Orcamento_wpp;
+
+})();
+</script>
+
+
 </body>
 </html>
