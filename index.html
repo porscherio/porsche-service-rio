@@ -1,5 +1,14 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.4.2 — Build: 2026-07-28 BRT -->
+<!-- Porsche Service Rio PWA — v4.5.0 — Build: 2026-07-28 BRT -->
+<!-- v4.5.0: ORÇAMENTO — base de clientes/veículos passa a ser a planilha
+     FINDER (16vo2VS..., abas gid 993543368 e 589601787), lida por
+     openById. Preenchimento AUTOMÁTICO: ao digitar a placa completa o
+     veículo entra sozinho; ao digitar 3+ letras do nome aparece a lista
+     para escolher. Debounce de 450ms e guarda de resposta atrasada, e o
+     preenchimento nunca apaga campo já digitado à mão. As colunas das
+     duas abas são descobertas pelo cabeçalho (orcMapearCabecalho_), como
+     no VehiclesFinder_BackendCode — conferir com ?action=orcFinderDebug.
+     A caixa de busca manual saiu; os próprios campos buscam. -->
 <!-- v4.4.2: ORÇAMENTO — preço de venda passa a ser o MAIOR entre o valor
      calculado (custo x fator NCM / margem) e o MSRP. O MSRP virou piso, não
      teto. O painel mostra qual dos dois prevaleceu e quanto daria o outro;
@@ -2007,7 +2016,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.4.2';
+const APP_VERSION = '4.5.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -7629,17 +7638,13 @@ function Polaris_brl(n) {
 
     <div class="orc-sec">
       <div class="orc-sec-t">Cliente e veículo</div>
-      <div class="polaris-search-row" style="margin-bottom:10px">
-        <input type="text" id="orc-busca" class="polaris-input" autocomplete="off"
-               placeholder="Placa, nome, CPF ou nº do RO"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();Orcamento_buscarCliente()}">
-        <button class="polaris-search-btn" id="orc-busca-btn" onclick="Orcamento_buscarCliente()">Buscar</button>
-      </div>
       <div id="orc-busca-res"></div>
       <div class="orc-grid">
-        <div class="orc-f orc-wide"><label for="orc-cli">Cliente (opcional)</label><input id="orc-cli" autocomplete="off"></div>
+        <div class="orc-f orc-wide"><label for="orc-cli">Cliente (opcional)</label>
+          <input id="orc-cli" autocomplete="off" oninput="Orcamento_autoCliente()"></div>
         <div class="orc-f"><label for="orc-mod">Modelo</label><input id="orc-mod" autocomplete="off" placeholder="911 Carrera S"></div>
-        <div class="orc-f"><label for="orc-pla">Placa</label><input id="orc-pla" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="orc-f"><label for="orc-pla">Placa</label><input id="orc-pla" autocomplete="off" style="text-transform:uppercase"
+                 oninput="this.value=this.value.toUpperCase();Orcamento_autoPlaca()"></div>
         <div class="orc-f orc-wide"><label for="orc-vin">Chassi (VIN)</label><input id="orc-vin" maxlength="17" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
         <div class="orc-f"><label for="orc-dt">Data</label><input id="orc-dt" type="date" onchange="Orcamento_validade()"></div>
         <div class="orc-f"><label for="orc-val">Válido até</label><input id="orc-val" type="date" readonly></div>
@@ -8036,44 +8041,77 @@ function carregarContexto() {
     .catch(function(e){ st('orc-st','Falha ao carregar aprovadores: '+e.message, true); });
 }
 
-// ── busca de cliente/veículo (reusa o searchCustomers existente) ──
-function Orcamento_buscarCliente() {
-  var q = $('orc-busca').value.trim();
-  var res = $('orc-busca-res');
-  if (!q) { res.innerHTML = ''; return; }
-  $('orc-busca-btn').disabled = true;
-  res.innerHTML = '<div class="orc-none">A buscar…</div>';
+// ── busca na base de clientes/veículos (planilha FINDER) ──────────
+// Dispara sozinha enquanto se digita. O debounce evita uma chamada por
+// tecla, e o guard de "última busca" evita que uma resposta atrasada
+// sobrescreva o que o utilizador já corrigiu depois.
+var _orcTimer = null, _orcUltimaPlaca = '', _orcUltimoNome = '';
 
-  fetch(API_URL + '?action=searchCustomers&query=' + encodeURIComponent(q))
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      $('orc-busca-btn').disabled = false;
-      if (!d.ok || !d.results || !d.results.length) {
-        res.innerHTML = '<div class="orc-none">Nada encontrado — preencha à mão abaixo.</div>';
-        return;
-      }
-      if (d.results.length === 1) { preencherCliente(d.results[0]); res.innerHTML = ''; return; }
-      res.innerHTML = '<div class="orc-none">Vários resultados — selecione:</div>' +
-        d.results.map(function(c, i){
-          return '<div class="orc-hit" data-i="'+i+'"><b>'+esc(c['Client Name']||'(sem nome)')+'</b>'+
-                 '<span>'+esc(c['License']||'')+' — '+esc(c['Modelo']||'')+' '+esc(String(c['Year']||''))+'</span></div>';
-        }).join('');
-      res.querySelectorAll('[data-i]').forEach(function(card){
-        card.addEventListener('click', function(){
-          preencherCliente(d.results[Number(card.dataset.i)]);
-          res.innerHTML = '';
-        });
-      });
-    })
-    .catch(function(){ $('orc-busca-btn').disabled = false; res.innerHTML = '<div class="orc-none">Erro na busca.</div>'; });
+function orcDebounce(fn, ms) {
+  clearTimeout(_orcTimer);
+  _orcTimer = setTimeout(fn, ms);
 }
 
-function preencherCliente(c) {
-  $('orc-cli').value = c['Client Name'] || '';
-  $('orc-mod').value = [c['Modelo'], c['Year']].filter(Boolean).join(' ').trim();
-  $('orc-pla').value = c['License'] || '';
-  $('orc-vin').value = c['VIN'] || '';
-  if (typeof showToast === 'function') showToast('Dados do veículo preenchidos.');
+function orcMostrar(html) { $('orc-busca-res').innerHTML = html || ''; }
+
+function Orcamento_autoPlaca() {
+  var placa = $('orc-pla').value.trim();
+  if (placa.replace(/[^A-Za-z0-9]/g, '').length < 7) { orcMostrar(''); return; }
+  orcDebounce(function () {
+    if (placa === _orcUltimaPlaca) return;
+    _orcUltimaPlaca = placa;
+    orcMostrar('<div class="orc-none">A procurar a placa…</div>');
+    fetch(API_URL + '?action=orcBuscarVeiculo&placa=' + encodeURIComponent(placa) +
+          '&tech=' + encodeURIComponent(currentTech))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if ($('orc-pla').value.trim() !== placa) return;   // já mudou, descarta
+        if (!d.ok || !d.results.length) { orcMostrar('<div class="orc-none">Placa não encontrada na base.</div>'); return; }
+        preencherFinder(d.results[0]);
+        orcMostrar('');
+      })
+      .catch(function () { orcMostrar('<div class="orc-none">Erro ao procurar a placa.</div>'); });
+  }, 450);
+}
+
+function Orcamento_autoCliente() {
+  var q = $('orc-cli').value.trim();
+  if (q.length < 3) { orcMostrar(''); return; }
+  orcDebounce(function () {
+    if (q === _orcUltimoNome) return;
+    _orcUltimoNome = q;
+    fetch(API_URL + '?action=orcBuscarCliente&q=' + encodeURIComponent(q) +
+          '&tech=' + encodeURIComponent(currentTech))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if ($('orc-cli').value.trim() !== q) return;
+        if (!d.ok || !d.results.length) { orcMostrar(''); return; }
+        orcMostrar('<div class="orc-none">Selecione o veículo:</div>' +
+          d.results.map(function (c, i) {
+            return '<div class="orc-hit" data-i="' + i + '"><b>' + esc(c.nome || '(sem nome)') + '</b>' +
+                   '<span>' + esc(c.placa || '') + ' — ' + esc(c.modelo || '') + ' ' + esc(String(c.ano || '')) + '</span></div>';
+          }).join(''));
+        $('orc-busca-res').querySelectorAll('[data-i]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            preencherFinder(d.results[Number(card.dataset.i)]);
+            orcMostrar('');
+          });
+        });
+      })
+      .catch(function () { orcMostrar(''); });
+  }, 450);
+}
+
+// Preenche só o que veio vazio da base — nunca apaga o que já foi digitado.
+function preencherFinder(c) {
+  if (c.nome)   $('orc-cli').value = c.nome;
+  if (c.placa)  $('orc-pla').value = String(c.placa).toUpperCase();
+  if (c.vin)    $('orc-vin').value = String(c.vin).toUpperCase();
+  var modelo = [c.modelo, c.ano].filter(Boolean).join(' ').trim();
+  if (modelo)   $('orc-mod').value = modelo;
+  _orcUltimaPlaca = $('orc-pla').value.trim();
+  _orcUltimoNome  = $('orc-cli').value.trim();
+  if (typeof showToast === 'function') showToast('Dados preenchidos da base.');
 }
 
 function Orcamento_validade() {
@@ -8356,7 +8394,8 @@ function Orcamento_wpp(){ if (estado.res && estado.res.whatsapp) window.open(est
 window.Orcamento_openNav  = Orcamento_openNav;
 window.Orcamento_close    = Orcamento_close;
 window.Orcamento_validade = Orcamento_validade;
-window.Orcamento_buscarCliente = Orcamento_buscarCliente;
+window.Orcamento_autoPlaca    = Orcamento_autoPlaca;
+window.Orcamento_autoCliente  = Orcamento_autoCliente;
 window.Orcamento_buscar   = Orcamento_buscar;
 window.Orcamento_margem   = Orcamento_margem;
 window.Orcamento_preco    = Orcamento_preco;
