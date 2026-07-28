@@ -1,5 +1,22 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.1.3 — Build: 2026-07-22 BRT -->
+<!-- Porsche Service Rio PWA — v4.4.0 — Build: 2026-07-28 BRT -->
+<!-- v4.4.0: ORÇAMENTO RO — gerador de estimativas para o cliente. Ícone
+     🧾 na nav (ambas as barras), ao lado do Polaris, com o MESMO gate do
+     POLARIS: Aprovadores + POLARIS_EXTRA_ACCESS, resolvido server-side
+     por polarisHasAccess_ (logo o Sebastião Neto entra junto). A busca de
+     peça reaproveita ?action=polarisSearch — não há segundo lookup de
+     preço no sistema. Numeração ORC-AAMM-XXXXX reservada ANTES de o
+     browser montar o arquivo, para o PDF já sair com o número definitivo;
+     a aba Orcamentos guarda 'reservado' e depois 'emitido'. PDF vetorial
+     paginado (jsPDF + autoTable, cabeçalho reduzido nas páginas 2+),
+     JPG opcional via html2canvas. Upload direto do browser para o
+     Dropbox com ?action=get_dropbox_token, mesmo padrão das fotos, em
+     /CTPRJ_NEW/vag ros/estimativa/<ano>/<mês>_<placa>_<vin8>_<numero>.
+     Envio ao Aprovador por link wa.me; orcEnviarWABA_() já está escrito
+     para quando o template utility for aprovado. Backend companheiro:
+     Orcamento.gs v2.0.0 + 4 rotas novas no Code.gs v4.4.0. NOTE for
+     Eytan: version number provisional, confirm against your own tracking
+     before deploying. -->
 <!-- v4.0.0: Service Intelligence (SI) — vehicle maintenance recommendation
      cards analyzed from RO/jobline/parts history — promoted to a major
      version bump. On-screen SI card modal now shares the same light
@@ -1978,7 +1995,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.4.0';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
