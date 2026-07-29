@@ -1,5 +1,23 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.5.4 — Build: 2026-07-28 BRT -->
+<!-- Porsche Service Rio PWA — v4.6.1 — Build: 2026-07-28 BRT -->
+<!-- v4.6.1: ORÇAMENTO — campos Telefone e E-mail do cliente no cabeçalho,
+     preenchidos pela base (aba Clientes) e gravados na aba Orcamentos
+     (telefone_cliente, email_cliente). Telefone normalizado para
+     +5521994494183 — formato que o envio WABA ao CLIENTE vai usar mais à
+     frente. Busca por nome passa a casar só INÍCIO de palavra: "lia"
+     encontra Lia, Liana e Maria Lia, nunca Amalia. Se a aba Orcamentos
+     já existia, apagar para recriar com as colunas novas. -->
+<!-- v4.6.0: ORÇAMENTO — o WhatsApp passa a mandar o ARQUIVO, não só texto.
+     O link wa.me nunca conseguiu anexar nada: o esquema click-to-chat só
+     aceita o parâmetro `text`. Agora há três saídas — "Enviar PDF pelo
+     WhatsApp" usa a Cloud API (WABA) e entrega o PDF ao Aprovador
+     escolhido, sem escolher contacto; "Anexar arquivo…" usa a Web Share
+     do telemóvel e anexa PDF e JPG de verdade; "Só o link" é o wa.me de
+     antes, mantido como recurso. O botão WABA só aparece se as três
+     propriedades (WABA_PHONE_NUMBER_ID, WABA_TOKEN,
+     WABA_TEMPLATE_ORCAMENTO) estiverem definidas. Link do Dropbox é
+     convertido para dl.dropboxusercontent.com, senão o Meta não baixa.
+     Backend: Orcamento.gs v2.4.0. -->
 <!-- v4.5.4: POLARIS — busca de peça de 15-20s para <1s, o que também
      acelera o Orçamento, que usa o mesmo polarisSearch. O TextFinder
      varria 410k linhas a cada busca, e peça substituída fazia isso
@@ -2049,7 +2067,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.5.4';
+const APP_VERSION = '4.6.1';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -7675,6 +7693,11 @@ function Polaris_brl(n) {
       <div class="orc-grid">
         <div class="orc-f orc-wide"><label for="orc-cli">Cliente (opcional)</label>
           <input id="orc-cli" autocomplete="off" oninput="Orcamento_autoCliente()"></div>
+        <div class="orc-f"><label for="orc-tel">Telefone</label>
+          <input id="orc-tel" type="tel" autocomplete="off" placeholder="+5521994494183"
+                 onblur="this.value=orcFmtFone(this.value)"></div>
+        <div class="orc-f"><label for="orc-email">E-mail</label>
+          <input id="orc-email" type="email" autocomplete="off"></div>
         <div class="orc-f"><label for="orc-mod">Modelo</label><input id="orc-mod" autocomplete="off" placeholder="911 Carrera S"></div>
         <div class="orc-f"><label for="orc-pla">Placa</label><input id="orc-pla" autocomplete="off" style="text-transform:uppercase"
                  oninput="this.value=this.value.toUpperCase();Orcamento_autoVeiculo(this.value)"></div>
@@ -7767,7 +7790,9 @@ function Polaris_brl(n) {
       <div class="orc-acts">
         <button class="orc-btn" onclick="Orcamento_previa()">Pré-visualizar</button>
         <button class="orc-btn pri" id="orc-gerar" onclick="Orcamento_gerar()">Gerar e salvar</button>
-        <button class="orc-btn go" id="orc-wpp" style="display:none" onclick="Orcamento_wpp()">Enviar no WhatsApp</button>
+        <button class="orc-btn go" id="orc-waba" style="display:none" onclick="Orcamento_waba()">Enviar PDF pelo WhatsApp</button>
+        <button class="orc-btn" id="orc-anexar" style="display:none" onclick="Orcamento_anexar()">Anexar arquivo…</button>
+        <button class="orc-btn" id="orc-wpp" style="display:none" onclick="Orcamento_wpp()">Só o link</button>
       </div>
       <div class="orc-st" id="orc-st"></div>
     </div>
@@ -7848,7 +7873,8 @@ function Polaris_brl(n) {
 (function () {
 'use strict';
 
-var estado = { itens: [], peca: null, manual: false, base: 'calculado', numero: null, res: null };
+var estado = { itens: [], peca: null, manual: false, base: 'calculado',
+               numero: null, res: null, arquivos: null, wabaPronto: false };
 
 function $(id){ return document.getElementById(id); }
 function moeda(v){ return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -8070,7 +8096,8 @@ function carregarContexto() {
       (c.aprovadores||[]).forEach(function(nome){
         var o=document.createElement('option'); o.value=nome; o.textContent=nome; sel.appendChild(o);
       });
-      $('dVersao').textContent = c.versao || 'v2.0.0';
+      $('dVersao').textContent = c.versao || 'v2.4.0';
+      estado.wabaPronto = !!c.wabaPronto;
     })
     .catch(function(e){ st('orc-st','Falha ao carregar aprovadores: '+e.message, true); });
 }
@@ -8087,6 +8114,15 @@ function orcDebounce(fn, ms) {
 }
 
 function orcMostrar(html) { $('orc-busca-res').innerHTML = html || ''; }
+
+// Mesma regra do backend: 10-11 dígitos ganha +55; 55 na frente ganha +.
+function orcFmtFone(v) {
+  var d = String(v || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length >= 12 && d.indexOf('55') === 0) return '+' + d;
+  if (d.length === 10 || d.length === 11) return '+55' + d;
+  return '+' + d;
+}
 
 // Placa e chassi caem na mesma busca: metade das linhas da aba Veiculos
 // tem chassi e placa em branco.
@@ -8152,7 +8188,7 @@ function orcResultados(d, mensagemVazia, tipo) {
         ? (c.nome || '(sem nome)')
         : [c.modelo, c.ano].filter(Boolean).join(' ') || '(sem modelo)';
       var linha = tipo === 'cliente'
-        ? [c.documento, c.telefone].filter(Boolean).join(' · ')
+        ? [c.telefone, c.email, c.documento].filter(Boolean).join(' · ')
         : [c.placa || 'sem placa', c.chassi, c.cor].filter(Boolean).join(' · ');
       return '<div class="orc-hit" data-i="' + i + '"><b>' + esc(titulo) + '</b>' +
              '<span>' + esc(linha) + '</span></div>';
@@ -8171,6 +8207,8 @@ function orcResultados(d, mensagemVazia, tipo) {
 function preencher(c, tipo) {
   if (tipo === 'cliente') {
     if (c.nome) $('orc-cli').value = c.nome;
+    if (c.telefone) $('orc-tel').value = c.telefone;
+    if (c.email) $('orc-email').value = c.email;
     _orcUltimoNome = $('orc-cli').value.trim();
   } else {
     if (c.placa)  $('orc-pla').value = c.placa;
@@ -8426,6 +8464,7 @@ async function Orcamento_gerar() {
     if (!tk.ok) throw new Error('Falha ao obter o token do Dropbox.');
 
     var caminhoFinal = '', link = '';
+    estado.arquivos = { pdf: pdfBlob, jpg: jpgBlob, nome: numero };
     if (pdfBlob) { caminhoFinal = await subirDropbox(tk.token, base + '.pdf', pdfBlob); link = await linkDropbox(tk.token, caminhoFinal); }
     if (jpgBlob) {
       var cj = await subirDropbox(tk.token, base + '.jpg', jpgBlob);
@@ -8437,7 +8476,9 @@ async function Orcamento_gerar() {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({
         action:'orcSalvar', tech: currentTech, numero: numero,
-        cliente: $('orc-cli').value.trim(), modelo: $('orc-mod').value.trim(),
+        cliente: $('orc-cli').value.trim(),
+        telefoneCliente: orcFmtFone($('orc-tel').value), emailCliente: $('orc-email').value.trim(),
+        modelo: $('orc-mod').value.trim(),
         placa: $('orc-pla').value.trim(), vin: $('orc-vin').value.trim(),
         observacao: $('orc-obs').value.trim(), prazo: $('orc-prz').value.trim(),
         taxaMO: taxaAtual(),
@@ -8450,7 +8491,10 @@ async function Orcamento_gerar() {
     estado.res = sv;
     st('orc-st', 'Guardado como ' + numero + ' em ' + caminhoFinal);
     if (typeof showToast === 'function') showToast('Orçamento ' + numero + ' guardado.');
+    estado.linkPdf = link;
     if (sv.whatsapp) $('orc-wpp').style.display = '';
+    $('orc-anexar').style.display = (navigator.canShare && estado.arquivos) ? '' : 'none';
+    $('orc-waba').style.display = estado.wabaPronto ? '' : 'none';
   } catch (e) {
     st('orc-st','Falhou: ' + e.message, true);
   } finally {
@@ -8458,7 +8502,52 @@ async function Orcamento_gerar() {
   }
 }
 
+// 1) wa.me — só texto. O esquema click-to-chat aceita apenas o
+//    parâmetro `text`; anexar arquivo por ele é impossível.
 function Orcamento_wpp(){ if (estado.res && estado.res.whatsapp) window.open(estado.res.whatsapp, '_blank'); }
+
+// 2) Web Share — manda o ARQUIVO de verdade pela folha de partilha do
+//    telemóvel. O destinatário é escolhido no WhatsApp, não aqui.
+async function Orcamento_anexar() {
+  if (!estado.arquivos) { st('orc-st','Gere o orçamento primeiro.', true); return; }
+  var lista = [];
+  if (estado.arquivos.pdf) lista.push(new File([estado.arquivos.pdf], estado.arquivos.nome + '.pdf', { type: 'application/pdf' }));
+  if (estado.arquivos.jpg) lista.push(new File([estado.arquivos.jpg], estado.arquivos.nome + '.jpg', { type: 'image/jpeg' }));
+  if (!lista.length) { st('orc-st','Nenhum arquivo gerado.', true); return; }
+
+  try {
+    if (!navigator.canShare || !navigator.canShare({ files: lista })) {
+      st('orc-st','Este navegador não partilha arquivos. Use "Enviar PDF pelo WhatsApp" ou o link.', true);
+      return;
+    }
+    await navigator.share({ files: lista, title: 'Orçamento ' + estado.arquivos.nome });
+    st('orc-st','');
+  } catch (e) {
+    if (e && e.name !== 'AbortError') st('orc-st','Não foi possível partilhar: ' + e.message, true);
+  }
+}
+
+// 3) WABA — envia o PDF direto ao Aprovador escolhido, sem folha de
+//    partilha e sem escolher contacto. Precisa do template aprovado.
+async function Orcamento_waba() {
+  if (!estado.numero || !estado.linkPdf) { st('orc-st','Gere o orçamento primeiro.', true); return; }
+  $('orc-waba').disabled = true;
+  st('orc-st','A enviar pelo WhatsApp…');
+  try {
+    var r = await fetch(API_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'orcEnviarWaba', tech: currentTech,
+        numero: estado.numero, aprovadorId: $('orc-apv').value, linkPdf: estado.linkPdf })
+    }).then(function (x) { return x.json(); });
+    if (!r.ok) throw new Error(r.error || 'falhou');
+    st('orc-st','PDF enviado a ' + $('orc-apv').value + '.');
+    if (typeof showToast === 'function') showToast('Orçamento enviado.');
+  } catch (e) {
+    st('orc-st','WABA: ' + e.message + ' — use "Anexar arquivo" ou "Só o link".', true);
+  } finally {
+    $('orc-waba').disabled = false;
+  }
+}
 
 window.Orcamento_openNav  = Orcamento_openNav;
 window.Orcamento_close    = Orcamento_close;
@@ -8477,6 +8566,8 @@ window.Orcamento_remover  = Orcamento_remover;
 window.Orcamento_previa   = Orcamento_previa;
 window.Orcamento_gerar    = Orcamento_gerar;
 window.Orcamento_wpp      = Orcamento_wpp;
+window.Orcamento_anexar   = Orcamento_anexar;
+window.Orcamento_waba     = Orcamento_waba;
 
 })();
 </script>
