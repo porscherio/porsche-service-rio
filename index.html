@@ -1,5 +1,38 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.5.0 — Build: 2026-07-28 BRT -->
+<!-- Porsche Service Rio PWA — v4.5.4 — Build: 2026-07-28 BRT -->
+<!-- v4.5.4: POLARIS — busca de peça de 15-20s para <1s, o que também
+     acelera o Orçamento, que usa o mesmo polarisSearch. O TextFinder
+     varria 410k linhas a cada busca, e peça substituída fazia isso
+     DUAS vezes. Agora a coluna A é ordenada uma vez e um índice com a
+     primeira chave de cada bloco de 2000 linhas fica nas
+     ScriptProperties; busca binária em memória + uma leitura de bloco.
+     Resultados em cache por 6h. Backend: Polaris.gs v1.1.0 — rodar
+     polarisPrepararPlanilha() uma vez, e a cada importação do CSV. -->
+<!-- v4.5.3: ORÇAMENTO — busca de 12-15s para <1s. Cada chamada ao /exec é
+     uma execução nova do Apps Script, então o memo por execução não valia
+     nada: a aba Veiculos inteira era relida a cada busca. Agora as duas
+     abas viram um índice compacto (arrays, não objetos) guardado no
+     CacheService em pedaços de 90KB, TTL 6h; a busca é comparação de
+     strings em memória. Só o primeiro pedido após expirar paga a
+     releitura — orcAquecerCache() num acionador de 4h elimina isso.
+     Backend: Orcamento.gs v2.3.0. -->
+<!-- v4.5.2: ORÇAMENTO — busca ligada às colunas reais das abas Clientes
+     (NomeCompleto, Telefone, Documento) e Veiculos (Chassi, Modelo,
+     Versao, Ano, Cor, Placa); acabou o mapeamento por palavra-chave.
+     As duas buscas são INDEPENDENTES de propósito: existe a aba
+     ClienteVeiculoRelacao, mas o orçamento não a usa — é legítimo emitir
+     para uma placa com um pagante que não é o dono registado. O campo
+     Cliente só preenche o nome; Placa e Chassi só preenchem veículo.
+     Chassi também dispara a busca, porque muita linha de Veiculos tem
+     chassi e placa em branco. Ano "2011/2011" passa a mostrar "2011".
+     Backend: Orcamento.gs v2.2.0. -->
+<!-- v4.5.1: ORÇAMENTO — busca de placa passa a ser PARCIAL a partir de 3
+     caracteres (antes exigia a placa inteira, então digitar os primeiros
+     caracteres não fazia nada). Casamento exato preenche direto; parcial
+     lista os que começam pelo digitado, depois os que contêm. Erro e
+     resultado vazio agora aparecem na tela em vez de deixarem a caixa em
+     branco — antes falha de mapeamento era indistinguível de "faltam
+     caracteres". Backend: Orcamento.gs v2.1.0. -->
 <!-- v4.5.0: ORÇAMENTO — base de clientes/veículos passa a ser a planilha
      FINDER (16vo2VS..., abas gid 993543368 e 589601787), lida por
      openById. Preenchimento AUTOMÁTICO: ao digitar a placa completa o
@@ -2016,7 +2049,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.5.4';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -7644,8 +7677,9 @@ function Polaris_brl(n) {
           <input id="orc-cli" autocomplete="off" oninput="Orcamento_autoCliente()"></div>
         <div class="orc-f"><label for="orc-mod">Modelo</label><input id="orc-mod" autocomplete="off" placeholder="911 Carrera S"></div>
         <div class="orc-f"><label for="orc-pla">Placa</label><input id="orc-pla" autocomplete="off" style="text-transform:uppercase"
-                 oninput="this.value=this.value.toUpperCase();Orcamento_autoPlaca()"></div>
-        <div class="orc-f orc-wide"><label for="orc-vin">Chassi (VIN)</label><input id="orc-vin" maxlength="17" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+                 oninput="this.value=this.value.toUpperCase();Orcamento_autoVeiculo(this.value)"></div>
+        <div class="orc-f orc-wide"><label for="orc-vin">Chassi (VIN)</label><input id="orc-vin" maxlength="17" autocomplete="off" style="text-transform:uppercase"
+                 oninput="this.value=this.value.toUpperCase();Orcamento_autoVeiculo(this.value)"></div>
         <div class="orc-f"><label for="orc-dt">Data</label><input id="orc-dt" type="date" onchange="Orcamento_validade()"></div>
         <div class="orc-f"><label for="orc-val">Válido até</label><input id="orc-val" type="date" readonly></div>
         <div class="orc-f orc-wide"><label for="orc-prz">Prazo</label><input id="orc-prz" autocomplete="off" placeholder="5 dias úteis"></div>
@@ -8054,23 +8088,20 @@ function orcDebounce(fn, ms) {
 
 function orcMostrar(html) { $('orc-busca-res').innerHTML = html || ''; }
 
-function Orcamento_autoPlaca() {
-  var placa = $('orc-pla').value.trim();
-  if (placa.replace(/[^A-Za-z0-9]/g, '').length < 7) { orcMostrar(''); return; }
+// Placa e chassi caem na mesma busca: metade das linhas da aba Veiculos
+// tem chassi e placa em branco.
+function Orcamento_autoVeiculo(termo) {
+  var q = String(termo || '').trim();
+  if (q.replace(/[^A-Za-z0-9]/g, '').length < 3) { orcMostrar(''); return; }
   orcDebounce(function () {
-    if (placa === _orcUltimaPlaca) return;
-    _orcUltimaPlaca = placa;
-    orcMostrar('<div class="orc-none">A procurar a placa…</div>');
-    fetch(API_URL + '?action=orcBuscarVeiculo&placa=' + encodeURIComponent(placa) +
-          '&tech=' + encodeURIComponent(currentTech))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if ($('orc-pla').value.trim() !== placa) return;   // já mudou, descarta
-        if (!d.ok || !d.results.length) { orcMostrar('<div class="orc-none">Placa não encontrada na base.</div>'); return; }
-        preencherFinder(d.results[0]);
-        orcMostrar('');
-      })
-      .catch(function () { orcMostrar('<div class="orc-none">Erro ao procurar a placa.</div>'); });
+    if (q === _orcUltimaPlaca) return;
+    _orcUltimaPlaca = q;
+    orcMostrar('<div class="orc-none">A procurar o veículo…</div>');
+    orcConsultar('orcBuscarVeiculo&termo=' + encodeURIComponent(q), function (d) {
+      var aindaVale = $('orc-pla').value.trim() === q || $('orc-vin').value.trim() === q;
+      if (!aindaVale) return;
+      orcResultados(d, 'Nada na base para ' + q + '.', 'veiculo');
+    });
   }, 450);
 }
 
@@ -8080,39 +8111,77 @@ function Orcamento_autoCliente() {
   orcDebounce(function () {
     if (q === _orcUltimoNome) return;
     _orcUltimoNome = q;
-    fetch(API_URL + '?action=orcBuscarCliente&q=' + encodeURIComponent(q) +
-          '&tech=' + encodeURIComponent(currentTech))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if ($('orc-cli').value.trim() !== q) return;
-        if (!d.ok || !d.results.length) { orcMostrar(''); return; }
-        orcMostrar('<div class="orc-none">Selecione o veículo:</div>' +
-          d.results.map(function (c, i) {
-            return '<div class="orc-hit" data-i="' + i + '"><b>' + esc(c.nome || '(sem nome)') + '</b>' +
-                   '<span>' + esc(c.placa || '') + ' — ' + esc(c.modelo || '') + ' ' + esc(String(c.ano || '')) + '</span></div>';
-          }).join(''));
-        $('orc-busca-res').querySelectorAll('[data-i]').forEach(function (card) {
-          card.addEventListener('click', function () {
-            preencherFinder(d.results[Number(card.dataset.i)]);
-            orcMostrar('');
-          });
-        });
-      })
-      .catch(function () { orcMostrar(''); });
+    orcMostrar('<div class="orc-none">A procurar…</div>');
+    orcConsultar('orcBuscarCliente&q=' + encodeURIComponent(q), function (d) {
+      if ($('orc-cli').value.trim() !== q) return;
+      orcResultados(d, 'Nenhum cliente com "' + q + '" na base.', 'cliente');
+    });
   }, 450);
 }
 
-// Preenche só o que veio vazio da base — nunca apaga o que já foi digitado.
-function preencherFinder(c) {
-  if (c.nome)   $('orc-cli').value = c.nome;
-  if (c.placa)  $('orc-pla').value = String(c.placa).toUpperCase();
-  if (c.vin)    $('orc-vin').value = String(c.vin).toUpperCase();
-  var modelo = [c.modelo, c.ano].filter(Boolean).join(' ').trim();
-  if (modelo)   $('orc-mod').value = modelo;
-  _orcUltimaPlaca = $('orc-pla').value.trim();
-  _orcUltimoNome  = $('orc-cli').value.trim();
-  if (typeof showToast === 'function') showToast('Dados preenchidos da base.');
+// Uma só porta para as duas buscas — e os erros aparecem, em vez de
+// deixarem a caixa vazia, que era indistinguível de "não digitou o bastante".
+function orcConsultar(queryString, aoReceber) {
+  fetch(API_URL + '?action=' + queryString + '&tech=' + encodeURIComponent(currentTech))
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(aoReceber)
+    .catch(function (e) {
+      orcMostrar('<div class="orc-none">Erro na busca: ' + esc(e.message) +
+                 '. Confira ?action=orcFinderDebug.</div>');
+    });
 }
+
+function orcResultados(d, mensagemVazia, tipo) {
+  if (!d || !d.ok) {
+    orcMostrar('<div class="orc-none">' +
+      (d && d.error === 'not_approver' ? 'Acesso restrito.' : 'Busca indisponível — veja ?action=orcFinderDebug.') +
+      '</div>');
+    return;
+  }
+  var lista = d.results || [];
+  if (!lista.length) { orcMostrar('<div class="orc-none">' + esc(mensagemVazia) + '</div>'); return; }
+  if (lista.length === 1) { preencher(lista[0], tipo); orcMostrar(''); return; }
+  var rodape = d.ms !== undefined ? ' <span style="opacity:.6">(' + d.ms + 'ms de ' + (d.total || 0) + ' registos)</span>' : '';
+
+  orcMostrar('<div class="orc-none">' + lista.length + ' resultados — selecione:' + rodape + '</div>' +
+    lista.map(function (c, i) {
+      var titulo = tipo === 'cliente'
+        ? (c.nome || '(sem nome)')
+        : [c.modelo, c.ano].filter(Boolean).join(' ') || '(sem modelo)';
+      var linha = tipo === 'cliente'
+        ? [c.documento, c.telefone].filter(Boolean).join(' · ')
+        : [c.placa || 'sem placa', c.chassi, c.cor].filter(Boolean).join(' · ');
+      return '<div class="orc-hit" data-i="' + i + '"><b>' + esc(titulo) + '</b>' +
+             '<span>' + esc(linha) + '</span></div>';
+    }).join(''));
+
+  $('orc-busca-res').querySelectorAll('[data-i]').forEach(function (card) {
+    card.addEventListener('click', function () {
+      preencher(lista[Number(card.dataset.i)], tipo);
+      orcMostrar('');
+    });
+  });
+}
+
+// Cada busca mexe só nos seus campos. Cliente nunca toca em veículo e
+// vice-versa — é legítimo emitir para uma placa com outro pagante.
+function preencher(c, tipo) {
+  if (tipo === 'cliente') {
+    if (c.nome) $('orc-cli').value = c.nome;
+    _orcUltimoNome = $('orc-cli').value.trim();
+  } else {
+    if (c.placa)  $('orc-pla').value = c.placa;
+    if (c.chassi) $('orc-vin').value = c.chassi;
+    var modelo = [c.modelo, c.ano].filter(Boolean).join(' ').trim();
+    if (modelo) $('orc-mod').value = modelo;
+    _orcUltimaPlaca = $('orc-pla').value.trim();
+  }
+  if (typeof showToast === 'function') showToast('Preenchido da base.');
+}
+
 
 function Orcamento_validade() {
   var b = $('orc-dt').value; if (!b) return;
@@ -8394,7 +8463,7 @@ function Orcamento_wpp(){ if (estado.res && estado.res.whatsapp) window.open(est
 window.Orcamento_openNav  = Orcamento_openNav;
 window.Orcamento_close    = Orcamento_close;
 window.Orcamento_validade = Orcamento_validade;
-window.Orcamento_autoPlaca    = Orcamento_autoPlaca;
+window.Orcamento_autoVeiculo  = Orcamento_autoVeiculo;
 window.Orcamento_autoCliente  = Orcamento_autoCliente;
 window.Orcamento_buscar   = Orcamento_buscar;
 window.Orcamento_margem   = Orcamento_margem;
