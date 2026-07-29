@@ -2719,6 +2719,7 @@ function renderROList(ros) {
   el.querySelectorAll('.card:not(.locked)').forEach(c => c.addEventListener('click', (ev)=>{
     if (ev.target.closest('.parts-badge')) return; // badge handles its own click
     if (ev.target.closest('.mileage-pill-blink')) return; // mileage pill handles its own click
+    if (ev.target.closest('.sync-now-pill')) return; // sync-now icon handles its own click
     openRO(c.dataset.ro);
   }));
   el.querySelectorAll('.parts-badge').forEach(b => b.addEventListener('click', (ev)=>{
@@ -2963,9 +2964,14 @@ async function syncRoNowClick(ev, btn) {
   btn.classList.add('spinning');
 
   try {
+    // No Content-Type header on purpose: setting application/json makes
+    // this a non-simple CORS request, the browser preflights with
+    // OPTIONS, and Apps Script /exec doesn't answer preflights — the
+    // call is blocked before it ever leaves. Without it, fetch sends
+    // text/plain (simple request, no preflight) and e.postData.contents
+    // still arrives intact. Same pattern as release/updateMileage.
     const res = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'syncRoNow', ro_number: ro, tech: currentTech }),
     });
     const data = await res.json();
@@ -3009,6 +3015,10 @@ function syncNowErrorText(data) {
       return 'A sincronização automática está a decorrer. Tente daqui a alguns segundos.';
     case 'cooldown':
       return 'Esta RO foi sincronizada há instantes. Aguarde ' + (data.retry_in || 45) + 's.';
+    case 'syncSingleRO_not_found':
+      return 'Backend incompleto: SyncOnDemand.gs não está neste projeto Apps Script.';
+    case 'unknown action':
+      return 'Backend desatualizado: falta implantar uma nova versão do Code.gs.';
     case 'joblines_tab_needs_migration':
       return 'A aba Joblines precisa da migração de colunas antes de sincronizar avulso.';
     default:
