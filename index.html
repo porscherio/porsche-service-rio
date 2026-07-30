@@ -1,5 +1,28 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.6.1 — Build: 2026-07-28 BRT -->
+<!-- Porsche Service Rio PWA — v4.6.4 — Build: 2026-07-28 BRT -->
+<!-- v4.6.4: ORÇAMENTO — "Cliente (telefone do cabeçalho)" entra como
+     destino no dropdown "Enviar para", além dos Aprovadores. Usa o
+     telefone do cabeçalho (preenchido da base Clientes quando existe, ou
+     digitado), nos DOIS caminhos: WABA (PDF direto) e wa.me (link).
+     Validação impede gerar/enviar com destino cliente e telefone vazio.
+     O default do dropdown continua sendo o primeiro Aprovador.
+     Backend: Orcamento.gs v2.6.0. -->
+<!-- v4.6.3: POLARIS/ORÇAMENTO — busca REVERSA quando exato e prefixo
+     falham: número digitado pode ser o SUBSTITUTO no fim de uma cadeia,
+     que só existe em final_key/final_part (colunas C/D), nunca como
+     linha própria — caso típico do balcão, que digita o número ATUAL do
+     catálogo (ex.: PAD133246, que substitui PAB133246). O painel mostra
+     e o orçamento grava o número NOVO, com o preço da linha antiga (o
+     único que o arquivo tem) e aviso de onde veio. TextFinder na coluna
+     C, só no caminho de falha, resultado em cache 6h.
+     Backend: Polaris.gs v1.4.0. -->
+<!-- v4.6.2: POLARIS/ORÇAMENTO — busca por PREFIXO quando o exato falha.
+     Nº completo tem 11 caracteres e no balcão digita-se muitas vezes sem
+     o sufixo de 2 dígitos (PAD907569 em vez de PAD90756900): agora as
+     variantes que começam pelo digitado aparecem numa lista para
+     escolher (teto de 10, mínimo de 6 caracteres), nos dois painéis.
+     Com a coluna ordenada isso custa uma leitura de bloco.
+     Backend: Polaris.gs v1.3.0. -->
 <!-- v4.6.1: ORÇAMENTO — campos Telefone e E-mail do cliente no cabeçalho,
      preenchidos pela base (aba Clientes) e gravados na aba Orcamentos
      (telefone_cliente, email_cliente). Telefone normalizado para
@@ -582,17 +605,6 @@ input:focus{outline:none;border-color:var(--black)}
 .marcar-entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#CC0000;color:#fff;cursor:pointer;border:none;font-family:inherit}
 .marcar-entregue-pill:hover{background:#ff1a1a}
 .marcar-entregue-pill.already{background:#FF6600;color:#fff}
-.sync-now-pill{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;font-size:12px;line-height:1;padding:0;border-radius:50%;margin-left:6px;vertical-align:middle;background:#E9E9EC;color:#4A4A4F;cursor:pointer;border:none;font-family:inherit;flex:0 0 auto}
-.sync-now-pill:hover{background:#D6D6DB}
-.sync-now-pill:disabled{cursor:default;opacity:.75}
-.sync-now-pill.spinning{animation:syncNowSpin .8s linear infinite}
-.sync-now-pill.ok{background:#16A34A;color:#fff}
-.sync-now-pill.err{background:#CC0000;color:#fff}
-@keyframes syncNowSpin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.sync-now-pill.spinning{animation:none;opacity:.6}}
-#sync-now-toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);max-width:82vw;background:#1F1F23;color:#fff;font-size:12px;line-height:1.35;padding:10px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.28);z-index:9999;opacity:0;transition:opacity .18s ease;pointer-events:none;text-align:center}
-#sync-now-toast.show{opacity:1}
-#sync-now-toast.err{background:#8A1218}
 .edoc-reentry-icon{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.03em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--black);color:#fff;cursor:pointer}
 .mileage-pill-blink{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:var(--amber);color:#fff;cursor:pointer;animation:mileage-blink 1.4s ease-in-out infinite}
 @keyframes mileage-blink{0%,100%{opacity:1}50%{opacity:.45}}
@@ -2078,7 +2090,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.6.1';
+const APP_VERSION = '4.6.4';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -2719,7 +2731,6 @@ function renderROList(ros) {
   el.querySelectorAll('.card:not(.locked)').forEach(c => c.addEventListener('click', (ev)=>{
     if (ev.target.closest('.parts-badge')) return; // badge handles its own click
     if (ev.target.closest('.mileage-pill-blink')) return; // mileage pill handles its own click
-    if (ev.target.closest('.sync-now-pill')) return; // sync-now icon handles its own click
     openRO(c.dataset.ro);
   }));
   el.querySelectorAll('.parts-badge').forEach(b => b.addEventListener('click', (ev)=>{
@@ -2769,11 +2780,6 @@ function roCard(r) {
     : manualEntregaEventId
       ? '<button class="marcar-entregue-pill already" data-ro="' + r.ro_number + '" data-evt="' + manualEntregaEventId + '" onclick="revertEntregaManual(event,this)">&#x21A9; REVERTER ENTREGA</button>'
       : '<button class="marcar-entregue-pill" data-ro="' + r.ro_number + '" data-plate="' + r.plate + '" data-mobile="' + (r.mobile||'') + '" data-cliente="' + escapeHtml(r.cust_name||'') + '" data-modelo="' + escapeHtml(r.vehicle||'') + '" data-year="' + (r.year||'') + '" data-vin="' + (r.vin||'') + '" data-servicos-evt="' + (r.servicos_event_id||'') + '" onclick="marcarEntregaManual(event,this)">&#x1F6D1; ENTREGAR AGORA</button>';
-  // Sincronizar agora (Aprovador-only). Pulls this one RO straight
-  // from the source spreadsheet, bypassing the 5-min schedule and the
-  // syncROs row watermark. Read-only refresh, so no confirm().
-  const syncNowPill = !isApproverTech ? ''
-    : '<button class="sync-now-pill" data-ro="' + r.ro_number + '" title="Sincronizar esta RO agora" aria-label="Sincronizar esta RO agora" onclick="syncRoNowClick(event,this)">&#x21BB;</button>';
   // Mileage check (v2.7.6) — blinking pill when missing/placeholder
   // (blank or exactly 1, meaning an Approver never checked the real
   // odometer reading when opening the RO); plain text next to the
@@ -2828,7 +2834,7 @@ function roCard(r) {
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
         datesLine +
-      '</div><div class="cright">' + syncNowPill + '<span class="badge ' + bc + '">' + bt + '</span>' + priorityPill + holdPill + '</div></div>' +
+      '</div><div class="cright"><span class="badge ' + bc + '">' + bt + '</span>' + priorityPill + holdPill + '</div></div>' +
       authTag + partsBadge +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
       '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:' + pct + '%"></div></div>' +
@@ -2915,7 +2921,7 @@ async function marcarEntregaManual(ev, btn) {
     if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
     // Persist event_id so the revert pill appears on next render
     localStorage.setItem('manual_entrega_' + ro, data.event_id);
-    await loadROs();
+    await loadROList();
   } catch (e) {
     alert('Erro ao marcar entrega: ' + e.message);
     btn.textContent = '\uD83D\uDED1 ENTREGAR AGORA';
@@ -2945,100 +2951,12 @@ async function revertEntregaManual(ev, btn) {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
     localStorage.removeItem('manual_entrega_' + ro);
-    await loadROs();
+    await loadROList();
   } catch (e) {
     alert('Erro ao reverter entrega: ' + e.message);
     btn.textContent = '\u21A9 REVERTER ENTREGA';
     btn.disabled = false;
   }
-}
-
-async function syncRoNowClick(ev, btn) {
-  ev.stopPropagation();
-  if (btn.disabled) return;
-
-  const ro       = btn.dataset.ro;
-  const original = '\u21BB';
-  btn.disabled = true;
-  btn.classList.remove('ok', 'err');
-  btn.classList.add('spinning');
-
-  try {
-    // No Content-Type header on purpose: setting application/json makes
-    // this a non-simple CORS request, the browser preflights with
-    // OPTIONS, and Apps Script /exec doesn't answer preflights — the
-    // call is blocked before it ever leaves. Without it, fetch sends
-    // text/plain (simple request, no preflight) and e.postData.contents
-    // still arrives intact. Same pattern as release/updateMileage.
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'syncRoNow', ro_number: ro, tech: currentTech }),
-    });
-    const data = await res.json();
-
-    btn.classList.remove('spinning');
-
-    if (!data.ok) {
-      btn.classList.add('err');
-      btn.innerHTML = '!';
-      syncNowToast(syncNowErrorText(data), true);
-    } else {
-      btn.classList.add('ok');
-      btn.innerHTML = '\u2713';
-      syncNowToast('RO #' + ro + ' \u2014 ' + (data.summary || 'sincronizada.'), false);
-      // Re-read the list so the card reflects whatever just landed.
-      await loadROs();
-      return; // loadROs() re-renders the card; nothing left to reset
-    }
-  } catch (e) {
-    btn.classList.remove('spinning');
-    btn.classList.add('err');
-    btn.innerHTML = '!';
-    syncNowToast('Sem ligação ao servidor. Verifique a internet.', true);
-  }
-
-  // Only reached on failure — restore the icon so it can be retried.
-  setTimeout(() => {
-    btn.classList.remove('ok', 'err');
-    btn.innerHTML = original;
-    btn.disabled = false;
-  }, 2600);
-}
-
-// Errors say what happened and what to do about it — never a bare
-// error code, never an apology.
-function syncNowErrorText(data) {
-  switch (data.error) {
-    case 'not_approver':
-      return 'Apenas Aprovadores podem sincronizar uma RO.';
-    case 'sync_busy':
-      return 'A sincronização automática está a decorrer. Tente daqui a alguns segundos.';
-    case 'cooldown':
-      return 'Esta RO foi sincronizada há instantes. Aguarde ' + (data.retry_in || 45) + 's.';
-    case 'syncSingleRO_not_found':
-      return 'Backend incompleto: SyncOnDemand.gs não está neste projeto Apps Script.';
-    case 'unknown action':
-      return 'Backend desatualizado: falta implantar uma nova versão do Code.gs.';
-    case 'joblines_tab_needs_migration':
-      return 'A aba Joblines precisa da migração de colunas antes de sincronizar avulso.';
-    default:
-      return 'Não foi possível sincronizar: ' + (data.error || 'erro desconhecido');
-  }
-}
-
-let _syncNowToastTimer = null;
-function syncNowToast(msg, isError) {
-  let el = document.getElementById('sync-now-toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'sync-now-toast';
-    document.body.appendChild(el);
-  }
-  el.textContent = msg;
-  el.classList.toggle('err', !!isError);
-  requestAnimationFrame(() => el.classList.add('show'));
-  clearTimeout(_syncNowToastTimer);
-  _syncNowToastTimer = setTimeout(() => el.classList.remove('show'), 4200);
 }
 
 function toggleManualPatio(roNumber, currentlyOn) {
@@ -7470,9 +7388,28 @@ function Polaris_render(res) {
     return;
   }
 
+  // Exato falhou mas há variantes com o mesmo início (número digitado
+  // sem o sufixo): lista para escolher, em vez de fingir que não existe.
+  if (res.partial && res.results.length > 1) {
+    status.textContent = res.results.length + ' peças começam por ' + res.query + ' — selecione:';
+    out.innerHTML = res.results.map(function (p, i) {
+      return '<div class="orc-hit" data-pi="' + i + '"><b>' + p.part + '</b>' +
+             '<span>' + (p.desc_pt || p.desc_en || '') + '</span></div>';
+    }).join('');
+    out.querySelectorAll('[data-pi]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        Polaris_render({ ok: true, query: res.query,
+                         results: [res.results[Number(card.dataset.pi)]], redirected: null });
+      });
+    });
+    return;
+  }
+
   const r = res.results[0];
   polarisLastRec = r;
-  status.textContent = '';
+  status.textContent = res.reverse
+    ? r.part + ' substitui ' + res.reverse.oldPart + ' — preço listado é do nº antigo.'
+    : (res.partial ? 'Exato não achado — mostrando ' + r.part + ':' : '');
 
   let banner = '';
   if (res.redirected) {
@@ -8198,9 +8135,15 @@ function carregarContexto() {
     .then(function(r){ return r.json(); })
     .then(function(c){
       var sel = $('orc-apv'); sel.innerHTML = '';
+      var oc = document.createElement('option');
+      oc.value = 'cliente'; oc.textContent = 'Cliente (telefone do cabeçalho)';
+      sel.appendChild(oc);
       (c.aprovadores||[]).forEach(function(nome){
         var o=document.createElement('option'); o.value=nome; o.textContent=nome; sel.appendChild(o);
       });
+      // Aprovador continua sendo o caso comum — Cliente fica visível mas
+      // não vira o default por acidente.
+      if (sel.options.length > 1) sel.selectedIndex = 1;
       $('dVersao').textContent = c.versao || 'v2.4.0';
       estado.wabaPronto = !!c.wabaPronto;
     })
@@ -8350,23 +8293,42 @@ function Orcamento_buscar() {
       }
       if (!res.results || !res.results.length) { st('orc-st-peca','Peça não encontrada: '+q, true); return; }
 
-      var r = res.results[0];
-      estado.peca = r; estado.manual = false;
-      $('orc-desc').textContent = r.desc_pt || r.desc_en || '(sem descrição)';
-      $('orc-pn-f').textContent = r.part;
-      $('orc-custo').textContent = moeda(r.cost);
-      $('orc-msrp').textContent = moeda(r.msrp);
-      $('orc-ncm').textContent = r.ncm || '—';
+      if (res.partial && res.results.length > 1) {
+        st('orc-st-peca', res.results.length + ' peças começam por ' + res.query + ' — selecione:');
+        orcMostrar(res.results.map(function (p, i) {
+          return '<div class="orc-hit" data-pp="' + i + '"><b>' + esc(p.part) + '</b>' +
+                 '<span>' + esc(p.desc_pt || p.desc_en || '') + '</span></div>';
+        }).join(''));
+        $('orc-busca-res').querySelectorAll('[data-pp]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            orcMostrar('');
+            orcPecaEscolhida(res.results[Number(card.dataset.pp)], !!res.redirected);
+          });
+        });
+        return;
+      }
 
+      var r = res.results[0];
       if (res.redirected) st('orc-st-peca', res.redirected.from + ' → ' + res.redirected.to + ' (substituída)');
       else if (r.finalMissing) st('orc-st-peca', 'Substituída por ' + (r.final_part||'?') + ', que não consta na lista. Dados são da peça antiga.', true);
+      else if (res.reverse) st('orc-st-peca', r.part + ' substitui ' + res.reverse.oldPart + ' — preço do nº antigo.');
+      else if (res.partial) st('orc-st-peca', 'Exato não achado — usando ' + r.part + '.');
       else st('orc-st-peca','');
-
-      $('orc-qtd').value = 1;
-      $('orc-found').classList.add('on');
-      Orcamento_preco();
+      orcPecaEscolhida(r, false);
     })
     .catch(function(e){ $('orc-pn-btn').disabled=false; st('orc-st-peca','Erro na busca: '+e.message, true); });
+}
+
+function orcPecaEscolhida(r, manterStatus) {
+  estado.peca = r; estado.manual = false;
+  $('orc-desc').textContent = r.desc_pt || r.desc_en || '(sem descrição)';
+  $('orc-pn-f').textContent = r.part;
+  $('orc-custo').textContent = moeda(r.cost);
+  $('orc-msrp').textContent = moeda(r.msrp);
+  $('orc-ncm').textContent = r.ncm || '—';
+  $('orc-qtd').value = 1;
+  $('orc-found').classList.add('on');
+  Orcamento_preco();
 }
 
 function Orcamento_margem() {
@@ -8544,6 +8506,9 @@ async function linkDropbox(token, caminho) {
 // ── gerar ─────────────────────────────────────────────────
 async function Orcamento_gerar() {
   if (!estado.itens.length) { st('orc-st','Inclua pelo menos um item antes de gerar.', true); return; }
+  if ($('orc-apv').value === 'cliente' && !orcFmtFone($('orc-tel').value)) {
+    st('orc-st','Destino é o cliente, mas o telefone do cabeçalho está vazio.', true); return;
+  }
   var fmt = $('orc-fmt').value;
   $('orc-gerar').disabled = true; $('orc-wpp').style.display = 'none';
 
@@ -8636,16 +8601,21 @@ async function Orcamento_anexar() {
 //    partilha e sem escolher contacto. Precisa do template aprovado.
 async function Orcamento_waba() {
   if (!estado.numero || !estado.linkPdf) { st('orc-st','Gere o orçamento primeiro.', true); return; }
+  if ($('orc-apv').value === 'cliente' && !orcFmtFone($('orc-tel').value)) {
+    st('orc-st','Preencha o telefone do cliente no cabeçalho para enviar a ele.', true); return;
+  }
   $('orc-waba').disabled = true;
   st('orc-st','A enviar pelo WhatsApp…');
   try {
     var r = await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'orcEnviarWaba', tech: currentTech,
-        numero: estado.numero, aprovadorId: $('orc-apv').value, linkPdf: estado.linkPdf })
+        numero: estado.numero, aprovadorId: $('orc-apv').value,
+        telefoneCliente: orcFmtFone($('orc-tel').value), linkPdf: estado.linkPdf })
     }).then(function (x) { return x.json(); });
     if (!r.ok) throw new Error(r.error || 'falhou');
-    st('orc-st','PDF enviado a ' + $('orc-apv').value + '.');
+    st('orc-st','PDF enviado a ' + ($('orc-apv').value === 'cliente'
+      ? ('cliente ' + orcFmtFone($('orc-tel').value)) : $('orc-apv').value) + '.');
     if (typeof showToast === 'function') showToast('Orçamento enviado.');
   } catch (e) {
     st('orc-st','WABA: ' + e.message + ' — use "Anexar arquivo" ou "Só o link".', true);
