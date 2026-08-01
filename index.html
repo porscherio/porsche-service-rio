@@ -1,5 +1,21 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.7.0 — Build: 2026-07-31 21:28 BRT -->
+<!-- Porsche Service Rio PWA — v4.7.1 — Build: 2026-07-31 22:33 BRT -->
+<!-- v4.7.1: CORREÇÃO — ENTREGAR AGORA dava "Erro ao marcar entrega:
+     Failed to fetch" e nada acontecia. marcarEntregaManual e
+     revertEntregaManual eram os DOIS únicos fetch do arquivo que
+     mandavam headers: { 'Content-Type': 'application/json' }. Isso
+     torna a requisição CORS "não-simples" e o browser dispara um
+     preflight OPTIONS antes do POST. O web app do Apps Script não
+     atende OPTIONS — não existe doOptions e o ContentService não
+     consegue devolver Access-Control-Allow-Headers — então o
+     preflight falha e o fetch rejeita ANTES de sair da máquina. Daí
+     "nada mudou": a chamada nunca chegou ao servidor. Removidos os
+     dois headers; sem eles o Content-Type default é text/plain,
+     requisição simples, sem preflight — exatamente o padrão dos
+     outros ~20 POSTs do app (updateMileage, syncRoNow, setPriority).
+     doPost já faz JSON.parse(e.postData.contents) sem olhar o mime,
+     então markEntregaSemAgendamento/revertEntregaSemAgendamento no
+     Code.gs não mudam. Backend inalterado: Code.gs v4.7.0. -->
 <!-- v4.7.0: SINCRONIZAR AGORA — ícone ↻ no canto superior direito do
      card da RO, visível apenas para Aprovadores. Puxa UMA RO da planilha
      OLD para o PWA na hora, sem esperar o ciclo de 5 min do syncAll.
@@ -2933,8 +2949,16 @@ async function marcarEntregaManual(ev, btn) {
   btn.disabled = true;
   try {
     const res = await fetch(API_URL, {
+      // v4.7.1 — SEM header Content-Type. Apps Script /exec não responde
+      // a preflight OPTIONS (não há doOptions e ContentService não emite
+      // Access-Control-Allow-Headers). Mandar application/json tornava a
+      // requisição "não-simples", o browser disparava o preflight, ele
+      // falhava e o fetch rejeitava com "Failed to fetch" — a chamada
+      // nunca chegava ao servidor. Sem header o Content-Type default é
+      // text/plain, requisição simples, sem preflight. doPost faz
+      // JSON.parse(e.postData.contents) e não olha o mime, então o
+      // backend continua igual. Mesmo padrão de updateMileage/syncRoNow.
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'markEntregaSemAgendamento',
         tech: currentTech,
@@ -2970,8 +2994,8 @@ async function revertEntregaManual(ev, btn) {
   btn.disabled = true;
   try {
     const res = await fetch(API_URL, {
+      // v4.7.1 — sem header Content-Type; mesma razão do marcar (preflight).
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'revertEntregaSemAgendamento',
         tech: currentTech,
