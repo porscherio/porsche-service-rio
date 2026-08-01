@@ -1,5 +1,23 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.7.1 — Build: 2026-07-31 22:33 BRT -->
+<!-- Porsche Service Rio PWA — v4.7.3 — Build: 2026-07-31 22:58 BRT -->
+<!-- v4.7.3: ENTREGAR AGORA — revert simétrico (Code.gs v4.7.2). Quando
+     a entrega revertida é anterior à v4.7.2 o servidor devolve
+     prev_state_unknown:true, e o PWA avisa que pátio e situação da RO
+     precisam ser reconferidos à mão — esses eventos não carimbaram o
+     estado anterior, então não há o que restaurar. Backend: Code.gs
+     v4.7.2. -->
+<!-- v4.7.2: ENTREGAR AGORA — a pill "REVERTER ENTREGA" não voltava e a
+     RO sumia da lista do Aprovador (teste RO 28638). A pill era
+     desenhada a partir do localStorage do aparelho, o que nunca ia
+     funcionar: (a) só valia no aparelho que clicou — outro Aprovador,
+     ou o mesmo no desktop, jamais veria como desfazer; (b) o card
+     inteiro já tinha saído da lista, então não havia onde desenhar
+     pill nenhuma. Agora a pill vem de r.manual_entrega_event_id,
+     campo novo do servidor, e a RO entregue manualmente permanece na
+     lista do Aprovador por 48h com selo "ENTREGUE — reversível".
+     localStorage mantido apenas como resposta imediata ao clique.
+     Backend: Code.gs v4.7.1 (obrigatório — sem ele o campo não
+     existe e o comportamento continua o de agora). -->
 <!-- v4.7.1: CORREÇÃO — ENTREGAR AGORA dava "Erro ao marcar entrega:
      Failed to fetch" e nada acontecia. marcarEntregaManual e
      revertEntregaManual eram os DOIS únicos fetch do arquivo que
@@ -2816,8 +2834,20 @@ function roCard(r) {
   // only ever one place controlling the flag.
   const chegadaPill = r.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
   // v4.1.2 — Marcar Entregue Sem Agendamento pill (Aprovador-only).
+  // v4.7.2 — a pill de REVERTER passa a vir do SERVIDOR
+  // (r.manual_entrega_event_id, novo em Code.gs v4.7.1). O
+  // localStorage continua como reserva porque ele responde no mesmo
+  // instante do clique, antes do loadROs voltar — mas ele sozinho
+  // nunca bastou: só valia no aparelho que clicou, e a RO ainda sumia
+  // da lista antes de renderizar de novo (ver getROs, janela de 48h).
   const _meKey = 'manual_entrega_' + r.ro_number;
-  const manualEntregaEventId = isApproverTech ? (localStorage.getItem(_meKey) || '') : '';
+  const manualEntregaEventId = !isApproverTech ? ''
+    : (r.manual_entrega_event_id || localStorage.getItem(_meKey) || '');
+  // Selo para o Aprovador entender por que este card entregue ainda
+  // está na lista — sem ele o card parece uma RO aberta qualquer.
+  const entregueTag = (isApproverTech && r.entregue && manualEntregaEventId)
+    ? '<span class="chegada-pill" style="background:#FDE7E9;color:#8B1A1A">&#x1F4E6; ENTREGUE &mdash; revers&#xED;vel por 48h</span>'
+    : '';
   const marcarEntregaPill = !isApproverTech ? ''
     : manualEntregaEventId
       ? '<button class="marcar-entregue-pill already" data-ro="' + r.ro_number + '" data-evt="' + manualEntregaEventId + '" onclick="revertEntregaManual(event,this)">&#x21A9; REVERTER ENTREGA</button>'
@@ -2876,7 +2906,7 @@ function roCard(r) {
       (r.hold_flag ? ' em-espera' : '') +
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + chegadaPill + marcarEntregaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
+        '<div class="cro">RO #' + r.ro_number + chegadaPill + entregueTag + marcarEntregaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
         '<div class="cjob">Placa: ' + r.plate + mileageHtml + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
@@ -3007,6 +3037,20 @@ async function revertEntregaManual(ev, btn) {
     if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
     localStorage.removeItem('manual_entrega_' + ro);
     await loadROs();
+    // v4.7.2 — o servidor agora é a fonte da pill, então depois do
+    // revert a RO volta à lista sem selo e sem pill de reverter, em
+    // qualquer aparelho. Nada mais a limpar aqui.
+    //
+    // v4.7.3 — entrega criada antes da v4.7.2 não carimbou o estado
+    // anterior no evento, então o servidor não teve o que restaurar no
+    // pátio nem na situação do NEW. Avisar em vez de deixar o Aprovador
+    // supor que o desfazer foi completo.
+    if (data.prev_state_unknown) {
+      alert('\u26A0\uFE0F Entrega revertida, mas era anterior à atualização que grava o estado anterior.\n\n' +
+            'Confira à mão na RO #' + ro + ':\n' +
+            '\u2022 Se o carro está no pátio, marque Confirmar Chegada\n' +
+            '\u2022 Situação da RO no sistema (ficou em branco)');
+    }
   } catch (e) {
     alert('Erro ao reverter entrega: ' + e.message);
     btn.textContent = '\u21A9 REVERTER ENTREGA';
