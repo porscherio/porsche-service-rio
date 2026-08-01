@@ -1,5 +1,12 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.7.3 — Build: 2026-07-31 22:58 BRT -->
+<!-- Porsche Service Rio PWA — v4.7.4 — Build: 2026-07-31 23:14 BRT -->
+<!-- v4.7.4: ENTREGAR AGORA — sem mudança de código no front. O card já
+     mandava data-servicos-evt=r.servicos_event_id desde a v4.1.2; o
+     que faltava era o servidor PRODUZIR esse campo, o que Code.gs
+     v4.7.3 passa a fazer. Com ele o selo NO PÁTIO some do card ao
+     entregar e o carro sai do painel Veículos no Pátio. Versão
+     marcada só para casar com o backend. Backend: Code.gs v4.7.3
+     (obrigatório). -->
 <!-- v4.7.3: ENTREGAR AGORA — revert simétrico (Code.gs v4.7.2). Quando
      a entrega revertida é anterior à v4.7.2 o servidor devolve
      prev_state_unknown:true, e o PWA avisa que pátio e situação da RO
@@ -2149,7 +2156,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.7.4';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
