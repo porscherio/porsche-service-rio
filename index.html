@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.7.4 — Build: 2026-07-31 23:14 BRT -->
+<!-- Porsche Service Rio PWA — v4.7.4 — Build: 2026-08-04 20:52 BRT -->
 <!-- v4.7.4: ENTREGAR AGORA — sem mudança de código no front. O card já
      mandava data-servicos-evt=r.servicos_event_id desde a v4.1.2; o
      que faltava era o servidor PRODUZIR esse campo, o que Code.gs
@@ -422,6 +422,22 @@
              action=setDisponibilidade POST per technician on Salvar.
              Same visual pattern as the existing apv-panel/pkg-panel/
              agenda-panel full-screen panels — no new CSS classes. -->
+<!-- v4.7.5: REMOVER PRIORIDADE — a prioridade manual era só de mão
+             única: dava pra definir e nunca pra tirar. renderPriorityRow
+             ganha um botão "Remover" ao lado de "Definir", visível
+             apenas quando a RO realmente tem prioridade, e o novo
+             removePriorityForRO chama Code.gs action=removePriority.
+             A RO sai da fila e as abaixo sobem uma posição — mesma
+             regra que já valia na entrega (removeFromPriorityQueue).
+             Motivo é opcional na remoção; o backend grava um texto
+             default no PriorityAudit.
+             Como o POST é no-cors (resposta opaca) e o .then dispara
+             quando o pedido sai e não quando o Apps Script termina, o
+             sucesso NÃO é anunciado de cara: espera 1,5s, relê
+             getPriority e só então diz o que aconteceu de verdade.
+             Requer Code.gs com o endpoint novo E Capacidade.gs v3.27
+             (sem ele, remover prioridade jogava a RO pra #1 na fila).
+             APP_VERSION deixado em 4.7.4 pra Eytan numerar. -->
 <!-- v3.4.5: PRIORITY MOTIVO — renderPriorityRow's priority-set control
              now includes a required "motivo" dropdown (fixed list,
              same wording as Prioridade_v3.xlsx: Cliente VIP / Prazo
@@ -3221,6 +3237,14 @@ async function renderPriorityRow(ro) {
       '</select>' +
       '<button class="pill-btn" style="background:#1e3a5f;color:#fff;border:none;cursor:pointer" ' +
         'onclick="setPriorityForRO(\''+escapeHtml(String(roNumber))+'\')">Definir</button>' +
+      // v4.7.5 — o botão de remover só existe quando há o que remover.
+      // Mostrá-lo sempre convidaria a clicar numa RO sem prioridade, e
+      // o backend responderia sem_prioridade — erro que o usuário nem
+      // consegue ver, já que o POST é no-cors e a resposta é opaca.
+      ((priority !== null && priority !== undefined)
+        ? '<button class="pill-btn" style="background:#fff;color:#991b1b;border:1px solid #fecaca;cursor:pointer" ' +
+            'onclick="removePriorityForRO(\''+escapeHtml(String(roNumber))+'\')">Remover</button>'
+        : '') +
     '</div>';
 }
 
@@ -3240,6 +3264,48 @@ function setPriorityForRO(roNumber) {
       renderPriorityRow(activeRO); // re-fetch to reflect any reorder that happened server-side
     }
   }).catch(() => showToast('Erro ao definir prioridade.'));
+}
+
+// v4.7.5 — remoção de prioridade manual (Code.gs action=removePriority).
+// A RO sai da fila manual e todas as abaixo sobem um lugar: #8 removida
+// faz #9 virar #8 — mesma regra que já vale quando a RO é entregue.
+//
+// Confirmação nativa, mesmo padrão do resto do arquivo (entrega,
+// reverter entrega, retirar da espera). Motivo é OPCIONAL aqui, ao
+// contrário de definir: o backend grava "PRIORIDADE REMOVIDA (era #N)"
+// no PriorityAudit quando nenhum é escolhido, o que já deixa a linha
+// legível sozinha. Pra exigir motivo também na remoção, basta copiar a
+// guarda do setPriorityForRO acima.
+function removePriorityForRO(roNumber) {
+  const motivoEl = document.getElementById('s2-priority-motivo');
+  const motivo   = motivoEl ? motivoEl.value : '';
+  if (!confirm('Remover a prioridade manual da RO #' + roNumber + '?\n\nA RO sai da fila de prioridade e as ROs abaixo dela sobem uma posição.')) return;
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'removePriority', ro_number: roNumber, tech: currentTech, motivo: motivo }),
+  }).then(() => {
+    showToast('A remover prioridade...');
+    // O POST é no-cors: a resposta é opaca, e o .then dispara quando o
+    // pedido SAI, não quando o Apps Script termina de processar. Então
+    // não dá pra anunciar sucesso aqui — quem confirma é a releitura,
+    // com folga pro servidor gravar a coluna nova na Priorities.
+    setTimeout(async () => {
+      if (!activeRO || String(activeRO.ro_number) !== String(roNumber)) return;
+      try {
+        const data = await fetch(API_URL + '?action=getPriority&ro_number=' + encodeURIComponent(roNumber)).then(r => r.json());
+        if (data.ok && (data.priority === null || data.priority === undefined)) {
+          showToast('&#x2705; Prioridade removida.');
+        } else {
+          showToast('A prioridade continua definida — tente novamente.');
+        }
+      } catch (e) {
+        // Sem rede pra confirmar: não afirma nada, nos dois sentidos.
+        showToast('Não foi possível confirmar a remoção.');
+      }
+      renderPriorityRow(activeRO);
+    }, 1500);
+  }).catch(() => showToast('Erro ao remover prioridade.'));
 }
 
 
