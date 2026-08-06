@@ -648,6 +648,12 @@ input:focus{outline:none;border-color:var(--black)}
 .parts-label-pending{color:var(--amber-text)}
 .parts-label-received{color:var(--green-text)}
 .parts-list{color:var(--black);font-size:11px}
+/* v4.7.5 — pill de reclassificacao, so Aprovador. Fica ao lado do
+   badge da jobline; o card inteiro abre a tarefa, por isso o
+   handler faz stopPropagation. */
+.reclass-pill{background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;border-radius:12px;font-size:11px;padding:2px 8px;margin-left:6px;cursor:pointer;line-height:1.6}
+.reclass-pill:active{background:#C7D2FE}
+.reclass-pill[disabled]{opacity:.45}
 .parts-none{color:#aaa;font-style:italic}
 #photo-canvas{display:none}
 .pill-btn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;line-height:1.6.3}
@@ -2172,7 +2178,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.7.4';
+const APP_VERSION = '4.7.5';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3507,6 +3513,14 @@ function joblineCard(j) {
   if (j.suggested_tech === currentTech && !isLocked && !isDone) { bc = 'b-sug'; bt = 'Sugerida'; }
   if (j.is_default && !isLocked && !isDone && !isPaused)        { bc = 'b-def'; bt = 'Padrão'; }
 
+  // v4.7.5 — pill de reclassificacao (Aprovador). Move ESTE item DESTA
+  // RO para a aba Parts na NEW. Nao escreve override: regra global por
+  // codigo foi exatamente o que quebrou dezenas de ROs de uma vez.
+  const reclassPill = !isApproverTech ? ''
+    : '<button class="reclass-pill" data-chave="' + j.jobline_id + '"'
+      + ' title="Isto e uma peca, nao mao de obra"'
+      + ' onclick="reclassClick(event,this)">&#x1F527;&#x2192;&#x1F4E6;</button>';
+
   const prog     = isPaused ? '<div class="prog-bg"><div class="prog p-a" style="width:' + j.completion_pct + '%"></div></div>' : '';
   const lastTech = j.last_tech ? '<div class="clast">&#x1F464; Último: ' + j.last_tech + '</div>' : '';
 
@@ -3519,11 +3533,55 @@ function joblineCard(j) {
       (j.is_default              ? ' default-jl' : '') +
     '" data-id="' + j.jobline_id + '" data-ro="' + j.ro_number + '">' +
       '<div class="crow"><div><div class="cro">' + j.job_description + '</div></div>' +
-      '<span class="badge ' + bc + '">' + bt + '</span></div>' +
+      '<span class="badge ' + bc + '">' + bt + '</span>' + reclassPill + '</div>' +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
       lastTech + prog + apvBadge +
     '</div>'
   );
+}
+
+// ── v4.7.5 — reclassificacao peca <-> jobline ────────────────────
+// Tres niveis de guarda, todos decididos no servidor (rpEstadoItem):
+//   lock ativo            -> recusa, sem excecao
+//   tempo apontado > 60s  -> exige confirmacao explicita
+//   limpo                 -> confirmacao simples
+// Nao aparece na hora: a mudanca vai para a NEW e chega a tela na
+// proxima ponte + syncJoblines.
+async function reclassClick(ev, btn) {
+  ev.stopPropagation();   // o card inteiro abre a jobline no clique
+  ev.preventDefault();
+  const chave = btn.dataset.chave;
+  btn.disabled = true;
+  try {
+    const r = await fetch(API_URL + '?action=reclassEstado&chave=' + encodeURIComponent(chave)
+                          + '&tech=' + encodeURIComponent(currentTech));
+    const est = await r.json();
+    if (!est.ok)       { alert('Erro: ' + (est.erro || 'desconhecido')); return; }
+    if (!est.origem)   { alert('Item nao encontrado como linha ativa na base.'); return; }
+    if (est.lockAtivo) { alert('Ha um tecnico com este item aberto agora.\n\nPeca para encerrar antes de reclassificar.'); return; }
+
+    let msg = 'Mover para ' + est.destino + '?\n\n' + chave;
+    let forcar = false;
+    if (est.precisaForcar) {
+      const min = Math.round(est.elapsed / 60);
+      msg = 'ATENCAO: este item tem ' + min + ' min apontados e ' + est.completion + '% concluido.\n\n'
+          + 'Ao mover para ' + est.destino + ', esses valores saem da tela do tecnico.\n'
+          + 'O Work Log continua intacto e os valores ficam guardados na aba ReclassAudit.\n\n'
+          + 'Confirmar mesmo assim?';
+      forcar = true;
+    }
+    if (!confirm(msg)) return;
+
+    const r2 = await fetch(API_URL + '?action=reclassInverter&chave=' + encodeURIComponent(chave)
+                           + '&forcar=' + forcar + '&tech=' + encodeURIComponent(currentTech));
+    const res = await r2.json();
+    if (!res.ok) { alert('Erro: ' + (res.erro || 'desconhecido')); return; }
+    alert('Movido para ' + res.para + '.\n\nAparece na tela apos a proxima sincronizacao.');
+  } catch (e) {
+    alert('Sem ligacao ao servidor.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function openJobline(id, roNumber) {
