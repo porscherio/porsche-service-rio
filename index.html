@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.7.4 — Build: 2026-08-04 20:52 BRT --> version 4.7.5
+<!-- Porsche Service Rio PWA — v4.7.4 — Build: 2026-08-04 20:52 BRT -->
 <!-- v4.7.4: ENTREGAR AGORA — sem mudança de código no front. O card já
      mandava data-servicos-evt=r.servicos_event_id desde a v4.1.2; o
      que faltava era o servidor PRODUZIR esse campo, o que Code.gs
@@ -2178,7 +2178,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.7.5';
+const APP_VERSION = '4.7.6';
 const GANTT_URL   = 'https://script.google.com/macros/s/AKfycbx4xXYo-8_bHJY--ZbdCJdkFY5iu7O7OO6PIH7fH9FQymmen1qLyl-UiMV0nzIgYece/exec';
 const SI_URL      = 'https://script.google.com/macros/s/AKfycbxAP5ukom5SaBMix1FK5Ae9Kwmw3Yc8mMXpSknLQNwfts_ei0jzNH88uf_EcZ3jghZnUw/exec';
 
@@ -3577,6 +3577,9 @@ async function reclassClick(ev, btn) {
     const res = await r2.json();
     if (!res.ok) { alert('Erro: ' + (res.erro || 'desconhecido')); return; }
     alert('Movido para ' + res.para + '.\n\nAparece na tela apos a proxima sincronizacao.');
+    // O painel de pecas le a lista do servidor; recarregar aqui evita
+    // o Aprovador clicar duas vezes no mesmo item achando que falhou.
+    if (res.de === 'Parts' && typeof pkgReload === 'function') pkgReload();
   } catch (e) {
     alert('Sem ligacao ao servidor.');
   } finally {
@@ -6204,6 +6207,21 @@ function receiptChipHtml(p) {
   return '';
 }
 
+// v4.7.6 — pill inversa: esta "peca" e na verdade mao de obra.
+// So aparece para Aprovador, e so quando ha part_code e a peca veio
+// da OI (peca manual nao tem linha correspondente na NEW, entao nao
+// ha o que reclassificar).
+function reclassPillPeca(p) {
+  if (!isApproverTech) return '';
+  if (!p.part_code) return '';
+  if (p.source === 'manual') return '';
+  const ro = (typeof pkgCurrentRO !== 'undefined' && pkgCurrentRO) ? pkgCurrentRO.ro_number : '';
+  if (!ro) return '';
+  return ' <button class="reclass-pill" data-chave="' + ro + '_' + p.part_code + '"'
+       + ' title="Isto e mao de obra, nao peca"'
+       + ' onclick="reclassClick(event,this)">&#x1F4E6;&#x2192;&#x1F527;</button>';
+}
+
 function pkgPartCardHtml(p) {
   const safeId   = pkgSafeId(p.part_key);
   const isOrdered = (p.status === 'To Be Ordered' || p.status === 'Ordered' || p.status === 'Confirmed' || p.status === 'Back Order' || p.status === 'Delivered');
@@ -6228,7 +6246,7 @@ function pkgPartCardHtml(p) {
       '<div class="pkg-part-head">' +
         '<div>' +
           '<div class="pkg-part-desc">' + escapeHtml(p.part_description) + (p.source==='manual' ? ' <span style="color:#aaa;font-weight:400;font-size:10px">(manual)</span>' : '') + '</div>' +
-          '<div class="pkg-part-qty">Qtd: ' + p.quantity + (p.part_code ? ' · Cód: '+p.part_code : '') + '</div>' +
+          '<div class="pkg-part-qty">Qtd: ' + p.quantity + (p.part_code ? ' · Cód: '+p.part_code : '') + reclassPillPeca(p) + '</div>' +
         '</div>' +
         (p.status === 'Delivered' ? receiptChipHtml(p) : '') +
       '</div>' +
