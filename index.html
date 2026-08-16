@@ -1,5 +1,19 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.8.2 — Build: 2026-08-16 16:35 BRT -->
+<!-- Porsche Service Rio PWA — v4.8.3 — Build: 2026-08-16 17:10 BRT -->
+<!-- v4.8.3: CAMPANHAS — dois acertos vindos do primeiro teste na
+     RO 29784:
+     (a) quando o usuário NÃO é Aprovador, o botão INCLUIR NA RO
+         sumia sem dizer nada, e ausência silenciosa é indistinguível
+         de defeito — foi o que aconteceu no teste. Agora sai uma
+         linha discreta dizendo que é só para Aprovador e com que
+         nome a sessão está logada, que é o dado que resolve o caso
+         na hora (o gate é por nome, contra a aba Aprovadores);
+     (b) campanha em aberto que JÁ tem RO registrada no estado ganha
+         o selo "já na RO xxxxx". É o caso da WSA4 nesta RO: existe
+         jobline em 28243 e mesmo assim ela consta como a executar —
+         sem o selo, o Aprovador pediria de novo o que já está
+         lançado. O checkbox some junto, pelo mesmo motivo.
+     Backend inalterado: Campanhas.gs v2.1.0. -->
 <!-- v4.8.2: CAMPANHAS — leitura da lista de concluídas. Três ajustes
      de exibição, nenhuma mudança de regra:
      (a) a data ganhou espaço (coluna de 74 para 92px) porque passou a
@@ -2256,7 +2270,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.8.2';
+const APP_VERSION = '4.8.3';
 
 // ── v4.8.0 — MODO DO APP ────────────────────────────────────────
 // Este arquivo e IDENTICO nos dois repositorios; a UNICA diferenca
@@ -3174,10 +3188,17 @@ function campRender(painel, d) {
     h.push('<div class="camp-grp"><div class="camp-grp-t exe">A EXECUTAR &middot; ' + d.executar.length + '</div>');
     d.executar.forEach(it => {
       const rec = /recall/i.test(it.tipo || '');
+      // it.ro numa campanha AINDA EM ABERTO quer dizer que ja existe
+      // jobline lancada para ela (o estado guardou a RO da execucao
+      // mapeada), so que sem prova de conclusao. Pedir de novo seria
+      // duplicar o item na OI — por isso selo, e sem checkbox.
+      const jaNaRo = !!it.ro;
+      const pedivel = d.aprovador && !it.solicitada && !jaNaRo;
       h.push('<div class="camp-item' + (rec ? ' recall' : '') + '">' +
-        (d.aprovador && !it.solicitada ? '<input type="checkbox" data-camp-cod="' + escapeHtml(it.codigo) + '">' : '') +
+        (pedivel ? '<input type="checkbox" data-camp-cod="' + escapeHtml(it.codigo) + '">' : '') +
         '<span class="camp-cod">' + escapeHtml(it.codigo) + '</span>' +
         '<span class="camp-desc" title="' + escapeHtml(it.descricao || '') + '">' + escapeHtml(it.descricao || '—') + '</span>' +
+        (jaNaRo ? '<span class="camp-tag" title="Já existe jobline lançada para esta campanha, sem conclusão registrada">já na RO ' + escapeHtml(String(it.ro)) + '</span>' : '') +
         (it.solicitada ? '<span class="camp-tag">solicitada</span>' : '') +
         (it.tipo ? '<span class="camp-tag ' + (rec ? 'recall' : 'camp') + '">' + escapeHtml(it.tipo) + '</span>' : '') +
         '</div>');
@@ -3186,6 +3207,11 @@ function campRender(painel, d) {
       h.push('<div class="camp-acao">' +
         '<button class="camp-btn" data-camp-incluir data-ro="' + escapeHtml(String(ro)) + '" data-vin="' + escapeHtml(d.vin) + '">INCLUIR NA RO</button>' +
         '<span class="camp-msg" data-camp-status></span></div>');
+    } else {
+      // Sem esta linha, tecnico e Aprovador com nome fora da aba veem
+      // exatamente a mesma tela — e o segundo caso e defeito.
+      h.push('<div class="camp-acao"><span class="camp-msg">Incluir na RO: só Aprovador (logado como ' +
+        escapeHtml(currentTech || '—') + ')</span></div>');
     }
     h.push('</div>');
   } else {
