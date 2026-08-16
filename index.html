@@ -1,5 +1,17 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.8.1 — Build: 2026-08-16 15:05 BRT -->
+<!-- Porsche Service Rio PWA — v4.8.2 — Build: 2026-08-16 16:35 BRT -->
+<!-- v4.8.2: CAMPANHAS — leitura da lista de concluídas. Três ajustes
+     de exibição, nenhuma mudança de regra:
+     (a) a data ganhou espaço (coluna de 74 para 92px) porque passou a
+         sair como 18/mai/2026 — ver Campanhas.gs v2.1.0. Antes vinha
+         o toString cru do JavaScript e ficava ilegível;
+     (b) a coluna da prova dizia só "NF", que não diz por si se é bom
+         ou ruim. Virou "RO 28243 ✓NF" em verde, com title explicando
+         que NF significa faturada à PAG — a prova mais forte de que
+         a campanha foi mesmo executada aqui;
+     (c) a descrição continua cortada numa linha (decisão do Eytan),
+         mas ganhou title com o texto inteiro no toque longo/hover.
+     Backend: Campanhas.gs v2.1.0. -->
 <!-- v4.8.1: CAMPANHAS — pill nova no card da RO, ao lado da
      quilometragem, mostrando o status de campanhas e recalls daquele
      VIN. Clicar abre um painel dentro do card com três listas: a
@@ -1195,8 +1207,9 @@ input:focus{outline:none;border-color:var(--black)}
 .camp-tab{width:100%;border-collapse:collapse;table-layout:fixed}
 .camp-tab td{padding:4px 0;font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .camp-tab td.c1{width:58px;font-family:monospace;color:#333}
-.camp-tab td.c3{width:74px;text-align:right}
-.camp-tab td.c4{width:92px;text-align:right}
+.camp-tab td.c3{width:92px;text-align:right}
+.camp-tab td.c4{width:96px;text-align:right;color:#0F6E56}
+.camp-tab td.c4.sem{color:#854F0B}
 .camp-nota{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:#999}
 .camp-acao{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
 .camp-btn{font-size:11px;font-weight:700;letter-spacing:.03em;padding:6px 12px;border-radius:20px;
@@ -2243,7 +2256,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.8.1';
+const APP_VERSION = '4.8.2';
 
 // ── v4.8.0 — MODO DO APP ────────────────────────────────────────
 // Este arquivo e IDENTICO nos dois repositorios; a UNICA diferenca
@@ -3164,7 +3177,7 @@ function campRender(painel, d) {
       h.push('<div class="camp-item' + (rec ? ' recall' : '') + '">' +
         (d.aprovador && !it.solicitada ? '<input type="checkbox" data-camp-cod="' + escapeHtml(it.codigo) + '">' : '') +
         '<span class="camp-cod">' + escapeHtml(it.codigo) + '</span>' +
-        '<span class="camp-desc">' + escapeHtml(it.descricao || '—') + '</span>' +
+        '<span class="camp-desc" title="' + escapeHtml(it.descricao || '') + '">' + escapeHtml(it.descricao || '—') + '</span>' +
         (it.solicitada ? '<span class="camp-tag">solicitada</span>' : '') +
         (it.tipo ? '<span class="camp-tag ' + (rec ? 'recall' : 'camp') + '">' + escapeHtml(it.tipo) + '</span>' : '') +
         '</div>');
@@ -3182,8 +3195,8 @@ function campRender(painel, d) {
   if (d.aprovador && d.aCobrar && d.aCobrar.length) {
     h.push('<div class="camp-grp"><div class="camp-grp-t">A COBRAR DA PAG &middot; ' + d.aCobrar.length + '</div><table class="camp-tab">');
     d.aCobrar.forEach(it => {
-      h.push('<tr><td class="c1">' + escapeHtml(it.codigo) + '</td><td>' + escapeHtml(it.descricao || '—') +
-        '</td><td class="c3">' + (it.ro ? 'RO ' + escapeHtml(String(it.ro)) : '') + '</td><td class="c4">sem NF</td></tr>');
+      h.push('<tr><td class="c1">' + escapeHtml(it.codigo) + '</td><td title="' + escapeHtml(it.descricao || '') + '">' + escapeHtml(it.descricao || '—') +
+        '</td><td class="c3">' + (it.ro ? 'RO ' + escapeHtml(String(it.ro)) : '') + '</td><td class="c4 sem" title="Feita aqui e nunca faturada à PAG">sem NF</td></tr>');
     });
     h.push('</table></div>');
   }
@@ -3191,10 +3204,18 @@ function campRender(painel, d) {
   if (d.concluidas && d.concluidas.length) {
     h.push('<div class="camp-grp"><div class="camp-grp-t">CONCLUÍDAS &middot; ' + d.concluidas.length + '</div><table class="camp-tab">');
     d.concluidas.forEach(it => {
-      let prova = it.ro ? 'RO ' + it.ro : (it.fonte || 'WWS');
-      if (it.ro && /nf/i.test(it.fonte || '')) prova += ' · NF';
-      h.push('<tr><td class="c1">' + escapeHtml(it.codigo) + '</td><td>' + escapeHtml(it.descricao || '—') +
-        '</td><td class="c3">' + escapeHtml(it.data || '—') + '</td><td class="c4">' + escapeHtml(prova) + '</td></tr>');
+      // A prova responde "isso foi mesmo feito?". NF e a mais forte:
+      // servico faturado a PAG. Por isso vem com check e em verde, e o
+      // title explica — "NF" sozinho nao diz se e bom ou ruim.
+      const temNF   = /nf/i.test(it.fonte || '');
+      const temConf = /confirm/i.test(it.fonte || '');
+      let prova, titulo;
+      if (temNF)        { prova = (it.ro ? 'RO ' + it.ro + ' ' : '') + '✓NF'; titulo = 'Executada aqui e faturada à PAG (nota fiscal) — prova mais forte'; }
+      else if (temConf) { prova = (it.ro ? 'RO ' + it.ro + ' ' : '') + '✓conf'; titulo = 'Confirmada à mão pelo gestor de campanhas'; }
+      else if (it.ro)   { prova = 'RO ' + it.ro; titulo = 'Jobline da RO aponta execução, sem NF registrada'; }
+      else              { prova = 'WWS'; titulo = 'Dada como concluída pelo arquivo da Porsche AG'; }
+      h.push('<tr><td class="c1">' + escapeHtml(it.codigo) + '</td><td title="' + escapeHtml(it.descricao || '') + '">' + escapeHtml(it.descricao || '—') +
+        '</td><td class="c3">' + escapeHtml(it.data || '—') + '</td><td class="c4' + (temNF || temConf ? '' : ' sem') + '" title="' + escapeHtml(titulo) + '">' + escapeHtml(prova) + '</td></tr>');
     });
     h.push('</table></div>');
   }
