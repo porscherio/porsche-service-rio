@@ -1,5 +1,28 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.7.4 — Build: 2026-08-04 20:52 BRT -->
+<!-- Porsche Service Rio PWA — v4.8.1 — Build: 2026-08-16 15:05 BRT -->
+<!-- v4.8.1: CAMPANHAS — pill nova no card da RO, ao lado da
+     quilometragem, mostrando o status de campanhas e recalls daquele
+     VIN. Clicar abre um painel dentro do card com três listas: a
+     executar, a cobrar da PAG e concluídas (com data, RO e a prova —
+     NF, confirmação do gestor ou o próprio arquivo do WWS). O painel
+     nasce fechado de propósito: o card já carrega placa, km, cliente,
+     reclamação, datas e progresso, e as campanhas são consulta, não
+     leitura obrigatória.
+     A COBRAR e o botão INCLUIR NA RO são só do Aprovador; o técnico vê
+     concluídas e a executar. A checagem é no SERVIDOR (campDetalhe
+     nem devolve a fila de cobrança para quem não é Aprovador) —
+     esconder no HTML não é permissão.
+     INCLUIR NA RO não cria jobline: registra na aba
+     CampanhasSolicitadas e abre o WhatsApp com a mensagem pronta para
+     quem abre OS na OI. A OI segue sendo a única fonte de jobline —
+     jobline criada só no PWA não tem linha de origem e o syncJoblines
+     não sabe o que fazer com ela.
+     As pills da lista carregam em UMA chamada (?action=campResumo com
+     os VINs visíveis), nunca uma por card. O VIN já vinha no r.vin
+     desde a v4.1.2, então não houve mudança no getROs.
+     Backend: Campanhas.gs v2.0.0 (obrigatório) + duas linhas de
+     roteamento no doGet/doPost do Code.gs. Sem elas a pill fica em
+     "sem dados" e nada mais acontece. -->
 <!-- v4.7.4: ENTREGAR AGORA — sem mudança de código no front. O card já
      mandava data-servicos-evt=r.servicos_event_id desde a v4.1.2; o
      que faltava era o servidor PRODUZIR esse campo, o que Code.gs
@@ -1140,6 +1163,48 @@ input:focus{outline:none;border-color:var(--black)}
   .si-card-closebar { display: none !important; }
   .si-card { box-shadow: none !important; }
 }
+
+/* ── v4.8.1 Campanhas ──────────────────────────────────────────
+   A pill segue o padrao das outras do card (chegada/mileage/hold):
+   10px, 700, radius 20, margin-left 6. O rosa acido e reservado a
+   pendencia — em dia e sem dados sao neutros de proposito, para o
+   olho so parar no card que exige acao. */
+.camp-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  letter-spacing:.03em;padding:3px 9px;border-radius:20px;margin-left:6px;white-space:nowrap;
+  vertical-align:middle;cursor:pointer;border:none;font-family:inherit}
+.camp-pill.pend{background:#FF2D95;color:#fff}
+.camp-pill.ok{background:#EFEFEF;color:#555}
+.camp-pill.none{background:#F5F5F5;color:#999}
+.camp-pill.loading{background:#F5F5F5;color:#bbb;cursor:default}
+.camp-panel{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);cursor:default}
+.camp-panel[hidden]{display:none}
+.camp-grp{margin-top:11px}
+.camp-grp:first-child{margin-top:0}
+.camp-grp-t{font-size:10px;font-weight:700;letter-spacing:.04em;color:#888;margin-bottom:5px}
+.camp-grp-t.exe{color:#C2185B}
+.camp-item{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--border);
+  border-radius:7px;margin-bottom:5px;font-size:12px}
+.camp-item.recall{border-color:#F09595}
+.camp-item input{margin:0;flex:none}
+.camp-cod{font-family:monospace;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;
+  background:#F1F1F1;color:#333;flex:none}
+.camp-desc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#444}
+.camp-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex:none;background:#EEE;color:#666}
+.camp-tag.recall{background:#FCEBEB;color:#A32D2D}
+.camp-tag.camp{background:#FAEEDA;color:#854F0B}
+.camp-tab{width:100%;border-collapse:collapse;table-layout:fixed}
+.camp-tab td{padding:4px 0;font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.camp-tab td.c1{width:58px;font-family:monospace;color:#333}
+.camp-tab td.c3{width:74px;text-align:right}
+.camp-tab td.c4{width:92px;text-align:right}
+.camp-nota{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:#999}
+.camp-acao{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.camp-btn{font-size:11px;font-weight:700;letter-spacing:.03em;padding:6px 12px;border-radius:20px;
+  border:none;background:var(--black,#111);color:#fff;cursor:pointer;font-family:inherit}
+.camp-btn:disabled{opacity:.5;cursor:default}
+.camp-msg{font-size:10px;color:#888}
+.camp-msg.err{color:#A32D2D}
+.camp-msg.good{color:#0F6E56}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -2178,7 +2243,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.8.0';
+const APP_VERSION = '4.8.1';
 
 // ── v4.8.0 — MODO DO APP ────────────────────────────────────────
 // Este arquivo e IDENTICO nos dois repositorios; a UNICA diferenca
@@ -2859,6 +2924,8 @@ function renderROList(ros) {
     if (ev.target.closest('.parts-badge')) return; // badge handles its own click
     if (ev.target.closest('.mileage-pill-blink')) return; // mileage pill handles its own click
     if (ev.target.closest('.sync-now-pill')) return; // sync-now icon handles its own click
+    if (ev.target.closest('.camp-pill')) return;    // campanhas pill handles its own click
+    if (ev.target.closest('.camp-panel')) return;   // clique dentro do painel nao abre a RO
     openRO(c.dataset.ro);
   }));
   el.querySelectorAll('.parts-badge').forEach(b => b.addEventListener('click', (ev)=>{
@@ -2870,6 +2937,7 @@ function renderROList(ros) {
     ev.stopPropagation();
     openMileageModal(p.dataset.mileageRo);
   }));
+  campCarregarPills(el);   // v4.8.1 — uma chamada para todos os cards
   const count = sug.length + free.length + paused.length;
   document.getElementById('t1-sub').textContent = count+' ordem(ns) disponível(is)';
 }
@@ -2959,6 +3027,16 @@ function roCard(r) {
   const entregaPill = entregaTxt
     ? '<span class="entrega-pill">Entrega: ' + entregaTxt + '</span>'
     : '';
+  // v4.8.1 — Campanhas. A pill nasce em 'loading' e e preenchida em
+  // lote por campCarregarPills(), uma chamada para todos os cards
+  // visiveis. Sem VIN nao ha o que consultar: o card fica sem pill em
+  // vez de mostrar uma pill morta.
+  const campPill = r.vin
+    ? '<span class="camp-pill loading" data-camp-pill data-ro="' + r.ro_number + '" data-vin="' + r.vin + '" role="button" aria-expanded="false">Campanhas &middot; \u2026</span>'
+    : '';
+  const campPanel = r.vin
+    ? '<div class="camp-panel" data-camp-panel data-ro="' + r.ro_number + '" hidden></div>'
+    : '';
   const datesLine = (createdTxt || entregaPill)
     ? '<div class="cdates">' +
         (createdTxt ? 'Aberta: ' + createdTxt : '') +
@@ -2975,7 +3053,7 @@ function roCard(r) {
     '" data-ro="' + r.ro_number + '">' +
       '<div class="crow"><div>' +
         '<div class="cro">RO #' + r.ro_number + chegadaPill + entregueTag + marcarEntregaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
-        '<div class="cjob">Placa: ' + r.plate + mileageHtml + '</div>' +
+        '<div class="cjob">Placa: ' + r.plate + mileageHtml + campPill + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
         datesLine +
@@ -2984,8 +3062,186 @@ function roCard(r) {
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
       '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:' + pct + '%"></div></div>' +
       '<span class="ro-prog-txt">' + done + '/' + total + ' joblines</span></div>' +
+      campPanel +
     '</div>'
   );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v4.8.1 — CAMPANHAS (pill do card da RO)
+// Backend: Campanhas.gs v2.0.0 — ?action=campResumo / campDetalhe e
+// POST campSolicitar. As tres acoes passam pelo doGet/doPost do
+// Code.gs, entao dependem das duas linhas de roteamento descritas no
+// cabecalho do Campanhas.gs.
+// ═══════════════════════════════════════════════════════════════
+const campCache = {};   // vin -> detalhe ja carregado
+
+// Carrega TODAS as pills visiveis numa chamada so. Uma chamada por
+// card estouraria a cota de URL fetch do Apps Script com 40 ROs na
+// tela e deixaria a lista piscando por segundos.
+async function campCarregarPills(scope) {
+  const el = scope || document;
+  const pills = Array.from(el.querySelectorAll('[data-camp-pill]'));
+  if (!pills.length) return;
+  const vins = [...new Set(pills.map(p => p.dataset.vin).filter(Boolean))];
+  if (!vins.length) return;
+  try {
+    const res  = await fetch(API_URL + '?action=campResumo&vins=' + encodeURIComponent(vins.join(',')));
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'falha');
+    pills.forEach(p => {
+      const r = data.resumo[String(p.dataset.vin).toUpperCase()];
+      if (!r || r.estado === 'sem_dados') {
+        p.className = 'camp-pill none';
+        p.innerHTML = 'Campanhas &middot; sem dados';
+      } else if (r.estado === 'pendente') {
+        p.className = 'camp-pill pend';
+        p.innerHTML = 'Campanhas &middot; ' + r.aExecutar + ' a executar';
+      } else {
+        p.className = 'camp-pill ok';
+        p.innerHTML = 'Campanhas &middot; em dia';
+      }
+    });
+  } catch (e) {
+    console.warn('campResumo falhou', e);
+    pills.forEach(p => { p.className = 'camp-pill none'; p.innerHTML = 'Campanhas &middot; indisponível'; });
+  }
+}
+
+// Delegacao no documento: os cards sao recriados a cada loadROs, entao
+// listener preso ao elemento morre no primeiro refresh.
+document.addEventListener('click', function (ev) {
+  const pill = ev.target.closest('[data-camp-pill]');
+  if (pill) { ev.stopPropagation(); campTogglePainel(pill); return; }
+  const btn = ev.target.closest('[data-camp-incluir]');
+  if (btn) { ev.stopPropagation(); campSolicitar(btn); }
+});
+
+function campPainelDaRo(ro) {
+  return document.querySelector('.camp-panel[data-ro="' + ro + '"]');
+}
+
+async function campTogglePainel(pill) {
+  const ro  = pill.dataset.ro;
+  const vin = pill.dataset.vin;
+  const painel = campPainelDaRo(ro);
+  if (!painel) return;
+
+  if (!painel.hidden) {
+    painel.hidden = true;
+    pill.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  painel.hidden = false;
+  pill.setAttribute('aria-expanded', 'true');
+
+  if (campCache[vin]) { campRender(painel, campCache[vin]); return; }
+  painel.innerHTML = '<div class="camp-msg">Carregando…</div>';
+  try {
+    const res = await fetch(API_URL + '?action=campDetalhe&vin=' + encodeURIComponent(vin) +
+      '&ro_number=' + encodeURIComponent(ro) + '&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    campCache[vin] = data;
+    campRender(painel, data);
+  } catch (e) {
+    painel.innerHTML = '<div class="camp-msg err">Não consegui ler as campanhas. Toque de novo.</div>';
+  }
+}
+
+function campRender(painel, d) {
+  if (!d || !d.ok) { painel.innerHTML = '<div class="camp-msg err">Dado indisponível.</div>'; return; }
+  if (d.semDados) {
+    painel.innerHTML = '<div class="camp-msg">' + escapeHtml(d.motivo || 'Sem dados de campanha para este VIN.') + '</div>';
+    return;
+  }
+  const ro = painel.dataset.ro;
+  const h = [];
+
+  if (d.executar && d.executar.length) {
+    h.push('<div class="camp-grp"><div class="camp-grp-t exe">A EXECUTAR &middot; ' + d.executar.length + '</div>');
+    d.executar.forEach(it => {
+      const rec = /recall/i.test(it.tipo || '');
+      h.push('<div class="camp-item' + (rec ? ' recall' : '') + '">' +
+        (d.aprovador && !it.solicitada ? '<input type="checkbox" data-camp-cod="' + escapeHtml(it.codigo) + '">' : '') +
+        '<span class="camp-cod">' + escapeHtml(it.codigo) + '</span>' +
+        '<span class="camp-desc">' + escapeHtml(it.descricao || '—') + '</span>' +
+        (it.solicitada ? '<span class="camp-tag">solicitada</span>' : '') +
+        (it.tipo ? '<span class="camp-tag ' + (rec ? 'recall' : 'camp') + '">' + escapeHtml(it.tipo) + '</span>' : '') +
+        '</div>');
+    });
+    if (d.aprovador) {
+      h.push('<div class="camp-acao">' +
+        '<button class="camp-btn" data-camp-incluir data-ro="' + escapeHtml(String(ro)) + '" data-vin="' + escapeHtml(d.vin) + '">INCLUIR NA RO</button>' +
+        '<span class="camp-msg" data-camp-status></span></div>');
+    }
+    h.push('</div>');
+  } else {
+    h.push('<div class="camp-grp"><div class="camp-grp-t">NENHUMA CAMPANHA EM ABERTO</div></div>');
+  }
+
+  if (d.aprovador && d.aCobrar && d.aCobrar.length) {
+    h.push('<div class="camp-grp"><div class="camp-grp-t">A COBRAR DA PAG &middot; ' + d.aCobrar.length + '</div><table class="camp-tab">');
+    d.aCobrar.forEach(it => {
+      h.push('<tr><td class="c1">' + escapeHtml(it.codigo) + '</td><td>' + escapeHtml(it.descricao || '—') +
+        '</td><td class="c3">' + (it.ro ? 'RO ' + escapeHtml(String(it.ro)) : '') + '</td><td class="c4">sem NF</td></tr>');
+    });
+    h.push('</table></div>');
+  }
+
+  if (d.concluidas && d.concluidas.length) {
+    h.push('<div class="camp-grp"><div class="camp-grp-t">CONCLUÍDAS &middot; ' + d.concluidas.length + '</div><table class="camp-tab">');
+    d.concluidas.forEach(it => {
+      let prova = it.ro ? 'RO ' + it.ro : (it.fonte || 'WWS');
+      if (it.ro && /nf/i.test(it.fonte || '')) prova += ' · NF';
+      h.push('<tr><td class="c1">' + escapeHtml(it.codigo) + '</td><td>' + escapeHtml(it.descricao || '—') +
+        '</td><td class="c3">' + escapeHtml(it.data || '—') + '</td><td class="c4">' + escapeHtml(prova) + '</td></tr>');
+    });
+    h.push('</table></div>');
+  }
+
+  if (d.pag && d.pag.length) {
+    h.push('<div class="camp-nota">' + d.pag.length +
+      ' campanha(s) provavelmente encerrada(s) pela PAG, sem prova de execução aqui: ' +
+      d.pag.map(it => escapeHtml(it.codigo)).join(', ') + '</div>');
+  }
+
+  painel.innerHTML = h.join('');
+}
+
+async function campSolicitar(btn) {
+  const ro     = btn.dataset.ro;
+  const vin    = btn.dataset.vin;
+  const painel = campPainelDaRo(ro);
+  const status = painel.querySelector('[data-camp-status]');
+  const codigos = Array.from(painel.querySelectorAll('[data-camp-cod]:checked')).map(c => c.dataset.campCod);
+
+  if (!codigos.length) { status.className = 'camp-msg err'; status.textContent = 'Marque a campanha a incluir.'; return; }
+
+  btn.disabled = true;
+  status.className = 'camp-msg';
+  status.textContent = 'Registrando…';
+  try {
+    // SEM header Content-Type — mesma razao da v4.7.1: header dispara
+    // preflight OPTIONS, que o /exec do Apps Script nao atende.
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'campSolicitar', ro_number: ro, vin: vin, codigos: codigos, tech: currentTech })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'falha ao registrar');
+    status.className = 'camp-msg good';
+    status.textContent = 'Registrada. Abrindo o WhatsApp…';
+    delete campCache[vin];
+    window.open(data.waUrl, '_blank');
+    const rec = await fetch(API_URL + '?action=campDetalhe&vin=' + encodeURIComponent(vin) +
+      '&ro_number=' + encodeURIComponent(ro) + '&tech=' + encodeURIComponent(currentTech)).then(r => r.json());
+    campCache[vin] = rec;
+    campRender(painel, rec);
+  } catch (e) {
+    btn.disabled = false;
+    status.className = 'camp-msg err';
+    status.textContent = 'Falha ao registrar: ' + e.message;
+  }
 }
 
 function openRO(roNumber) {
