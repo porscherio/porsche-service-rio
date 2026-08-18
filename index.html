@@ -1,5 +1,44 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v4.8.3 — Build: 2026-08-16 17:10 BRT -->
+<!-- Porsche Service Rio PWA — v5.0.0 — Build: 2026-08-17 21:55 BRT -->
+<!-- v5.0.0: VIRADA DE VERSÃO MAIOR, decidida pelo Eytan. Não é só mais
+     uma tela: o ciclo 4.8.x/4.9.0 trouxe a integração do WWS ponta a
+     ponta (pill de campanhas no card da RO, estado por VIN, prova de
+     execução e cobrança à PAG) e agora a tela de RELATÓRIOS com
+     permissão por categoria. São duas capacidades novas do produto,
+     não correções — daí o 5.0.0 em vez de seguir no 4.9.x.
+     O conteúdo desta entrega é o que estava marcado como v4.9.0:
+     RELATÓRIOS — ícone novo no rodapé, no lugar do HISTÓRICO
+     (confirmado com o Eytan que não é usado hoje). Navegação em dois
+     níveis: lista de categorias e, dentro de cada uma, a sub-lista de
+     relatórios. Ordem pedida: Pátio, Veículos atendidos, Financeiro e
+     WWS por último.
+     FASE A: só o Pátio tem relatório de verdade (veículos no pátio,
+     aguardando peça, aguardando serviço com filtro de dias). As outras
+     categorias aparecem com os itens marcados "em breve" — de
+     propósito, para a tela já mostrar para onde vai em vez de esconder
+     o que falta.
+     PERMISSÃO por CATEGORIA: base é Aprovador, com exceções
+     INCLUIR/EXCLUIR por usuário na aba RelatoriosPermissoes (ex.:
+     incluir o Sebastião só em WWS, excluir o Matheus do Financeiro).
+     EXCLUIR vence INCLUIR. A checagem é no SERVIDOR em toda chamada de
+     dado — esconder item de menu não é permissão.
+     O ícone só aparece para quem tem ao menos uma categoria visível.
+     Backend: Relatorios.gs v1.0.0 + uma linha de rota no Code.gs
+     v4.9.4. -->
+<!-- v4.8.4: CAMPANHAS — duas correções de critério, vindas da
+     comparação entre as ROs 29784 e 30056 (mesmo VIN):
+     (a) RO SEM VIN agora mostra pill CINZA "Campanhas · sem VIN" em
+         vez de pill nenhuma. Antes a RO recém-criada, cujo chassi
+         ainda não desceu da OI, ficava idêntica a um carro sem
+         pendência — exatamente o alerta que a pill existe para dar.
+         "Não sei" e "não deve nada" não podem parecer a mesma coisa;
+     (b) o selo "já na RO xxxxx" VOLTOU a ser incluível. Na v4.8.3 ele
+         tirava o checkbox para evitar item duplicado na OI, e isso
+         estava errado: campanha lançada numa RO ANTERIOR e nunca
+         concluída nem faturada à PAG é justamente o que o Aprovador
+         precisa puxar para a RO atual. O selo continua, agora como
+         aviso (⚠) e com confirmação antes de solicitar.
+     Backend inalterado: Campanhas.gs v2.1.0. -->
 <!-- v4.8.3: CAMPANHAS — dois acertos vindos do primeiro teste na
      RO 29784:
      (a) quando o usuário NÃO é Aprovador, o botão INCLUIR NA RO
@@ -1218,6 +1257,7 @@ input:focus{outline:none;border-color:var(--black)}
 .camp-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex:none;background:#EEE;color:#666}
 .camp-tag.recall{background:#FCEBEB;color:#A32D2D}
 .camp-tag.camp{background:#FAEEDA;color:#854F0B}
+.camp-tag.aviso{background:#FDE7E9;color:#8B1A1A}
 .camp-tab{width:100%;border-collapse:collapse;table-layout:fixed}
 .camp-tab td{padding:4px 0;font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .camp-tab td.c1{width:58px;font-family:monospace;color:#333}
@@ -1232,6 +1272,27 @@ input:focus{outline:none;border-color:var(--black)}
 .camp-msg{font-size:10px;color:#888}
 .camp-msg.err{color:#A32D2D}
 .camp-msg.good{color:#0F6E56}
+
+/* ── v4.9.0 Relatórios ───────────────────────────────────────── */
+.rel-cat{border:1px solid var(--border);border-radius:8px;margin:0 0 8px;overflow:hidden;background:#fff}
+.rel-cat-head{display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer}
+.rel-cat-nome{font-size:14px;font-weight:600;flex:1}
+.rel-cat-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#FF2D95;color:#fff}
+.rel-cat-chev{font-size:13px;color:#999}
+.rel-sub{padding:0 12px 8px}
+.rel-item{display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px;border-top:1px solid var(--border);cursor:pointer}
+.rel-item.off{opacity:.45;cursor:default}
+.rel-item-nome{flex:1}
+.rel-item-nota{font-size:10px;color:#999}
+.rel-tab{width:100%;border-collapse:collapse;font-size:12px}
+.rel-tab th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.03em;color:#888;padding:6px 6px;border-bottom:1px solid var(--border);white-space:nowrap}
+.rel-tab td{padding:7px 6px;border-bottom:1px solid var(--border);color:#333}
+.rel-tab tr:active td{background:#FAFAFA}
+.rel-vazio{text-align:center;color:#aaa;font-size:13px;padding:40px 0}
+.rel-filtro{display:flex;gap:6px;margin:0 0 10px}
+.rel-filtro button{font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:#fff;color:#666;cursor:pointer;font-family:inherit}
+.rel-filtro button.on{background:var(--black,#111);color:#fff;border-color:var(--black,#111)}
+.rel-resumo{font-size:11px;color:#888;margin:0 0 10px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -1321,7 +1382,7 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
     <div class="nav">
       <button class="ntab on" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
-      <button class="ntab" onclick="goTo('s-hist')">&#x1F4CB;<br>Histórico</button>
+      <button class="ntab" id="btn-rel-nav" style="display:none" onclick="relAbrir()">&#x1F4C8;<br>Relatórios</button>
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
       <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" id="btn-polaris-nav" style="display:none" onclick="openPolarisNav()">&#x1F50D;<br>Polaris</button>
@@ -1702,7 +1763,26 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
   </div>
 
-  <!-- HISTORICO -->
+  <!-- RELATORIOS (v4.9.0) -->
+  <div class="screen" id="s-rel">
+    <div class="topbar">
+      <button class="back" onclick="relVoltar()" aria-label="Voltar">&#8592;</button>
+      <div style="flex:1"><div class="tb-title" id="rel-titulo">Relatórios</div></div>
+    </div>
+    <div class="scroll" id="rel-conteudo">
+      <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
+    </div>
+    <div class="nav">
+      <button class="ntab" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
+      <button class="ntab on">&#x1F4C8;<br>Relatórios</button>
+      <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
+      <button class="ntab" onclick="doLogout()">&#x1F6AA;<br>Sair</button>
+    </div>
+  </div>
+
+  <!-- HISTORICO (v4.9.0: sem porta de entrada no rodapé — mantido no
+       arquivo porque a tela ainda é alcançável por goTo('s-hist') e
+       remover markup vivo é mais arriscado que deixá-lo órfão) -->
   <div class="screen" id="s-hist">
     <div class="topbar"><div class="tb-title">Histórico de hoje</div></div>
     <div class="scroll" id="hist-list">
@@ -1710,7 +1790,7 @@ input:focus{outline:none;border-color:var(--black)}
     </div>
     <div class="nav">
       <button class="ntab" onclick="goTo('s1')">&#x1F697;<br>Ordens</button>
-      <button class="ntab on">&#x1F4CB;<br>Histórico</button>
+      <button class="ntab" id="btn-rel-nav-2" style="display:none" onclick="relAbrir()">&#x1F4C8;<br>Relatórios</button>
       <button class="ntab" onclick="openGanttNav()">&#x1F4CA;<br>Gantt</button>
       <button class="ntab" id="btn-si-nav" style="display:none" onclick="openSINav()">&#x26A1;<br>SI</button>
       <button class="ntab" id="btn-polaris-nav" style="display:none" onclick="openPolarisNav()">&#x1F50D;<br>Polaris</button>
@@ -2270,7 +2350,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '4.8.3';
+const APP_VERSION = '5.0.0';
 
 // ── v4.8.0 — MODO DO APP ────────────────────────────────────────
 // Este arquivo e IDENTICO nos dois repositorios; a UNICA diferenca
@@ -2436,6 +2516,7 @@ async function doLogin() {
   document.getElementById('sug-greet').textContent = saudacao;
   checkAndShowApprovalButton();
   checkAndShowPolarisButton();
+  relCarregarMenu();   // v4.9.0 — mostra o ícone só se houver categoria visível
   checkAndShowOrcamentoButton();
   checkAndShowDisponibilidadeIcon();
   checkAppVersion(); // fire-and-forget - never blocks/delays the app loading
@@ -2529,6 +2610,8 @@ function doLogout() {
   currentTech=''; activeTask=null; activeRO=null;
   liveROs=[]; liveJoblines={}; approvalCache={}; partsSummaryCache={}; partsDetailCache={};
   isApproverTech=false;
+  relCategorias = null; relCatAberta = null;   // v4.9.0
+  ['btn-rel-nav','btn-rel-nav-2'].forEach(id => { const b=document.getElementById(id); if (b) b.style.display='none'; });
   clearTimer();
   document.getElementById('inp-pin').value='';
   document.getElementById('sel-tech').value='';
@@ -3058,9 +3141,12 @@ function roCard(r) {
   // lote por campCarregarPills(), uma chamada para todos os cards
   // visiveis. Sem VIN nao ha o que consultar: o card fica sem pill em
   // vez de mostrar uma pill morta.
+  // v4.8.4 — sem VIN a pill CONTINUA, em cinza e sem clique: a RO nova
+  // ainda nao recebeu o chassi da OI, e "nao sei" nao pode parecer
+  // "nada pendente". Tocar o sync (↻) resolve quando o dado chegar.
   const campPill = r.vin
     ? '<span class="camp-pill loading" data-camp-pill data-ro="' + r.ro_number + '" data-vin="' + r.vin + '" role="button" aria-expanded="false">Campanhas &middot; \u2026</span>'
-    : '';
+    : '<span class="camp-pill none" title="Esta RO ainda nao tem VIN na base - o chassi vem da OI e pode demorar alguns minutos. Sem VIN nao da para saber se ha campanha pendente.">Campanhas &middot; sem VIN</span>';
   const campPanel = r.vin
     ? '<div class="camp-panel" data-camp-panel data-ro="' + r.ro_number + '" hidden></div>'
     : '';
@@ -3192,13 +3278,16 @@ function campRender(painel, d) {
       // jobline lancada para ela (o estado guardou a RO da execucao
       // mapeada), so que sem prova de conclusao. Pedir de novo seria
       // duplicar o item na OI — por isso selo, e sem checkbox.
+      // v4.8.4 — ja lancada em RO anterior e INCLUIVEL de novo: se
+      // estivesse feita, teria conclusao ou NF, e estaria nas
+      // concluidas. E o caso que o Aprovador mais precisa puxar.
       const jaNaRo = !!it.ro;
-      const pedivel = d.aprovador && !it.solicitada && !jaNaRo;
+      const pedivel = d.aprovador && !it.solicitada;
       h.push('<div class="camp-item' + (rec ? ' recall' : '') + '">' +
         (pedivel ? '<input type="checkbox" data-camp-cod="' + escapeHtml(it.codigo) + '">' : '') +
         '<span class="camp-cod">' + escapeHtml(it.codigo) + '</span>' +
         '<span class="camp-desc" title="' + escapeHtml(it.descricao || '') + '">' + escapeHtml(it.descricao || '—') + '</span>' +
-        (jaNaRo ? '<span class="camp-tag" title="Já existe jobline lançada para esta campanha, sem conclusão registrada">já na RO ' + escapeHtml(String(it.ro)) + '</span>' : '') +
+        (jaNaRo ? '<span class="camp-tag aviso" title="Já foi lançada na RO ' + escapeHtml(String(it.ro)) + ' e nunca concluída nem faturada à PAG. Pode ser incluída de novo — confira antes se não está em execução.">⚠ já na RO ' + escapeHtml(String(it.ro)) + '</span>' : '') +
         (it.solicitada ? '<span class="camp-tag">solicitada</span>' : '') +
         (it.tipo ? '<span class="camp-tag ' + (rec ? 'recall' : 'camp') + '">' + escapeHtml(it.tipo) + '</span>' : '') +
         '</div>');
@@ -3264,6 +3353,16 @@ async function campSolicitar(btn) {
 
   if (!codigos.length) { status.className = 'camp-msg err'; status.textContent = 'Marque a campanha a incluir.'; return; }
 
+  // Confirmacao so no caso ambiguo: campanha que ja esteve numa RO.
+  // Pode estar em execucao agora, e ai o pedido seria duplicado.
+  const jaLancadas = (campCache[vin] && campCache[vin].executar || [])
+    .filter(it => it.ro && codigos.indexOf(it.codigo) !== -1)
+    .map(it => it.codigo + ' (RO ' + it.ro + ')');
+  if (jaLancadas.length && !confirm('Estas campanhas já foram lançadas antes e nunca concluídas:\n\n' +
+      jaLancadas.join('\n') + '\n\nIncluir mesmo assim na RO ' + ro + '?')) {
+    return;
+  }
+
   btn.disabled = true;
   status.className = 'camp-msg';
   status.textContent = 'Registrando…';
@@ -3289,6 +3388,138 @@ async function campSolicitar(btn) {
     status.className = 'camp-msg err';
     status.textContent = 'Falha ao registrar: ' + e.message;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v4.9.0 — RELATÓRIOS
+// Backend: Relatorios.gs v1.0.0 (?action=relCategorias / relDados).
+// A permissão por categoria é decidida no SERVIDOR; aqui só se
+// desenha o que ele devolveu.
+// ═══════════════════════════════════════════════════════════════
+let relCategorias = null;      // cache do menu na sessão
+let relCatAberta = null;       // id da categoria expandida
+let relTelaAnterior = 's1';
+
+// O ícone só aparece se houver ao menos uma categoria visível — quem
+// não tem nada para ver não descobre a tela pelo rodapé.
+async function relCarregarMenu() {
+  try {
+    const res = await fetch(API_URL + '?action=relCategorias&tech=' + encodeURIComponent(currentTech));
+    const data = await res.json();
+    if (!data.ok || !data.categorias || !data.categorias.length) return;
+    relCategorias = data.categorias;
+    ['btn-rel-nav', 'btn-rel-nav-2'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.style.display = '';
+    });
+  } catch (e) {
+    console.warn('relCategorias falhou', e);
+  }
+}
+
+function relAbrir() {
+  relTelaAnterior = 's1';
+  relCatAberta = null;
+  goTo('s-rel');
+  relRenderMenu();
+}
+
+function relVoltar() {
+  // Dentro de um relatório, voltar é voltar para a lista, não sair da
+  // tela — o caminho de volta tem que espelhar o caminho de ida.
+  if (document.getElementById('rel-titulo').textContent !== 'Relatórios') {
+    relRenderMenu();
+    return;
+  }
+  goTo(relTelaAnterior);
+}
+
+function relRenderMenu() {
+  document.getElementById('rel-titulo').textContent = 'Relatórios';
+  const el = document.getElementById('rel-conteudo');
+  if (!relCategorias) { el.innerHTML = '<div class="rel-vazio">Nada disponível.</div>'; return; }
+
+  const h = [];
+  relCategorias.forEach((c, i) => {
+    const aberta = relCatAberta === c.id;
+    h.push('<div class="rel-cat">' +
+      '<div class="rel-cat-head" onclick="relToggleCat(\'' + c.id + '\')">' +
+        '<span class="rel-cat-nome">' + (i + 1) + ' · ' + escapeHtml(c.titulo) + '</span>' +
+        '<span class="rel-cat-chev">' + (aberta ? '&#9650;' : '&#9660;') + '</span>' +
+      '</div>');
+    if (aberta) {
+      h.push('<div class="rel-sub">');
+      c.relatorios.forEach(r => {
+        if (r.pronto) {
+          h.push('<div class="rel-item" onclick="relAbrirRelatorio(\'' + r.id + '\')">' +
+            '<span class="rel-item-nome">' + escapeHtml(r.titulo) + '</span>' +
+            (r.nota ? '<span class="rel-item-nota">' + escapeHtml(r.nota) + '</span>' : '') +
+            '<span class="rel-cat-chev">&#8250;</span></div>');
+        } else {
+          h.push('<div class="rel-item off">' +
+            '<span class="rel-item-nome">' + escapeHtml(r.titulo) + '</span>' +
+            '<span class="rel-item-nota">em breve</span></div>');
+        }
+      });
+      h.push('</div>');
+    }
+    h.push('</div>');
+  });
+  el.innerHTML = h.join('');
+}
+
+function relToggleCat(id) {
+  relCatAberta = (relCatAberta === id) ? null : id;
+  relRenderMenu();
+}
+
+async function relAbrirRelatorio(relId, dias) {
+  const el = document.getElementById('rel-conteudo');
+  el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
+  try {
+    const url = API_URL + '?action=relDados&rel=' + encodeURIComponent(relId) +
+      '&tech=' + encodeURIComponent(currentTech) +
+      (dias ? '&dias=' + encodeURIComponent(dias) : '');
+    const data = await (await fetch(url)).json();
+    if (!data.ok) { el.innerHTML = '<div class="rel-vazio">' + escapeHtml(data.error || 'falhou') + '</div>'; return; }
+    relRenderRelatorio(data, relId);
+  } catch (e) {
+    el.innerHTML = '<div class="rel-vazio">Não consegui carregar. Toque de novo.</div>';
+  }
+}
+
+function relRenderRelatorio(d, relId) {
+  document.getElementById('rel-titulo').textContent = d.titulo || 'Relatório';
+  const el = document.getElementById('rel-conteudo');
+  const h = [];
+
+  // Filtro de dias: só no relatório que o Eytan pediu com faixas.
+  if (relId === 'patio_servico') {
+    const atual = d.filtro_dias || 0;
+    h.push('<div class="rel-filtro">');
+    [[0, 'todos'], [3, '>3d'], [7, '>7d'], [15, '>15d']].forEach(op => {
+      h.push('<button class="' + (atual === op[0] ? 'on' : '') + '" onclick="relAbrirRelatorio(\'patio_servico\',' + op[0] + ')">' + op[1] + '</button>');
+    });
+    h.push('</div>');
+  }
+
+  h.push('<div class="rel-resumo">' + d.total + ' registro(s)</div>');
+
+  if (!d.linhas || !d.linhas.length) {
+    h.push('<div class="rel-vazio">Nada a mostrar.</div>');
+  } else {
+    h.push('<table class="rel-tab"><tr>');
+    d.colunas.forEach(c => h.push('<th>' + escapeHtml(c) + '</th>'));
+    h.push('</tr>');
+    d.linhas.forEach(linha => {
+      const ro = String(linha[0]);
+      h.push('<tr onclick="openRO(\'' + ro + '\')">');
+      linha.forEach(v => h.push('<td>' + escapeHtml(String(v == null ? '' : v)) + '</td>'));
+      h.push('</tr>');
+    });
+    h.push('</table>');
+  }
+  el.innerHTML = h.join('');
 }
 
 function openRO(roNumber) {
