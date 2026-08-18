@@ -3515,21 +3515,31 @@ function relRenderRelatorio(d, relId) {
     h.push('</div>');
   }
 
-  h.push('<div class="rel-resumo">' + d.total + ' registro(s)</div>');
+  if (d.aviso) h.push('<div class="rel-vazio" style="color:#854F0B">' + escapeHtml(d.aviso) + '</div>');
+
+  h.push('<div class="rel-resumo">' + d.total + ' registro(s)' +
+    (d.resumo ? ' · ' + escapeHtml(d.resumo) : '') + '</div>');
 
   if (!d.linhas || !d.linhas.length) {
-    h.push('<div class="rel-vazio">Nada a mostrar.</div>');
+    if (!d.aviso) h.push('<div class="rel-vazio">Nada a mostrar.</div>');
   } else {
+    // Abrir a RO ao tocar só faz sentido quando a 1ª coluna É a RO.
+    // Em "Pendentes por veículo" ela é a placa, e a RO fica na última.
+    const colRo = d.colunas.indexOf('RO') !== -1 ? d.colunas.indexOf('RO')
+                : d.colunas.indexOf('Última RO');
     h.push('<table class="rel-tab"><tr>');
     d.colunas.forEach(c => h.push('<th>' + escapeHtml(c) + '</th>'));
     h.push('</tr>');
     d.linhas.forEach(linha => {
-      const ro = String(linha[0]);
-      h.push('<tr onclick="openRO(\'' + ro + '\')">');
+      const ro = colRo === -1 ? '' : String(linha[colRo] || '').replace(/\D/g, '');
+      h.push(ro ? '<tr onclick="openRO(\'' + ro + '\')">' : '<tr>');
       linha.forEach(v => h.push('<td>' + escapeHtml(String(v == null ? '' : v)) + '</td>'));
       h.push('</tr>');
     });
     h.push('</table>');
+    if (d.linhas.length >= 400) {
+      h.push('<div class="rel-resumo">mostrando as primeiras 400 linhas</div>');
+    }
   }
   el.innerHTML = h.join('');
 }
