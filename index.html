@@ -3473,13 +3473,14 @@ function relToggleCat(id) {
   relRenderMenu();
 }
 
-async function relAbrirRelatorio(relId, dias) {
+async function relAbrirRelatorio(relId, dias, ord) {
   const el = document.getElementById('rel-conteudo');
   el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
   try {
     const url = API_URL + '?action=relDados&rel=' + encodeURIComponent(relId) +
       '&tech=' + encodeURIComponent(currentTech) +
-      (dias ? '&dias=' + encodeURIComponent(dias) : '');
+      (dias ? '&dias=' + encodeURIComponent(dias) : '') +
+      (ord ? '&ord=' + encodeURIComponent(ord) : '');
     const data = await (await fetch(url)).json();
     if (!data.ok) { el.innerHTML = '<div class="rel-vazio">' + escapeHtml(data.error || 'falhou') + '</div>'; return; }
     relRenderRelatorio(data, relId);
@@ -3492,6 +3493,17 @@ function relRenderRelatorio(d, relId) {
   document.getElementById('rel-titulo').textContent = d.titulo || 'Relatório';
   const el = document.getElementById('rel-conteudo');
   const h = [];
+
+  // v1.1.0 — ordenação: o servidor manda as opções, então acrescentar
+  // uma ordem nova lá não exige mexer aqui.
+  if (d.ordens && d.ordens.length) {
+    h.push('<div class="rel-filtro">');
+    d.ordens.forEach(o => {
+      h.push('<button class="' + (d.ordem === o.id ? 'on' : '') + '" ' +
+        'onclick="relAbrirRelatorio(\'' + relId + '\',0,\'' + o.id + '\')">' + escapeHtml(o.rotulo) + '</button>');
+    });
+    h.push('</div>');
+  }
 
   // Filtro de dias: só no relatório que o Eytan pediu com faixas.
   if (relId === 'patio_servico') {
