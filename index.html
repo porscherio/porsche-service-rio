@@ -1,5 +1,35 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.0.0 — Build: 2026-08-17 21:55 BRT -->
+<!-- Porsche Service Rio PWA — v5.1.0 — Build: 2026-08-18 22:10 BRT -->
+<!-- v5.1.0: FAIXA DE PILLS no card da RO. As pills estavam espalhadas
+     por quatro lugares — ao lado do número da RO, na linha da placa,
+     na coluna da direita e na linha das datas — e o Eytan achou o card
+     confuso, com informação misturada. Agora TODAS ficam numa faixa
+     abaixo dos dados, separada por um divisor: o lado esquerdo do card
+     vira fato puro (veículo, placa, km, cliente, telefone, reclamação,
+     datas) e o status fica num lugar só.
+     FAIXA e não coluna lateral: um trilho à direita comeria ~150px dos
+     380px de um celular e jogaria nome de cliente longo para três
+     linhas — o oposto do que se quer. A faixa usa a largura toda e
+     quebra sozinha em duas linhas quando precisa.
+     ORDEM FIXA, do que trava o trabalho para o informativo: em espera,
+     peças, aprovação, quilometragem, status, campanhas, pátio,
+     prioridade; depois, separadas, as ações de Aprovador (entregar,
+     reverter, sincronizar). Lista agrupada convida a ler em ordem,
+     então a ordem passa a significar alguma coisa.
+     Nenhuma pill nova e nenhuma regra de visibilidade mudou — só o
+     lugar onde são desenhadas. Backend intocado. -->
+<!-- v5.0.1: TELEFONE DO CLIENTE no card e na tela da RO, no formato
+     +5521994494183 e clicável: abre a conversa no WhatsApp, de onde
+     dá para ligar ou mandar mensagem.
+     O número vem da coluna phone nova da aba ROs (syncAll v1.13.0) —
+     o dado sempre existiu na OLD e parava lá. Buscar por RO na hora
+     de desenhar seria uma chamada por card; a coluna custa uma
+     leitura que o app já fazia.
+     A formatação é só de exibição: a base guarda como veio (dígitos
+     com DDI). Número sem DDI ganha o 55 ao montar o link, e número
+     curto demais aparece como texto simples, sem link — abrir o
+     WhatsApp num número truncado leva o técnico a conversar com um
+     desconhecido. -->
 <!-- v5.0.0: VIRADA DE VERSÃO MAIOR, decidida pelo Eytan. Não é só mais
      uma tela: o ciclo 4.8.x/4.9.0 trouxe a integração do WWS ponta a
      ponta (pill de campanhas no card da RO, estado por VIN, prova de
@@ -1273,6 +1303,23 @@ input:focus{outline:none;border-color:var(--black)}
 .camp-msg.err{color:#A32D2D}
 .camp-msg.good{color:#0F6E56}
 
+/* ── v5.1.0 faixa de pills do card ─────────────────────────── */
+.pill-strip{display:flex;flex-wrap:wrap;align-items:center;gap:4px;
+  margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+/* Empurra as ações de Aprovador para a direita quando sobra espaço, e
+   deixa de empurrar quando a faixa quebra — assim numa linha só elas
+   ficam visivelmente separadas do status, e em duas não abrem buraco. */
+.pill-strip-sep{flex:1 1 auto;min-width:8px}
+/* As pills antigas foram desenhadas cada uma com sua margem, para
+   quando viviam soltas no meio do texto. Dentro da faixa quem espaça
+   é o gap, senão o alinhamento fica irregular. */
+.pill-strip > *{margin-left:0 !important;margin-right:0 !important;vertical-align:middle}
+
+/* ── v5.0.1 telefone do cliente ────────────────────────────── */
+.cfone{color:#0F6E56;text-decoration:none;font-weight:600;white-space:nowrap}
+.cfone:active{opacity:.6}
+.cfone-invalido{color:#aaa;white-space:nowrap}
+
 /* ── v4.9.0 Relatórios ───────────────────────────────────────── */
 .rel-cat{border:1px solid var(--border);border-radius:8px;margin:0 0 8px;overflow:hidden;background:#fff}
 .rel-cat-head{display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer}
@@ -2350,7 +2397,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.0.0';
+const APP_VERSION = '5.1.0';
 
 // ── v4.8.0 — MODO DO APP ────────────────────────────────────────
 // Este arquivo e IDENTICO nos dois repositorios; a UNICA diferenca
@@ -3070,7 +3117,7 @@ function roCard(r) {
       ? '<span class="apr-pill apr-no">&#x26A0; N&#xC3;O APROVADO</span>'
       : '';
   const custLine = r.cust_name
-    ? '<div class="cjob">&#x1F464; ' + r.cust_name + '</div>'
+    ? '<div class="cjob">&#x1F464; ' + r.cust_name + telefoneHtml(r.phone) + '</div>'
     : '';
   const partsBadge = partsBadgeHtml(r.ro_number);
   // Chegada pill (v2.7.0) — read-only here, matched server-side by
@@ -3107,9 +3154,15 @@ function roCard(r) {
   // (blank or exactly 1, meaning an Approver never checked the real
   // odometer reading when opening the RO); plain text next to the
   // plate otherwise. ANY tech can tap the pill — see openMileageModal.
-  const mileageHtml = mileageIsMissing(r.mileage)
-    ? '<span class="mileage-pill-blink" data-mileage-ro="' + r.ro_number + '">&#x26A0; Confirmar quilometragem</span>'
+  // v5.1.0 — separadas: a quilometragem CONHECIDA é fato e fica na
+  // linha da placa; a pendência de confirmar é ação e vai para a
+  // faixa, junto do resto que exige alguém fazer algo.
+  const mileageTexto = mileageIsMissing(r.mileage)
+    ? ''
     : ' &middot; ' + Number(r.mileage).toLocaleString('pt-BR') + ' km';
+  const mileagePill = mileageIsMissing(r.mileage)
+    ? '<span class="mileage-pill-blink" data-mileage-ro="' + r.ro_number + '">&#x26A0; Confirmar quilometragem</span>'
+    : '';
   // v3.2.1: Priority pill — only rendered when a priority number is
   // actually set for this RO (see readPriorityMap/setPriority in
   // Code.gs). null/undefined means never prioritized — no pill at
@@ -3150,6 +3203,33 @@ function roCard(r) {
   const campPanel = r.vin
     ? '<div class="camp-panel" data-camp-panel data-ro="' + r.ro_number + '" hidden></div>'
     : '';
+
+  // ── v5.1.0 — FAIXA DE PILLS ──────────────────────────────────
+  // Ordem fixa: primeiro o que TRAVA o trabalho (em espera, peças,
+  // aprovação, quilometragem por confirmar), depois o status, depois o
+  // informativo. Card com muita pill é normal; card onde a pill que
+  // importa está em lugar diferente a cada RO é que cansa.
+  // As ações de Aprovador vão num grupo próprio, à direita, para não
+  // se misturarem com o que é status.
+  const pillsEstado = [
+    holdPill,
+    partsBadge,
+    authTag,
+    mileagePill,
+    '<span class="badge ' + bc + '">' + bt + '</span>',
+    campPill,
+    chegadaPill,
+    entregueTag,
+    priorityPill,
+  ].filter(Boolean).join('');
+
+  const pillsAprovador = [marcarEntregaPill, syncNowPill].filter(Boolean).join('');
+
+  const faixaPills = (pillsEstado || pillsAprovador)
+    ? '<div class="pill-strip">' + pillsEstado +
+        (pillsAprovador ? '<span class="pill-strip-sep"></span>' + pillsAprovador : '') +
+      '</div>'
+    : '';
   const datesLine = (createdTxt || entregaPill)
     ? '<div class="cdates">' +
         (createdTxt ? 'Aberta: ' + createdTxt : '') +
@@ -3164,14 +3244,17 @@ function roCard(r) {
       (r.suggested === currentTech ? ' sugerida' : '') +
       (r.hold_flag ? ' em-espera' : '') +
     '" data-ro="' + r.ro_number + '">' +
+      // v5.1.0 — o cabeçalho ficou só com fato; as pills desceram para
+      // a faixa. A coluna da direita sumiu de propósito: com a faixa
+      // ela viraria um segundo lugar para procurar status.
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + chegadaPill + entregueTag + marcarEntregaPill + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
-        '<div class="cjob">Placa: ' + r.plate + mileageHtml + campPill + '</div>' +
+        '<div class="cro">RO #' + r.ro_number + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
+        '<div class="cjob">Placa: ' + r.plate + mileageTexto + '</div>' +
         custLine +
         '<div class="cdesc">' + r.complaint + '</div>' +
         datesLine +
-      '</div><div class="cright">' + syncNowPill + '<span class="badge ' + bc + '">' + bt + '</span>' + priorityPill + holdPill + '</div></div>' +
-      authTag + partsBadge +
+      '</div></div>' +
+      faixaPills +
       '<div class="trow"><div class="tdot ' + dot + '"></div><span class="tname">' + status + '</span></div>' +
       '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:' + pct + '%"></div></div>' +
       '<span class="ro-prog-txt">' + done + '/' + total + ' joblines</span></div>' +
@@ -3544,6 +3627,36 @@ function relRenderRelatorio(d, relId) {
   el.innerHTML = h.join('');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v5.0.1 — TELEFONE DO CLIENTE
+// A base guarda o numero como veio da OI (digitos, normalmente ja com
+// o 55). Aqui so se formata para exibir e se monta o link.
+// ═══════════════════════════════════════════════════════════════
+
+/** Digitos com DDI. Numero salvo sem o 55 na frente ganha o 55. */
+function telefoneDigitos(bruto) {
+  let d = String(bruto == null ? '' : bruto).replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length <= 11 && d.indexOf('55') !== 0) d = '55' + d;
+  return d;
+}
+
+/**
+ * Numero clicavel no formato +5521994494183.
+ * Numero curto demais NAO vira link: abrir conversa com um numero
+ * truncado poe o tecnico falando com um estranho, pior que nao ter o
+ * atalho. Nesse caso sai em cinza, para o cadastro ser corrigido.
+ */
+function telefoneHtml(bruto) {
+  const d = telefoneDigitos(bruto);
+  if (!d) return '';
+  if (d.length < 12) {
+    return ' <span class="cfone-invalido" title="Número incompleto no cadastro">+' + escapeHtml(d) + '</span>';
+  }
+  return ' <a class="cfone" href="https://wa.me/' + d + '" target="_blank" rel="noopener"' +
+         ' onclick="event.stopPropagation()" title="Abrir conversa no WhatsApp">+' + d + '</a>';
+}
+
 function openRO(roNumber) {
   const ro = liveROs.find(r => String(r.ro_number)===String(roNumber));
   if (!ro) return;
@@ -3560,7 +3673,8 @@ function openRO(roNumber) {
     ? '<span class="mileage-pill-blink" data-mileage-ro="' + escapeHtml(String(ro.ro_number)) + '">&#x26A0; Confirmar quilometragem</span>'
     : ' &middot; ' + Number(ro.mileage).toLocaleString('pt-BR') + ' km';
   document.getElementById('s2-ro-vehicle').innerHTML = escapeHtml(vehicleWithYear(ro.vehicle, ro.vin))+' &middot; '+escapeHtml(String(ro.plate))+mileageHtmlS2;
-  document.getElementById('s2-ro-customer').textContent = ro.cust_name ? '👤 '+ro.cust_name : '';
+  document.getElementById('s2-ro-customer').innerHTML =
+    (ro.cust_name ? '👤 ' + escapeHtml(ro.cust_name) : '') + telefoneHtml(ro.phone);
   document.getElementById('s2-ro-vin').textContent = ro.vin ? 'VIN: '+ro.vin : '';
   document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
