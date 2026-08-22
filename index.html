@@ -1310,6 +1310,30 @@ input:focus{outline:none;border-color:var(--black)}
    deixa de empurrar quando a faixa quebra — assim numa linha só elas
    ficam visivelmente separadas do status, e em duas não abrem buraco. */
 .pill-strip-sep{flex:1 1 auto;min-width:8px}
+/* v5.2.0 — PILL PENDENTE.
+   Clicar em "Confirmar Chegada" (e nas outras pills que gravam no
+   servidor) ficava alguns segundos sem retorno nenhum: a requisicao
+   vai, o refresh da lista demora, e a tela nao mudava. Na madrugada
+   de 22/08/2026 isso fez o proprio Eytan concluir que o clique nao
+   tinha funcionado, quando tinha — o defeito estava na leitura, nao
+   na escrita, mas a tela nao dava como saber.
+   Enquanto a acao esta no ar a pill INVERTE: fundo escuro, letra
+   branca, piscando. Nao desabilita o clique de proposito (decisao do
+   Eytan) — so avisa que esta processando. */
+.pill-pending{
+  background:#111 !important;
+  color:#fff !important;
+  border-color:#111 !important;
+  animation:pillPendingBlink .7s ease-in-out infinite;
+}
+.pill-pending *{color:#fff !important}
+@keyframes pillPendingBlink{
+  0%,100%{opacity:1}
+  50%{opacity:.35}
+}
+@media (prefers-reduced-motion: reduce){
+  .pill-pending{animation:none}
+}
 /* As pills antigas foram desenhadas cada uma com sua margem, para
    quando viviam soltas no meio do texto. Dentro da faixa quem espaça
    é o gap, senão o alinhamento fica irregular. */
@@ -2397,7 +2421,41 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.2.0';
+
+// ── v5.2.0 — FEEDBACK DE PILL PENDENTE ──────────────────────────
+// Toda pill que grava no servidor (Confirmar Chegada, entrega,
+// marcar no patio, espera, prioridade...) demora alguns segundos
+// entre o clique e o redesenho, porque a acao vai por fetch e so
+// depois a lista e recarregada. Nesse intervalo a tela nao mudava
+// NADA, e o clique parecia perdido.
+//
+// Feito como listener DELEGADO na fase de captura, e nao mexendo em
+// cada handler: sao muitos (toggleChegada, toggleEntrega,
+// toggleManualPatio, setHold, clearHold, markEntregaSemAgendamento,
+// setPriority...), e um por um sairia caro e ficaria facil de
+// esquecer numa pill nova. Assim qualquer pill ganha o efeito de
+// graca, inclusive as que ainda nao existem.
+//
+// A marca sai sozinha quando o card e redesenhado, porque o DOM e
+// recriado. O timeout e so a rede de seguranca para o caso de a
+// acao falhar sem redesenhar — sem ele a pill piscaria para sempre.
+// NAO desabilita o clique: decisao do Eytan em 22/08/2026.
+const PILL_PENDING_MAX_MS = 15000;
+
+document.addEventListener('click', function (ev) {
+  const alvo = ev.target && ev.target.closest
+    ? ev.target.closest('.pill-btn, .chegada-chip-off, [data-chegada-evt-id], [data-entrega-evt-id]')
+    : null;
+  if (!alvo) return;
+  // Link puro (GANTT, SI) abre outra tela e nao grava nada.
+  if (alvo.tagName === 'A' && alvo.getAttribute('href') && alvo.getAttribute('target') === '_blank') return;
+  // O botao de sincronizar ja tem animacao propria (classe spinning).
+  if (alvo.classList.contains('spinning')) return;
+
+  alvo.classList.add('pill-pending');
+  setTimeout(function () { alvo.classList.remove('pill-pending'); }, PILL_PENDING_MAX_MS);
+}, true);
 
 // ── v4.8.0 — MODO DO APP ────────────────────────────────────────
 // Este arquivo e IDENTICO nos dois repositorios; a UNICA diferenca
