@@ -2421,7 +2421,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.2.0';
+const APP_VERSION = '5.3.0';
 
 // ── v5.2.0 — FEEDBACK DE PILL PENDENTE ──────────────────────────
 // Toda pill que grava no servidor (Confirmar Chegada, entrega,
@@ -6640,16 +6640,34 @@ function agdSearchCustomersForCreate() {
         showToast('Dados encontrados.');
         return;
       }
-      // Multiple matches — show a list to pick from
+      // Multiple matches — show a list to pick from.
+      //
+      // v5.3.0 — cada resultado mostra DE ONDE VEIO, o ClienteID e o
+      // documento. Antes vinha so nome e placa, e com isso nao dava
+      // para distinguir dois cadastros da mesma pessoa: em 22/08/2026
+      // "Cabral" trouxe ROGERIO CABRAL DE MENEZES e ROGERIO ESPINDULA
+      // CABRAL DE MENEZES, o mesmo cliente em duas linhas — uma com CPF
+      // e ClienteID da OI, outra sem nenhum dos dois. Com ID e
+      // documento a vista, o Aprovador escolhe o certo na hora.
       resultsEl.innerHTML = '<div class="sec-lbl" style="margin-top:8px">Vários resultados — selecione:</div>' +
-        data.results.map((c, i) =>
-          '<div class="card" data-idx="' + i + '" style="cursor:pointer">' +
-            '<div class="crow"><div>' +
+        data.results.map((c, i) => {
+          const origem = c._origem === 'CLIENTES' ? 'OI' : 'oficina';
+          const corOrigem = c._origem === 'CLIENTES' ? '#1a7f37' : '#8a6d00';
+          const id = c._cliente_id ? escapeHtml(String(c._cliente_id)) : '—';
+          const doc = c['CPF.CNPJ'] ? escapeHtml(String(c['CPF.CNPJ'])) : 'sem documento';
+          const veic = [c['License'], c['Modelo'], c['Year'] ? String(c['Year']) : '']
+                        .filter(Boolean).map(escapeHtml).join(' — ');
+          return '<div class="card" data-idx="' + i + '" style="cursor:pointer">' +
+            '<div class="crow"><div style="min-width:0">' +
               '<div class="cro">' + escapeHtml(c['Client Name'] || '(sem nome)') + '</div>' +
-              '<div class="cjob">' + escapeHtml(c['License'] || '') + ' — ' + escapeHtml(c['Modelo'] || '') + ' ' + escapeHtml(String(c['Year'] || '')) + '</div>' +
+              '<div class="cjob" style="color:' + corOrigem + ';font-weight:600">' +
+                origem + ' &middot; ID ' + id + ' &middot; ' + doc +
+              '</div>' +
+              (veic ? '<div class="cjob">' + veic + '</div>' : '') +
+              (c['Mobile'] ? '<div class="cjob">' + escapeHtml(String(c['Mobile'])) + '</div>' : '') +
             '</div><span style="font-size:18px;color:#ccc">&#x276F;</span></div>' +
-          '</div>'
-        ).join('');
+          '</div>';
+        }).join('');
       resultsEl.querySelectorAll('[data-idx]').forEach(card => {
         card.addEventListener('click', () => {
           const c = data.results[Number(card.dataset.idx)];
