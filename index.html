@@ -1,5 +1,14 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.1.0 — Build: 2026-08-18 22:10 BRT -->
+<!-- Porsche Service Rio PWA — v5.3.1 — Build: 2026-08-23 19:45 BRT -->
+<!-- v5.3.1: FEEDBACK NO "Criar agendamento". O botão já se desabilitava
+     durante o envio, mas .bigbtn não tem estilo de :disabled — então
+     nada mudava na tela e, entre o toque e o toast, não havia como
+     saber se o clique tinha pegado. Agora pisca (mesmo pillPendingBlink
+     da pill de v5.2.0) e vira "Agendando…", voltando ao normal se der
+     erro. Continua bloqueado durante o envio, diferente da pill: criar
+     duas vezes cria dois eventos.
+     (O cabeçalho estava parado no v5.1.0 embora o corpo já trouxesse
+     v5.2.0 e v5.3.0 — corrigido aqui.) -->
 <!-- v5.1.0: FAIXA DE PILLS no card da RO. As pills estavam espalhadas
      por quatro lugares — ao lado do número da RO, na linha da placa,
      na coluna da direita e na linha das datas — e o Eytan achou o card
@@ -1333,6 +1342,24 @@ input:focus{outline:none;border-color:var(--black)}
 }
 @media (prefers-reduced-motion: reduce){
   .pill-pending{animation:none}
+}
+/* v5.3.1 — MESMO FEEDBACK NO BOTAO GRANDE DE CRIAR AGENDAMENTO.
+   O "Criar agendamento" ja se desabilitava durante o envio (para nao
+   criar dois eventos no mesmo horario com um toque duplo), mas
+   desabilitar nao MOSTRA nada: o .bigbtn nao tem estilo de :disabled,
+   entao o botao ficava exatamente igual e a tela nao dava sinal de que
+   algo estava acontecendo. Mesmo defeito que a pill de "Confirmar
+   Chegada" tinha antes da v5.2.0, e a mesma cura — so que aqui o
+   clique CONTINUA bloqueado, porque criar e diferente de confirmar:
+   repetir cria um segundo agendamento.
+   Reusa o pillPendingBlink de proposito: um feedback so no app
+   inteiro, em vez de duas animacoes parecidas que divergem depois. */
+.btn-pending{
+  animation:pillPendingBlink .7s ease-in-out infinite;
+  cursor:default;
+}
+@media (prefers-reduced-motion: reduce){
+  .btn-pending{animation:none;opacity:.6}
 }
 /* As pills antigas foram desenhadas cada uma com sua margem, para
    quando viviam soltas no meio do texto. Dentro da faixa quem espaça
@@ -6843,16 +6870,36 @@ function agdConfirmCreate() {
   // Disable the button immediately to prevent double-submission —
   // this is a create action (unlike edits), so an accidental double
   // tap would create two separate calendar events for the same slot.
-  document.getElementById('agd-c-confirm-btn').disabled = true;
+  //
+  // v5.3.1 — e AVISA que esta processando. Desabilitar sozinho nao
+  // mudava nada na tela (o .bigbtn nao tem estilo de :disabled), entao
+  // entre o toque e o toast o Aprovador ficava sem saber se o clique
+  // pegou. Pisca e troca o rotulo enquanto o pedido esta no ar.
+  const btnCriar = document.getElementById('agd-c-confirm-btn');
+  const rotuloOriginal = btnCriar.innerHTML;
+  btnCriar.disabled = true;
+  btnCriar.classList.add('btn-pending');
+  btnCriar.innerHTML = 'Agendando\u2026';
+
+  // Restaura o botao ao estado em que estava. So faz sentido no ERRO:
+  // no sucesso o agdGoStep1() troca de tela e o botao volta a nascer
+  // desabilitado, esperando a escolha de um horario.
+  function restaurarBotaoCriar() {
+    btnCriar.classList.remove('btn-pending');
+    btnCriar.innerHTML = rotuloOriginal;
+    btnCriar.disabled = false;
+  }
 
   fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(body) })
     .then(() => {
+      btnCriar.classList.remove('btn-pending');
+      btnCriar.innerHTML = rotuloOriginal;
       showToast('Agendamento criado.');
       agdGoStep1();
     })
     .catch(() => {
       showToast('Erro ao criar agendamento.');
-      document.getElementById('agd-c-confirm-btn').disabled = false;
+      restaurarBotaoCriar();
     });
 }
 
