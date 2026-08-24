@@ -803,6 +803,11 @@ input:focus{outline:none;border-color:var(--black)}
 .noshow-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#7a7a7a;color:#fff}
 .chegada-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#9EFF00;color:#1a1a1a}
 .chegada-pill.clickable{cursor:pointer}
+/* v5.4.1 — as duas acoes da fila SERVICOS, visualmente distintas.
+   Antes as duas usavam .chegada-chip-off (branco/cinza) e so o texto
+   diferenciava, num alvo de toque de 9px. */
+.chip-chegada-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#dceeff;color:#12507f;border:1px solid #9fcbec;cursor:pointer}
+.chip-noshow-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#ffdcdc;color:#8f2020;border:1px solid #eca0a0;cursor:pointer}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
 .entregue-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#F5D300;color:#1a1a1a}
 .entregue-pill.clickable{cursor:pointer}
@@ -2449,7 +2454,18 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.4.0';
+const APP_VERSION = '5.4.2';
+// v5.4.2: switch "Mostrar resolvidos" removido — o caminho de desfazer e a
+//   pill do card da RO, nao esta tela, entao a lista SERVICOS esconde
+//   resolvidos sem excecao. Volta a ser exclusiva da ENTREGA, como antes.
+// v5.4.1: lista SERVICOS vira fila de trabalho — some por padrao o que ja
+//   foi resolvido (chegada confirmada ou nao compareceu), com o switch
+//   "Mostrar resolvidos" para trazer de volta e poder DESFAZER.
+//   Ordenacao por DATA ascendente (era por numero de RO desde a v2.7.15;
+//   a busca por RO ja resolve achar uma OS especifica, e para uma fila o
+//   que importa e o que vem primeiro).
+//   Pills: Confirmar Chegada azul claro, Nao compareceu vermelho claro —
+//   eram as duas iguais e cinzas, faceis de trocar no toque.
 // v5.4.0: pill "Nao compareceu" nos cards SERVICOS da lista de
 //   Agendamento. Nao apaga o evento (o Cancelar agendamento continua
 //   sendo o botao destrutivo, para cancelamento de verdade) — so marca
@@ -2480,7 +2496,7 @@ const PILL_PENDING_MAX_MS = 15000;
 
 document.addEventListener('click', function (ev) {
   const alvo = ev.target && ev.target.closest
-    ? ev.target.closest('.pill-btn, .chegada-chip-off, [data-chegada-evt-id], [data-entrega-evt-id]')
+    ? ev.target.closest('.pill-btn, .chegada-chip-off, .chip-chegada-off, .chip-noshow-off, [data-chegada-evt-id], [data-entrega-evt-id], [data-noshow-evt-id]')
     : null;
   if (!alvo) return;
   // Link puro (GANTT, SI) abre outra tela e nao grava nada.
@@ -5863,6 +5879,9 @@ function agdMgmtOpenList(which) {
   // never filters by status. Reset to unchecked (hidden by default)
   // each time the list is opened, so a stale checked state from a
   // previous ENTREGA visit doesn't silently carry over.
+  // v5.4.2 — a linha volta a ser so da ENTREGA. Em SERVICOS o resolvido
+  // some e nao volta: desfazer e pela pill do card da RO (v4.10.7), que
+  // agora limpa tambem a tag do evento, entao some daqui de verdade.
   const showDeliveredRow = document.getElementById('agd-mgmt-show-delivered-row');
   const showDeliveredCb  = document.getElementById('agd-mgmt-show-delivered');
   if (which === 'entrega') {
@@ -5884,7 +5903,7 @@ function agdMgmtUpdateSubLabel() {
   const subEl = document.getElementById('agd-mgmt-sub');
   if (!subEl) return;
   if (agdCurrentCalendar === 'servicos') {
-    subEl.textContent = 'Últimos 7 dias e próximos 60 dias';
+    subEl.textContent = 'Aguardando chegada — últimos 7 e próximos 60 dias';
     return;
   }
   const showDeliveredCb = document.getElementById('agd-mgmt-show-delivered');
@@ -5899,19 +5918,23 @@ function agdMgmtRefreshList() {
   agdMgmtUpdateSubLabel();
   const showDeliveredCb = document.getElementById('agd-mgmt-show-delivered');
   const includeDelivered = (agdCurrentCalendar === 'entrega' && showDeliveredCb && showDeliveredCb.checked) ? '1' : '0';
-  fetch(API_URL + '?action=getAgendamentos&calendar=' + agdCurrentCalendar + '&include_delivered=' + includeDelivered)
+  fetch(API_URL + '?action=getAgendamentos&calendar=' + agdCurrentCalendar +
+        '&include_delivered=' + includeDelivered +
+        '&include_resolvidos=0')
     .then(r => r.json())
     .then(data => {
       if (!data.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar agendamentos.</div>'; return; }
-      // v2.7.15 — sort ASCENDING by RO number (the API returns these
-      // in whatever order the underlying Calendar query gives back,
-      // i.e. chronological by event time — not useful for finding a
-      // specific RO in a long list). parseInt with a 0 fallback keeps
-      // any malformed/blank ro_number from breaking the sort (it just
-      // sinks to the top, rather than throwing).
-      const sorted = (data.events || []).slice().sort((a, b) =>
-        (parseInt(a.ro_number) || 0) - (parseInt(b.ro_number) || 0)
-      );
+      // v5.4.1 — ordem por DATA ascendente. Era por numero de RO desde a
+      // v2.7.15, cuja razao era achar uma OS especifica numa lista longa
+      // — necessidade que a caixa de busca por RO logo abaixo ja cobre.
+      // Como fila de trabalho, o que importa e o que vem primeiro, e com
+      // resolvidos escondidos a lista deixou de ser longa.
+      // Evento sem data valida vai para o fim em vez de quebrar o sort.
+      const sorted = (data.events || []).slice().sort((a, b) => {
+        const at = a.start ? new Date(a.start).getTime() : Infinity;
+        const bt = b.start ? new Date(b.start).getTime() : Infinity;
+        return (isNaN(at) ? Infinity : at) - (isNaN(bt) ? Infinity : bt);
+      });
       agdMgmtAllEvents = sorted; // cached for agdFilterMgmtList search
       document.getElementById('agd-mgmt-search').value = '';
       document.getElementById('agd-mgmt-search-clear').style.display = 'none';
@@ -6189,7 +6212,7 @@ function agdRenderList(events) {
     if (agdCurrentCalendar === 'servicos') {
       chegadaChip = ev.chegada
         ? '<span class="chegada-pill clickable" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="on">&#x2705; NO P&#xC1;TIO</span>'
-        : '<span class="chegada-chip-off" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="off">Confirmar Chegada</span>';
+        : '<span class="chip-chegada-off" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="off">Confirmar Chegada</span>';
       // v5.4.0 — pill "Nao compareceu", SERVICOS e so quando o carro
       // ainda nao chegou (chegar limpa o no-show do lado do servidor,
       // entao os dois estados nunca coexistem). Marcado, vira etiqueta
@@ -6198,7 +6221,7 @@ function agdRenderList(events) {
       if (!ev.chegada) {
         noShowChip = ev.no_show
           ? '<span class="noshow-pill clickable" data-noshow-evt-id="' + escapeHtml(ev.id) + '" data-noshow-state="on">&#x1F6AB; N&#xC3;O COMPARECEU</span>'
-          : '<span class="chegada-chip-off" data-noshow-evt-id="' + escapeHtml(ev.id) + '" data-noshow-state="off">N&#xE3;o compareceu</span>';
+          : '<span class="chip-noshow-off" data-noshow-evt-id="' + escapeHtml(ev.id) + '" data-noshow-state="off">N&#xE3;o compareceu</span>';
       }
     } else if (ev.chegada) {
       chegadaChip = '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>';
