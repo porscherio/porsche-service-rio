@@ -800,6 +800,7 @@ input:focus{outline:none;border-color:var(--black)}
 .card.em-espera{opacity:.55}
 .card.em-espera .cdesc{text-decoration:line-through}
 .hold-reason-line{font-size:12px;color:#7A6000;margin-top:4px}
+.noshow-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#7a7a7a;color:#fff}
 .chegada-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#9EFF00;color:#1a1a1a}
 .chegada-pill.clickable{cursor:pointer}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
@@ -2448,7 +2449,14 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.3.0';
+const APP_VERSION = '5.4.0';
+// v5.4.0: pill "Nao compareceu" nos cards SERVICOS da lista de
+//   Agendamento. Nao apaga o evento (o Cancelar agendamento continua
+//   sendo o botao destrutivo, para cancelamento de verdade) — so marca
+//   que o horario passou e o carro nao veio, tirando o item da area
+//   Aguardando chegada do Patio sem perder o registro.
+//   Reversivel: Confirmar Chegada limpa o no-show sozinho, entao cliente
+//   atrasado se resolve com o fluxo normal, sem destaguear antes.
 
 // ── v5.2.0 — FEEDBACK DE PILL PENDENTE ──────────────────────────
 // Toda pill que grava no servidor (Confirmar Chegada, entrega,
@@ -6177,10 +6185,21 @@ function agdRenderList(events) {
     // when true — arrival isn't something to confirm from ENTREGA,
     // it's a live mirror of the linked SERVICOS event (v2.6.0).
     let chegadaChip = '';
+    let noShowChip  = '';
     if (agdCurrentCalendar === 'servicos') {
       chegadaChip = ev.chegada
         ? '<span class="chegada-pill clickable" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="on">&#x2705; NO P&#xC1;TIO</span>'
         : '<span class="chegada-chip-off" data-chegada-evt-id="' + escapeHtml(ev.id) + '" data-chegada-state="off">Confirmar Chegada</span>';
+      // v5.4.0 — pill "Nao compareceu", SERVICOS e so quando o carro
+      // ainda nao chegou (chegar limpa o no-show do lado do servidor,
+      // entao os dois estados nunca coexistem). Marcado, vira etiqueta
+      // clicavel para desfazer; a via normal de desfazer, porem, e so
+      // confirmar a chegada.
+      if (!ev.chegada) {
+        noShowChip = ev.no_show
+          ? '<span class="noshow-pill clickable" data-noshow-evt-id="' + escapeHtml(ev.id) + '" data-noshow-state="on">&#x1F6AB; N&#xC3;O COMPARECEU</span>'
+          : '<span class="chegada-chip-off" data-noshow-evt-id="' + escapeHtml(ev.id) + '" data-noshow-state="off">N&#xE3;o compareceu</span>';
+      }
     } else if (ev.chegada) {
       chegadaChip = '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>';
     }
@@ -6214,7 +6233,7 @@ function agdRenderList(events) {
       '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
         '<div class="crow">' +
           '<div>' +
-            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + entregueChip + edocReentryIcon + '</div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + noShowChip + entregueChip + edocReentryIcon + '</div>' +
             '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
             '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
           '</div>' +
@@ -6226,6 +6245,7 @@ function agdRenderList(events) {
   el.querySelectorAll('[data-evt-id]').forEach(card => {
     card.addEventListener('click', (clickEvent) => {
       if (clickEvent.target.closest('[data-chegada-evt-id]')) return;  // chegada chip handles its own click
+      if (clickEvent.target.closest('[data-noshow-evt-id]')) return;   // no-show chip handles its own click
       if (clickEvent.target.closest('[data-entrega-evt-id]')) return;  // entregue chip handles its own click
       if (clickEvent.target.closest('[data-edoc-reentry-ro]')) return; // re-entry icon handles its own click
       const ev = events.find(e => e.id === card.dataset.evtId);
@@ -6236,6 +6256,12 @@ function agdRenderList(events) {
     chip.addEventListener('click', (clickEvent) => {
       clickEvent.stopPropagation();
       agdToggleChegadaFromList(chip.dataset.chegadaEvtId, chip.dataset.chegadaState === 'on');
+    });
+  });
+  el.querySelectorAll('[data-noshow-evt-id]').forEach(chip => {
+    chip.addEventListener('click', (clickEvent) => {
+      clickEvent.stopPropagation();
+      agdToggleNoShowFromList(chip.dataset.noshowEvtId, chip.dataset.noshowState === 'on');
     });
   });
   el.querySelectorAll('[data-entrega-evt-id]').forEach(chip => {
@@ -6268,6 +6294,29 @@ function agdToggleChegadaFromList(eventId, currentlyOn) {
     showToast(currentlyOn ? 'Chegada cancelada.' : '&#x2705; Chegada confirmada — NO PÁTIO');
     agdMgmtRefreshList();
   }).catch(() => showToast('Erro ao atualizar chegada.'));
+}
+
+// v5.4.0 — handler da pill "Nao compareceu".
+// A copy do confirm existe para separar tres coisas que a equipe pode
+// confundir e que tem consequencias diferentes:
+//   - cliente avisou e remarcou  -> mudar o horario, nao marcar nada
+//   - cliente cancelou de verdade -> Cancelar agendamento (apaga)
+//   - horario passou e ninguem veio -> esta pill (preserva o evento)
+function agdToggleNoShowFromList(eventId, currentlyOn) {
+  const msg = currentlyOn
+    ? 'Desmarcar "nao compareceu"? O agendamento volta para a lista de veiculos aguardando chegada.'
+    : 'Marcar que o cliente NAO COMPARECEU?\n\n' +
+      'O agendamento NAO e apagado — sai da lista de aguardando chegada e o registro fica.\n\n' +
+      'Se o cliente remarcou, use Reagendar. Se cancelou, use Cancelar agendamento.';
+  if (!confirm(msg)) return;
+
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'toggleNoShow', event_id: eventId, tech: currentTech }),
+  }).then(() => {
+    showToast(currentlyOn ? 'Marcacao removida.' : '\u{1F6AB} Marcado como nao compareceu.');
+    agdMgmtRefreshList();
+  }).catch(() => showToast('Erro ao atualizar.'));
 }
 
 // Toggle handler for the entregue chip in the Management ENTREGA
