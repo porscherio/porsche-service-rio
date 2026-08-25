@@ -1,5 +1,27 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.3.1 — Build: 2026-08-23 19:45 BRT -->
+<!-- Porsche Service Rio PWA — v5.5.0 — Build: 2026-08-25 23:58 BRT -->
+<!-- v5.5.0: POR PERÍODO no painel SI — o SI deixa de responder só "o que
+     este carro precisa?" e passa a responder "quem eu chamo esta semana?".
+     Aba nova ao lado de Todos/Vencidos/A Vencer/Em Dia, com presets de
+     período, lista agrupada por mês, seleção e fila de envio por WhatsApp.
+     DENTRO DO PAINEL SI e não como ícone novo no rodapé: o ⚡ já existe e já
+     é só de Aprovador, os dados são exatamente os mesmos (getSICards), e um
+     quinto ntab ao lado de Relatórios/Polaris/Orçamento não cabe em 380px.
+     Um ícone novo custaria segunda permissão, segunda busca e uma barra de
+     navegação truncada — sem ganhar nada.
+     VENCIDOS ENTRAM POR FORA DO INTERVALO: a data de um vencido está no
+     PASSADO, logo cairia fora de qualquer janela futura — e é o lead mais
+     quente que existe. Entra por toggle explícito, ligado por omissão.
+     A MENSAGEM LEVA SÓ OS SERVIÇOS DO PERÍODO. O card inteiro lista ~34
+     itens (24.183 dos 25.655 estão pendentes na base), e ninguém marca
+     revisão depois de receber "34 serviços pendentes". O período filtra a
+     frota E o texto que sai.
+     EST marca projeção por km: estimativa não pode parecer registo.
+     Sem envio em lote — o wa.me abre uma conversa de cada vez. A fila serve
+     para não perder o lugar e não mandar duas vezes; "enviado" é da sessão,
+     ainda não grava no servidor (ver SI_Contatos, próximo passo).
+     Exige SI.gs v4.2.1+ (dueISO/dueSource/nextDueISO). Com cache velho a aba
+     fica vazia e o resto do SI segue intacto. -->
 <!-- v5.3.1: FEEDBACK NO "Criar agendamento". O botão já se desabilitava
      durante o envio, mas .bigbtn não tem estilo de :disabled — então
      nada mudava na tela e, entre o toque e o toast, não havia como
@@ -1012,7 +1034,13 @@ input:focus{outline:none;border-color:var(--black)}
   display: flex; gap: 4px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   background: #0D0D0D;
+  /* v5.5.0 — cinco abas não cabem em 380px. Rola na horizontal em vez de
+     espremer a fonte ou quebrar linha; a barra some para não roubar altura. */
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
+.si-filters::-webkit-scrollbar { display: none; }
+.si-filter-btn { flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 420px) { .si-filters { padding: 0 12px; } .si-filter-btn { padding: 11px 10px 10px; } }
 .si-filter-btn {
   background: none; border: none;
   color: rgba(255,255,255,0.35);
@@ -1024,6 +1052,151 @@ input:focus{outline:none;border-color:var(--black)}
 }
 .si-filter-btn:hover { color: rgba(255,255,255,0.65); }
 .si-filter-btn.active { color: #fff; border-bottom-color: #C8102E; }
+
+/* ══ v5.5.0 — RETORNOS: filtro por período, seleção e fila de envio ══════════
+   O SI nasceu para responder "o que este carro precisa?". Isto acrescenta a
+   pergunta inversa, que é a do dia a dia: "quem eu chamo esta semana?".
+   Tudo mora dentro do painel SI que já existe — o ícone ⚡ do rodapé já é
+   só de Aprovador, então não há permissão nova nem segunda busca dos mesmos
+   dados. */
+
+/* Barra de período. Fica escondida até o Aprovador escolher um preset:
+   quem só quer olhar um carro não deve tropeçar nela. */
+.si-range-bar {
+  display: none;
+  flex-direction: column; gap: 8px;
+  padding: 10px 16px 12px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.si-range-bar.on { display: flex; }
+
+.si-range-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.si-range-preset {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.55);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em;
+  padding: 6px 11px; border-radius: 3px;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.si-range-preset:hover { color: rgba(255,255,255,0.85); }
+.si-range-preset.active {
+  background: rgba(200,16,46,0.22); border-color: #C8102E; color: #fff;
+}
+
+.si-range-dates { display: none; gap: 8px; align-items: center; flex-wrap: wrap; }
+.si-range-dates.on { display: flex; }
+.si-range-dates input[type="date"] {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.14);
+  color: #fff; font-family: inherit; font-size: 11px;
+  padding: 6px 8px; border-radius: 3px;
+}
+.si-range-dates label { color: rgba(255,255,255,0.35); font-size: 10px; }
+
+.si-range-opts { display: flex; gap: 14px; flex-wrap: wrap; }
+.si-range-opt {
+  display: flex; align-items: center; gap: 5px;
+  color: rgba(255,255,255,0.45); font-size: 10.5px; cursor: pointer;
+  user-select: none;
+}
+.si-range-opt input { accent-color: #C8102E; width: 13px; height: 13px; cursor: pointer; }
+.si-range-opt:hover { color: rgba(255,255,255,0.75); }
+
+.si-range-summary {
+  color: rgba(255,255,255,0.30); font-size: 10px; letter-spacing: 0.03em;
+}
+.si-range-summary strong { color: #fff; font-weight: 700; }
+
+/* Cabeçalho de mês. Sem isto a lista vira um paredão de placas: o mês é a
+   unidade em que o retorno é planeado. */
+.si-month-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; padding: 12px 2px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  margin-top: 4px;
+}
+.si-month-head:first-child { margin-top: 0; }
+.si-month-name {
+  color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.si-month-name.venc { color: #E5484D; }
+.si-month-count { color: rgba(255,255,255,0.28); font-size: 10px; }
+
+/* Linha do veículo em modo período: caixa de seleção + itens que casaram.
+   A caixa fica à esquerda e o resto da linha continua abrindo o card, para
+   não perder o gesto que já está no dedo de quem usa. */
+.si-veh-card.si-pick { display: flex; align-items: flex-start; gap: 10px; }
+.si-veh-check {
+  flex-shrink: 0; margin-top: 2px;
+  width: 17px; height: 17px; accent-color: #C8102E; cursor: pointer;
+}
+.si-veh-card.si-sel { border-color: #C8102E !important; background: rgba(200,16,46,0.08) !important; }
+.si-veh-body { flex: 1; min-width: 0; }
+
+.si-due-list {
+  margin-top: 5px; display: flex; flex-direction: column; gap: 2px;
+}
+.si-due-item {
+  display: flex; align-items: baseline; gap: 6px;
+  color: rgba(255,255,255,0.55); font-size: 10.5px; line-height: 1.35;
+}
+.si-due-date {
+  flex-shrink: 0; font-family: monospace; font-size: 9.5px;
+  color: rgba(255,255,255,0.32); min-width: 44px;
+}
+.si-due-date.venc { color: #E5484D; }
+/* Projeção por km NÃO pode parecer facto — marcada onde o olho bate. */
+.si-due-est {
+  flex-shrink: 0; font-size: 8px; font-weight: 700; letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.30); border: 1px solid rgba(255,255,255,0.16);
+  padding: 0 3px; border-radius: 2px;
+}
+.si-veh-nofone { color: #E5484D; font-size: 10px; }
+
+/* Fila de envio, ancorada em baixo. O wa.me abre uma conversa de cada vez —
+   não existe envio em lote — então a fila guarda o lugar em vez de fingir
+   que manda tudo de uma vez. */
+.si-queue {
+  position: sticky; bottom: 0; z-index: 5;
+  display: none; flex-direction: column; gap: 8px;
+  margin: 8px -16px -12px; padding: 12px 16px 14px;
+  background: #16181B; border-top: 1px solid rgba(200,16,46,0.45);
+  box-shadow: 0 -8px 20px rgba(0,0,0,0.45);
+}
+.si-queue.on { display: flex; }
+.si-queue-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.si-queue-info { color: rgba(255,255,255,0.55); font-size: 11px; min-width: 0; }
+.si-queue-info strong { color: #fff; }
+.si-queue-target {
+  color: #fff; font-size: 12.5px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.si-queue-btns { display: flex; gap: 7px; flex-shrink: 0; }
+.si-queue-btn {
+  background: rgba(37,211,102,0.16); border: 1px solid rgba(37,211,102,0.55);
+  color: #25D366; font-family: inherit;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 9px 15px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+}
+.si-queue-btn:hover { background: rgba(37,211,102,0.26); }
+.si-queue-btn.ghost {
+  background: none; border-color: rgba(255,255,255,0.16); color: rgba(255,255,255,0.45);
+}
+.si-queue-btn.ghost:hover { color: #fff; }
+.si-veh-card.si-done { opacity: 0.38; }
+.si-veh-sent {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em;
+  color: #25D366; border: 1px solid rgba(37,211,102,0.45);
+  padding: 1px 5px; border-radius: 2px;
+}
+
+@media (max-width: 420px) {
+  .si-range-bar { padding: 9px 12px 11px; }
+  .si-queue-btn { padding: 9px 12px; font-size: 10.5px; }
+  .si-queue-target { font-size: 11.5px; }
+}
 
 /* ── Vehicle list ─────────────────────────────────────────────────────────── */
 .si-list {
@@ -2454,7 +2627,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.4.2';
+const APP_VERSION = '5.5.0';
 // v5.4.2: switch "Mostrar resolvidos" removido — o caminho de desfazer e a
 //   pill do card da RO, nao esta tela, entao a lista SERVICOS esconde
 //   resolvidos sem excecao. Volta a ser exclusiva da ENTREGA, como antes.
@@ -7801,12 +7974,30 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     document.querySelectorAll('.si-filter-btn').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     siFilter = filter;
+    document.getElementById('si-range-bar').classList.toggle('on', filter === 'PERIODO');
     SI_renderList();
   };
 
   // ── RENDER LIST ───────────────────────────────────────────────────────────
   window.SI_renderList = function () {
     const container = document.getElementById('si-list');
+
+    // v5.5.0 — modo período assume a lista inteira: agrupa por mês, mostra os
+    // itens que casaram e traz seleção + fila. Os outros filtros seguem iguais.
+    if (siFilter === 'PERIODO') {
+      if (!siRange) {
+        document.getElementById('si-range-summary').textContent = 'Escolha um período acima';
+        container.innerHTML = `
+          <div class="si-empty">
+            <div class="si-empty-icon">📅</div>
+            <div>Escolha um período para ver quem chamar</div>
+          </div>`;
+        return;
+      }
+      renderRangeList_(container);
+      return;
+    }
+
     const filtered  = siCards.filter(c => {
       if (siFilter === 'ALL')      return true;
       if (siFilter === 'OVERDUE')  return c.statusCode === 'OVERDUE' || c.statusCode === 'SEM_REGISTRO';
@@ -7963,6 +8154,306 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     if (diff !== 0) return diff;
     return (a.placa || '').localeCompare(b.placa || '');
   }
+
+
+  // ══ v5.5.0 — RETORNOS: período, seleção e fila ════════════════════════════
+  // Depende do SI.gs v4.2.1+, que dá a cada item dueISO / dueSource / dueKm e
+  // a cada veículo nextDueISO. Com cache antigo (sem esses campos) o modo
+  // período simplesmente não acha nada, e os filtros de status seguem iguais.
+
+  let siRange = null;          // { start:'yyyy-mm-dd', end:'yyyy-mm-dd', label }
+  let siOpts  = { vencidos: true, comFone: true };
+  const siSel  = new Set();    // placas selecionadas
+  const siSent = new Set();    // placas já enviadas NESTA sessão
+
+  const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho',
+                 'agosto','setembro','outubro','novembro','dezembro'];
+
+  function isoHoje_() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function isoDe_(y, m, d) {
+    return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  function fimDoMes_(y, m) { return new Date(y, m+1, 0).getDate(); }
+  function ddMM_(iso) { return iso ? `${iso.slice(8,10)}/${iso.slice(5,7)}` : ''; }
+
+  // ── PRESETS DE PERÍODO ────────────────────────────────────────────────────
+  window.SI_setRange = function (el, preset) {
+    document.querySelectorAll('.si-range-preset').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    document.getElementById('si-range-dates').classList.toggle('on', preset === 'CUSTOM');
+
+    const hoje = new Date();
+    const y = hoje.getFullYear(), m = hoje.getMonth();
+
+    if (preset === 'OFF') {
+      siRange = null;
+      document.getElementById('si-range-bar').classList.remove('on');
+    } else if (preset === 'MES') {
+      siRange = { start: isoDe_(y, m, 1), end: isoDe_(y, m, fimDoMes_(y, m)),
+                  label: `${MESES[m]} de ${y}` };
+    } else if (preset === 'D30') {
+      const fim = new Date(hoje.getTime() + 30*864e5);
+      siRange = { start: isoHoje_(),
+                  end: isoDe_(fim.getFullYear(), fim.getMonth(), fim.getDate()),
+                  label: 'próximos 30 dias' };
+    } else if (preset === 'PROX') {
+      const d = new Date(y, m+1, 1);
+      const ny = d.getFullYear(), nm = d.getMonth();
+      siRange = { start: isoDe_(ny, nm, 1), end: isoDe_(ny, nm, fimDoMes_(ny, nm)),
+                  label: `${MESES[nm]} de ${ny}` };
+    } else if (preset === 'TRI') {
+      const fim = new Date(y, m+3, 0);
+      siRange = { start: isoHoje_(),
+                  end: isoDe_(fim.getFullYear(), fim.getMonth(), fim.getDate()),
+                  label: 'próximos 3 meses' };
+    } else if (preset === 'CUSTOM') {
+      const a = document.getElementById('si-range-ini').value;
+      const b = document.getElementById('si-range-fim').value;
+      if (!a || !b) { siRange = null; }
+      else if (a > b) {
+        if (typeof showToast === 'function') showToast('Data inicial depois da final');
+        return;
+      } else {
+        siRange = { start: a, end: b, label: `${ddMM_(a)} a ${ddMM_(b)}` };
+      }
+    }
+
+    siSel.clear();
+    SI_renderList();
+  };
+
+  window.SI_applyCustomRange = function () {
+    const btn = document.querySelector('.si-range-preset[data-preset="CUSTOM"]');
+    SI_setRange(btn, 'CUSTOM');
+  };
+
+  window.SI_setOpt = function (key, checked) {
+    siOpts[key] = checked;
+    siSel.clear();
+    SI_renderList();
+  };
+
+  // ── CASAMENTO ITEM × PERÍODO ──────────────────────────────────────────────
+  // Vencido tem data no PASSADO, logo cai fora de qualquer janela futura — e é
+  // justamente o lead mais quente. Por isso entra por fora do intervalo,
+  // controlado pelo toggle, e não por acidente da matemática de datas.
+  function itensNoPeriodo_(v) {
+    if (!siRange) return [];
+    const hoje = isoHoje_();
+    return (v.items || []).filter(i => {
+      if (!i || i.statusCode === 'OK' || !i.dueISO) return false;
+      if (i.dueISO < hoje) return siOpts.vencidos;
+      return i.dueISO >= siRange.start && i.dueISO <= siRange.end;
+    }).sort((a, b) => a.dueISO.localeCompare(b.dueISO));
+  }
+
+  function temFone_(v) { return !!String(v.telefone || '').replace(/\D/g, ''); }
+
+  function veiculosNoPeriodo_() {
+    const hoje = isoHoje_();
+    return siCards
+      .map(v => ({ v, hits: itensNoPeriodo_(v) }))
+      .filter(x => x.hits.length && (!siOpts.comFone || temFone_(x.v)))
+      .sort((a, b) => a.hits[0].dueISO.localeCompare(b.hits[0].dueISO)
+                   || (a.v.placa || '').localeCompare(b.v.placa || ''));
+  }
+
+  // ── LISTA EM MODO PERÍODO ─────────────────────────────────────────────────
+  function renderRangeList_(container) {
+    const grupos = veiculosNoPeriodo_();
+    const hoje   = isoHoje_();
+    const semFone = siOpts.comFone
+      ? siCards.filter(v => itensNoPeriodo_(v).length && !temFone_(v)).length : 0;
+
+    const nItens = grupos.reduce((s, g) => s + g.hits.length, 0);
+    document.getElementById('si-range-summary').innerHTML = grupos.length
+      ? `<strong>${grupos.length}</strong> veículo(s) · <strong>${nItens}</strong> serviço(s) · ${siRange.label}`
+        + (semFone ? ` · <span style="color:#E5484D">${semFone} sem telefone</span>` : '')
+      : `Nenhum veículo em ${siRange.label}`;
+
+    if (!grupos.length) {
+      container.innerHTML = `
+        <div class="si-empty">
+          <div class="si-empty-icon">✓</div>
+          <div>Nada previsto para ${siRange.label}</div>
+          <div style="font-size:10px;opacity:.6;margin-top:6px">
+            Tente incluir vencidos ou alargar o período</div>
+        </div>` + queueHTML_();
+      syncQueue_();
+      return;
+    }
+
+    // Agrupamento por mês do PRIMEIRO item que casou; vencidos num bloco só,
+    // no topo, porque não são "um mês", são uma dívida.
+    const blocos = new Map();
+    for (const g of grupos) {
+      const primeiro = g.hits[0].dueISO;
+      const chave = primeiro < hoje ? 'VENC' : primeiro.slice(0, 7);
+      if (!blocos.has(chave)) blocos.set(chave, []);
+      blocos.get(chave).push(g);
+    }
+    const ordem = [...blocos.keys()].sort((a, b) =>
+      a === 'VENC' ? -1 : b === 'VENC' ? 1 : a.localeCompare(b));
+
+    container.innerHTML = ordem.map(chave => {
+      const lista = blocos.get(chave);
+      const titulo = chave === 'VENC'
+        ? 'Vencidos'
+        : `${MESES[+chave.slice(5,7) - 1]} ${chave.slice(0,4)}`;
+      return `
+        <div class="si-month-head">
+          <span class="si-month-name ${chave === 'VENC' ? 'venc' : ''}">${titulo}</span>
+          <span class="si-month-count">${lista.length} veículo(s)</span>
+        </div>
+        ${lista.map(g => vehRowHTML_(g.v, g.hits, hoje)).join('')}`;
+    }).join('') + queueHTML_();
+
+    syncQueue_();
+  }
+
+  function vehRowHTML_(v, hits, hoje) {
+    const css   = STATUS_CSS[v.statusCode] || 'ok';
+    const yr    = (v.modelo || '').match(/\b(20\d{2})\b/)?.[1] || '';
+    const model = (v.modelo || '').replace(/\s*\b(20\d{2})\b\s*/, '').trim();
+    const sel   = siSel.has(v.placa);
+    const sent  = siSent.has(v.placa);
+    const fone  = temFone_(v);
+
+    const itens = hits.slice(0, 4).map(i => `
+      <div class="si-due-item">
+        <span class="si-due-date ${i.dueISO < hoje ? 'venc' : ''}">${ddMM_(i.dueISO)}</span>
+        <span>${esc(i.grupo)}</span>
+        ${i.dueSource === 'estimado' ? '<span class="si-due-est" title="Projeção pelo ritmo de km — não é registo">EST</span>' : ''}
+      </div>`).join('')
+      + (hits.length > 4 ? `<div class="si-due-item" style="opacity:.5">+${hits.length - 4} outro(s)</div>` : '');
+
+    return `
+      <div class="si-veh-card si-pick ${css} ${sel ? 'si-sel' : ''} ${sent ? 'si-done' : ''}"
+           onclick="SI_openCard('${v.placa}')">
+        <input type="checkbox" class="si-veh-check" ${sel ? 'checked' : ''}
+               ${fone ? '' : 'disabled title="Sem telefone — não dá para enviar"'}
+               onclick="event.stopPropagation();SI_toggleSel('${v.placa}',this.checked)">
+        <div class="si-veh-body">
+          <div class="si-veh-main">
+            <div>
+              <span class="si-veh-plate">${v.placa}</span>
+              <span class="si-veh-model">${esc(model)}${yr ? ` · ${yr}` : ''}</span>
+              ${sent ? '<span class="si-veh-sent">ENVIADO</span>' : ''}
+            </div>
+            <div>
+              <span class="si-veh-name">${esc(v.cliente)}</span>
+              ${fone ? '' : '<span class="si-veh-nofone">· sem telefone</span>'}
+            </div>
+          </div>
+          <div class="si-due-list">${itens}</div>
+        </div>
+      </div>`;
+  }
+
+  // ── SELEÇÃO ───────────────────────────────────────────────────────────────
+  window.SI_toggleSel = function (placa, on) {
+    if (on) siSel.add(placa); else siSel.delete(placa);
+    const row = document.querySelector(`.si-veh-card[onclick*="${placa}"]`);
+    if (row) row.classList.toggle('si-sel', on);
+    syncQueue_();
+  };
+
+  window.SI_selectAll = function () {
+    const todos = veiculosNoPeriodo_().filter(g => temFone_(g.v));
+    const marcar = siSel.size < todos.length;
+    siSel.clear();
+    if (marcar) todos.forEach(g => siSel.add(g.v.placa));
+    SI_renderList();
+  };
+
+  // ── FILA DE ENVIO ─────────────────────────────────────────────────────────
+  // Uma conversa de cada vez: o wa.me não aceita lote. O que a fila resolve é
+  // não perder o lugar entre um cliente e o próximo, e não mandar duas vezes.
+  function queueHTML_() {
+    return `
+      <div id="si-queue" class="si-queue">
+        <div class="si-queue-line">
+          <div class="si-queue-info">
+            <div id="si-queue-count"></div>
+            <div id="si-queue-target" class="si-queue-target"></div>
+          </div>
+          <div class="si-queue-btns">
+            <button class="si-queue-btn ghost" onclick="SI_queueSkip()">Pular</button>
+            <button class="si-queue-btn" onclick="SI_queueSend()">Enviar ➜</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function filaAtual_() {
+    return veiculosNoPeriodo_()
+      .filter(g => siSel.has(g.v.placa) && !siSent.has(g.v.placa));
+  }
+
+  function syncQueue_() {
+    const bar = document.getElementById('si-queue');
+    if (!bar) return;
+    const fila = filaAtual_();
+    bar.classList.toggle('on', siSel.size > 0);
+    if (!fila.length) {
+      document.getElementById('si-queue-count').innerHTML =
+        siSel.size ? '<strong>Fila concluída</strong>' : '';
+      document.getElementById('si-queue-target').textContent = '';
+      return;
+    }
+    const feitos = siSel.size - fila.length;
+    document.getElementById('si-queue-count').innerHTML =
+      `<strong>${feitos + 1}</strong> de ${siSel.size} · próximo:`;
+    document.getElementById('si-queue-target').textContent =
+      `${fila[0].v.placa} — ${fila[0].v.cliente || 'sem nome'}`;
+  }
+
+  // Mensagem com os serviços DO PERÍODO, não os 30 e tal do card inteiro.
+  // Um cliente que recebe "34 serviços pendentes" não marca nada.
+  function msgTexto_(v, hits) {
+    const nome  = String(v.cliente || '').trim().split(/\s+/)[0] || '';
+    const yr    = (v.modelo || '').match(/\b(20\d{2})\b/)?.[1] || '';
+    const model = (v.modelo || '').replace(/\s*\b(20\d{2})\b\s*/, '').trim();
+    const linhas = hits.slice(0, 6).map(i => {
+      const [yy, mm] = i.dueISO.split('-');
+      return `• ${i.grupo} — ${MESES[+mm - 1]}/${yy}`;
+    }).join('\n');
+    return [
+      `Olá${nome ? ', ' + nome : ''}! Aqui é da Porsche Service Rio.`,
+      ``,
+      `Pelo histórico do seu ${model}${yr ? ' ' + yr : ''} (${v.placa}), estes serviços estão previstos:`,
+      linhas,
+      ``,
+      `Quer que eu reserve um horário?`,
+      v.agendamentoUrl || '',
+    ].filter(l => l !== null).join('\n').trim();
+  }
+
+  window.SI_queueSend = function () {
+    const fila = filaAtual_();
+    if (!fila.length) return;
+    const { v, hits } = fila[0];
+    const num = String(v.telefone || '').replace(/\D/g, '');
+    if (!num) { SI_queueSkip(); return; }
+
+    window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msgTexto_(v, hits))}`, '_blank');
+
+    // Marcado ao abrir a conversa: o WhatsApp não devolve confirmação de
+    // envio, então "enviado" aqui quer dizer "conversa aberta e texto pronto".
+    // Vale de proteção contra mandar duas vezes, não de comprovativo.
+    siSent.add(v.placa);
+    SI_renderList();
+  };
+
+  window.SI_queueSkip = function () {
+    const fila = filaAtual_();
+    if (!fila.length) return;
+    siSel.delete(fila[0].v.placa);
+    SI_renderList();
+  };
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
   function setListLoading_(msg) {
@@ -8807,6 +9298,42 @@ function Polaris_brl(n) {
     <button class="si-filter-btn"        data-filter="OVERDUE"  onclick="SI_setFilter(this,'OVERDUE')">Vencidos</button>
     <button class="si-filter-btn"        data-filter="DUE_SOON" onclick="SI_setFilter(this,'DUE_SOON')">A Vencer</button>
     <button class="si-filter-btn"        data-filter="OK"       onclick="SI_setFilter(this,'OK')">Em Dia</button>
+    <button class="si-filter-btn"        data-filter="PERIODO"  onclick="SI_setFilter(this,'PERIODO')">Por período</button>
+  </div>
+
+  <!-- v5.5.0 — barra de período (só aparece na aba "Por período") -->
+  <div id="si-range-bar" class="si-range-bar">
+    <div class="si-range-presets">
+      <button class="si-range-preset" data-preset="MES"    onclick="SI_setRange(this,'MES')">Este mês</button>
+      <button class="si-range-preset" data-preset="D30"    onclick="SI_setRange(this,'D30')">Próximos 30 dias</button>
+      <button class="si-range-preset" data-preset="PROX"   onclick="SI_setRange(this,'PROX')">Mês que vem</button>
+      <button class="si-range-preset" data-preset="TRI"    onclick="SI_setRange(this,'TRI')">3 meses</button>
+      <button class="si-range-preset" data-preset="CUSTOM" onclick="SI_setRange(this,'CUSTOM')">Personalizado</button>
+    </div>
+
+    <div id="si-range-dates" class="si-range-dates">
+      <label for="si-range-ini">de</label>
+      <input type="date" id="si-range-ini">
+      <label for="si-range-fim">até</label>
+      <input type="date" id="si-range-fim">
+      <button class="si-range-preset active" onclick="SI_applyCustomRange()">Aplicar</button>
+    </div>
+
+    <div class="si-range-opts">
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('vencidos',this.checked)">
+        Incluir vencidos
+      </label>
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('comFone',this.checked)">
+        Só com telefone
+      </label>
+      <label class="si-range-opt" onclick="SI_selectAll()" style="margin-left:auto">
+        Marcar / desmarcar todos
+      </label>
+    </div>
+
+    <div id="si-range-summary" class="si-range-summary">Escolha um período acima</div>
   </div>
 
   <!-- Vehicle list -->
