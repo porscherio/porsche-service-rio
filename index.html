@@ -1,5 +1,28 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.8.01 — Build: 2026-08-26 02:10 BRT -->
+<!-- Porsche Service Rio PWA — v5.8.02 — Build: 2026-08-26 03:30 BRT -->
+<!-- v5.8.02: DUAS ABAS NOVAS NO SI — RECALL e GARANTIA — com a mesma
+     mecânica do "Por período": escolher, filtrar, marcar, enviar em fila.
+     As três partilham lista, seleção, fila, registo de contacto e aviso de
+     duplicado; só muda o que conta como linha e o texto que sai.
+     RECALL: campanhas e recalls em aberto do WWS, por VIN. MOSTRA OS DOIS por
+     omissão — recalls_abertos só é preenchido para códigos cujo "tipo" foi
+     escrito à mão no catálogo WWS_Campanhas, e enquanto essa coluna estiver
+     em branco tudo cai em campanhas_abertas; filtrar só recall daria lista
+     vazia que parece avaria. Toggle "Só recalls" para quando o catálogo
+     estiver preenchido. Recall a vermelho, campanha a cinzento.
+     GARANTIA: janela que abre na ENTREGA e fecha no fim do 23º mês. Ordenada
+     por quem tem MENOS tempo, porque a janela não reabre. "Sem data de
+     entrega" é caso à parte atrás de toggle: não é "não elegível", é "não
+     sabemos" — e pode ser oferta a perder-se.
+     Cada envio de garantia grava em SI_Garantia_Ofertas, aba onde o consultor
+     EXTERNO trabalha (colunas Resultado e Observações são dele; o script
+     nunca escreve nelas).
+     TEXTOS SEPARADOS: recall chama por segurança do carro e diz que é sem
+     custo; garantia é oferta comercial. Misturar estragaria os dois.
+     SELEÇÃO NÃO ATRAVESSA ABAS: 12 carros marcados por recall a receberem
+     mensagem de garantia seria fácil e caro.
+     EXIGE SI.gs v4.3.0 (v.wws) + SiGarantia.gs + 2 linhas no roteador do
+     Code.gs. Com cache antigo as abas ficam vazias; nada mais muda. -->
 <!-- NUMERACAO: a partir daqui o incremento e centesimal (5.8.01, 5.8.02...),
      a pedido do Eytan — as versoes estavam a queimar um minor por correcao.
      cmpVersion_ le "01" como 1, entao 5.8.01 e 5.8.1 comparam igual e nao ha
@@ -1245,6 +1268,17 @@ input:focus{outline:none;border-color:var(--black)}
 }
 .si-veh-nofone { color: #E5484D; font-size: 10px; }
 .si-veh-contato { color: rgba(37,211,102,0.75); font-size: 10px; }
+.si-veh-oferta  { color: rgba(120,170,255,0.80); font-size: 10px; }
+
+/* v5.8.02 — etiqueta de campanha/recall na linha do veículo. RECALL em
+   vermelho porque é segurança do carro; campanha em cinzento porque é
+   atualização. A cor faz a triagem antes da leitura. */
+.si-due-tag {
+  flex-shrink: 0; font-size: 8px; font-weight: 800; letter-spacing: 0.06em;
+  padding: 1px 4px; border-radius: 2px; min-width: 40px; text-align: center;
+  color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.18);
+}
+.si-due-tag.rec { color: #E5484D; border-color: rgba(229,72,77,0.55); }
 
 /* v5.8.01 — faixa de aviso no topo do card. Âmbar e nao vermelho: reenviar
    nao e erro, e uma decisao que o Aprovador deve tomar com a informacao na
@@ -2731,7 +2765,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.8.01';
+const APP_VERSION = '5.8.02';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -8122,7 +8156,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   window.SI_openPanel = function () {
     document.getElementById('si-panel').classList.add('si-open');
     if (!siCards.length) SI_loadCards();
-    SI_loadContatos().then(() => { if (siFilter === 'PERIODO') SI_renderList(); });
+    Promise.all([SI_loadContatos(), SI_loadOfertas()])
+      .then(() => { if (['PERIODO','RECALL','GARANTIA'].includes(siFilter)) SI_renderList(); });
   };
 
   window.SI_closePanel = function () {
@@ -8174,7 +8209,13 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     document.querySelectorAll('.si-filter-btn').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     siFilter = filter;
+    // v5.8.02 — cada modo tem a sua barra, e a selecção NÃO atravessa modos:
+    // trazer 12 carros marcados por recall para a aba da garantia e enviar
+    // mensagem de garantia a todos seria fácil e caro.
     document.getElementById('si-range-bar').classList.toggle('on', filter === 'PERIODO');
+    document.getElementById('si-recall-bar').classList.toggle('on', filter === 'RECALL');
+    document.getElementById('si-garantia-bar').classList.toggle('on', filter === 'GARANTIA');
+    siSel.clear();
     SI_renderList();
   };
 
@@ -8184,6 +8225,11 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
     // v5.5.0 — modo período assume a lista inteira: agrupa por mês, mostra os
     // itens que casaram e traz seleção + fila. Os outros filtros seguem iguais.
+    if (siFilter === 'RECALL' || siFilter === 'GARANTIA') {
+      renderModoLista_(container);
+      return;
+    }
+
     if (siFilter === 'PERIODO') {
       if (!siRange) {
         document.getElementById('si-range-summary').textContent = 'Escolha um período acima';
@@ -8387,7 +8433,22 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   // período simplesmente não acha nada, e os filtros de status seguem iguais.
 
   let siRange = null;          // { start:'yyyy-mm-dd', end:'yyyy-mm-dd', label }
-  let siOpts  = { vencidos: true, comFone: true, comLink: false, esconderContatados: true };
+  let siOpts  = { vencidos: true, comFone: true, comLink: false, esconderContatados: true,
+                  soRecalls: false, garantiaSemData: false, esconderOfertados: true };
+  let siOfertas = {};           // v5.8.02 — { PLACA: {data, por, resultado} }
+
+  // v5.8.02 — ofertas de garantia estendida já feitas. Mesmo raciocínio do
+  // log de contactos: o consultor externo e os três Aprovadores têm de ver o
+  // mesmo estado. "Vendida" some da lista para sempre; as outras voltam a
+  // aparecer quando a janela de esconder passar.
+  window.SI_loadOfertas = function () {
+    return fetch(`${SI_API_URL}?action=siGarantiaOfertas&dias=365`)
+      .then(r => r.json())
+      .then(res => { siOfertas = (res && res.data) || {}; })
+      .catch(err => { console.warn('[SI] log de ofertas indisponível', err); siOfertas = {}; });
+  };
+
+  function ofertaDe_(placa) { return siOfertas[String(placa || '').toUpperCase()] || null; }
   let siContatos = {};          // v5.8.0 — { PLACA: {data, por} }, do servidor
   const SI_DIAS_CONTATO = 60;   // janela do "já falamos com ele"
 
@@ -8508,6 +8569,77 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
                    || (a.v.placa || '').localeCompare(b.v.placa || ''));
   }
 
+  // ══ v5.8.02 — RECALL e GARANTIA ═══════════════════════════════════════════
+  // Mesma mecânica do período — escolher, filtrar, selecionar, enviar em fila
+  // — sobre duas perguntas diferentes. As três abas partilham lista, seleção,
+  // fila, registo de contacto e aviso de duplicado; só muda o que conta como
+  // "linha" do veículo e o texto que sai.
+  //
+  // Dependem do SI.gs v4.3.0 (v.wws). Com cache antigo v.wws vem vazio e as
+  // abas ficam vazias em vez de rebentar.
+
+  function wwsDe_(v) { return (v && v.wws) || {}; }
+
+  // RECALL — campanhas e recalls em aberto do WWS.
+  // POR OMISSÃO MOSTRA OS DOIS: recalls_abertos só é preenchido para códigos
+  // cujo "tipo" foi escrito à mão no catálogo WWS_Campanhas, e enquanto essa
+  // coluna estiver em branco tudo cai em campanhas_abertas. Filtrar só recall
+  // por omissão daria uma lista vazia que parece avaria.
+  function pendenciasWws_(v) {
+    const w = wwsDe_(v);
+    const rec  = (w.recalls   || []).map(c => ({ tipo: 'recall',   texto: c.texto, codigo: c.codigo }));
+    const camp = (w.campanhas || []).map(c => ({ tipo: 'campanha', texto: c.texto, codigo: c.codigo }));
+    return siOpts.soRecalls ? rec : rec.concat(camp);
+  }
+
+  function veiculosComRecall_() {
+    return siCards
+      .map(v => ({ v, hits: pendenciasWws_(v) }))
+      .filter(x => x.hits.length && (!siOpts.comFone || temFone_(x.v))
+                && !(siOpts.esconderContatados && contatoDe_(x.v.placa)))
+      // Recall antes de campanha, e depois quem tem mais pendências: é a ordem
+      // em que se quer ligar.
+      .sort((a, b) => {
+        const ra = a.hits.some(h => h.tipo === 'recall') ? 0 : 1;
+        const rb = b.hits.some(h => h.tipo === 'recall') ? 0 : 1;
+        return ra - rb || b.hits.length - a.hits.length
+            || (a.v.placa || '').localeCompare(b.v.placa || '');
+      });
+  }
+
+  // GARANTIA ESTENDIDA — janela que abre na entrega e fecha no fim do 23º mês.
+  // Ordenado por quem tem MENOS tempo: a janela não reabre.
+  // "Sem data de entrega" é caso à parte, atrás de um toggle: não é "não
+  // elegível", é "não sabemos" — e pode ser uma oferta que se está a perder.
+  function veiculosGarantia_() {
+    return siCards
+      .map(v => ({ v, g: wwsDe_(v).garantia || {} }))
+      .filter(x => siOpts.garantiaSemData ? x.g.semData : x.g.elegivel)
+      .filter(x => (!siOpts.comFone || temFone_(x.v))
+                && !(siOpts.esconderOfertados && ofertaDe_(x.v.placa)))
+      .map(x => ({ v: x.v, hits: [{
+        tipo: 'garantia',
+        texto: x.g.semData
+          ? 'Sem data de entrega registada'
+          : `Prazo até ${ddMM_(x.g.limiteISO)}/${String(x.g.limiteISO).slice(0,4)}`,
+        dias: x.g.diasRestantes, urgente: x.g.urgente, g: x.g,
+      }] }))
+      .sort((a, b) => {
+        const da = a.hits[0].dias, db = b.hits[0].dias;
+        if (da === undefined || da === null) return 1;
+        if (db === undefined || db === null) return -1;
+        return da - db || (a.v.placa || '').localeCompare(b.v.placa || '');
+      });
+  }
+
+  // Uma porta só para os três modos — a fila, o "marcar todos" e o render
+  // passam por aqui e não precisam de saber em que aba estão.
+  function veiculosDoModo_() {
+    if (siFilter === 'RECALL')   return veiculosComRecall_();
+    if (siFilter === 'GARANTIA') return veiculosGarantia_();
+    return veiculosNoPeriodo_();
+  }
+
   // ── LISTA EM MODO PERÍODO ─────────────────────────────────────────────────
   function renderRangeList_(container) {
     const grupos = veiculosNoPeriodo_();
@@ -8561,6 +8693,63 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     syncQueue_();
   }
 
+  // Lista dos modos RECALL e GARANTIA. Estrutura igual à do período — blocos
+  // com cabeçalho, linhas de veículo, fila em baixo — mas os blocos são
+  // categorias em vez de meses.
+  function renderModoLista_(container) {
+    const grupos = veiculosDoModo_();
+    const resumo = document.getElementById(
+      siFilter === 'RECALL' ? 'si-recall-summary' : 'si-garantia-summary');
+
+    if (siFilter === 'RECALL') {
+      const nRec = grupos.filter(g => g.hits.some(h => h.tipo === 'recall')).length;
+      const nPend = grupos.reduce((s, g) => s + g.hits.length, 0);
+      resumo.innerHTML = grupos.length
+        ? `<strong>${grupos.length}</strong> veículo(s) · <strong>${nPend}</strong> pendência(s)`
+          + (nRec ? ` · ${nRec} com recall` : ' · nenhum classificado como recall')
+        : 'Nenhum veículo com campanha ou recall em aberto';
+    } else {
+      const nUrg = grupos.filter(g => g.hits[0].urgente).length;
+      resumo.innerHTML = grupos.length
+        ? `<strong>${grupos.length}</strong> veículo(s) ${siOpts.garantiaSemData ? 'sem data de entrega' : 'dentro do prazo'}`
+          + (nUrg ? ` · <span style="color:#EF9F27">${nUrg} com menos de 90 dias</span>` : '')
+        : (siOpts.garantiaSemData ? 'Nenhum veículo sem data de entrega' : 'Nenhum veículo dentro do prazo de oferta');
+    }
+
+    if (!grupos.length) {
+      container.innerHTML = `
+        <div class="si-empty">
+          <div class="si-empty-icon">✓</div>
+          <div>${siFilter === 'RECALL' ? 'Nada pendente no WWS' : 'Ninguém no prazo'}</div>
+        </div>` + queueHTML_();
+      syncQueue_();
+      return;
+    }
+
+    const blocos = new Map();
+    for (const g of grupos) {
+      let chave;
+      if (siFilter === 'RECALL') {
+        chave = g.hits.some(h => h.tipo === 'recall') ? 'Recalls em aberto' : 'Campanhas em aberto';
+      } else if (g.hits[0].dias === undefined || g.hits[0].dias === null) {
+        chave = 'Sem data de entrega';
+      } else {
+        chave = g.hits[0].urgente ? 'Prazo a acabar (até 90 dias)' : 'Dentro do prazo';
+      }
+      if (!blocos.has(chave)) blocos.set(chave, []);
+      blocos.get(chave).push(g);
+    }
+
+    container.innerHTML = [...blocos.entries()].map(([titulo, lista]) => `
+      <div class="si-month-head">
+        <span class="si-month-name ${/Recall|acabar/.test(titulo) ? 'venc' : ''}">${titulo}</span>
+        <span class="si-month-count">${lista.length} veículo(s)</span>
+      </div>
+      ${lista.map(g => vehRowHTML_(g.v, g.hits, isoHoje_())).join('')}`).join('') + queueHTML_();
+
+    syncQueue_();
+  }
+
   function vehRowHTML_(v, hits, hoje) {
     const css   = STATUS_CSS[v.statusCode] || 'ok';
     const yr    = (v.modelo || '').match(/\b(20\d{2})\b/)?.[1] || '';
@@ -8569,12 +8758,33 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     const sent  = siSent.has(v.placa);
     const fone  = temFone_(v);
 
-    const itens = hits.slice(0, 4).map(i => `
-      <div class="si-due-item">
-        <span class="si-due-date ${i.dueISO < hoje ? 'venc' : ''}">${ddMM_(i.dueISO)}</span>
-        <span>${esc(i.grupo)}</span>
-        ${i.dueSource === 'estimado' ? '<span class="si-due-est" title="Projeção pelo ritmo de km — não é registo">EST</span>' : ''}
-      </div>`).join('')
+    // v5.8.02 — três formatos de linha, um por modo. Mantido num sítio só
+    // para a linha do veículo ter sempre o mesmo aspecto e o mesmo gesto.
+    const itens = hits.slice(0, 4).map(i => {
+      if (i.tipo === 'recall' || i.tipo === 'campanha') {
+        return `
+        <div class="si-due-item">
+          <span class="si-due-tag ${i.tipo === 'recall' ? 'rec' : ''}">${i.tipo === 'recall' ? 'RECALL' : 'CAMP'}</span>
+          <span>${esc(i.texto)}</span>
+        </div>`;
+      }
+      if (i.tipo === 'garantia') {
+        const d = i.dias;
+        return `
+        <div class="si-due-item">
+          <span class="si-due-date ${i.urgente ? 'venc' : ''}">${(d === undefined || d === null) ? '—' : d + 'd'}</span>
+          <span>${esc(i.texto)}</span>
+          ${i.g && i.g.mesesDesdeEntrega !== undefined
+            ? `<span class="si-due-est" title="Meses desde a entrega">${i.g.mesesDesdeEntrega}m</span>` : ''}
+        </div>`;
+      }
+      return `
+        <div class="si-due-item">
+          <span class="si-due-date ${i.dueISO < hoje ? 'venc' : ''}">${ddMM_(i.dueISO)}</span>
+          <span>${esc(i.grupo)}</span>
+          ${i.dueSource === 'estimado' ? '<span class="si-due-est" title="Projeção pelo ritmo de km — não é registo">EST</span>' : ''}
+        </div>`;
+    }).join('')
       + (hits.length > 4 ? `<div class="si-due-item" style="opacity:.5">+${hits.length - 4} outro(s)</div>` : '');
 
     return `
@@ -8597,6 +8807,10 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
                   const d = diasDesde_(c.data);
                   return `<span class="si-veh-contato" title="Último contato registrado">· falado há ${d}d${c.por ? ' por ' + esc(c.por.split(' ')[0]) : ''}</span>`;
                 })()}
+              ${(() => { if (siFilter !== 'GARANTIA') return '';
+                  const o = ofertaDe_(v.placa); if (!o) return '';
+                  return `<span class="si-veh-oferta" title="Oferta de garantia registada">· ofertada há ${diasDesde_(o.data)}d${o.resultado ? ' (' + esc(o.resultado) + ')' : ''}</span>`;
+                })()}
             </div>
           </div>
           <div class="si-due-list">${itens}</div>
@@ -8613,7 +8827,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   };
 
   window.SI_selectAll = function () {
-    const todos = veiculosNoPeriodo_().filter(g => temFone_(g.v));
+    const todos = veiculosDoModo_().filter(g => temFone_(g.v));
     const marcar = siSel.size < todos.length;
     siSel.clear();
     if (marcar) todos.forEach(g => siSel.add(g.v.placa));
@@ -8640,7 +8854,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   }
 
   function filaAtual_() {
-    return veiculosNoPeriodo_()
+    return veiculosDoModo_()
       .filter(g => siSel.has(g.v.placa) && !siSent.has(g.v.placa));
   }
 
@@ -8664,6 +8878,50 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
   // Mensagem com os serviços DO PERÍODO, não os 30 e tal do card inteiro.
   // Um cliente que recebe "34 serviços pendentes" não marca nada.
+  // v5.8.02 — textos de RECALL e GARANTIA. Separados de propósito: um chama
+  // por segurança do carro, o outro é oferta comercial, e misturar os dois
+  // numa mensagem só estraga os dois.
+  function msgRecall_(v, hits) {
+    const nome  = String(v.cliente || '').trim().split(/\s+/)[0] || '';
+    const yr    = (v.modelo || '').match(/\b(20\d{2})\b/)?.[1] || '';
+    const model = (v.modelo || '').replace(/\s*\b(20\d{2})\b\s*/, '').trim();
+    const temRecall = hits.some(h => h.tipo === 'recall');
+    return [
+      `Olá${nome ? ', ' + nome : ''}! Aqui é da Porsche Service Rio.`,
+      ``,
+      temRecall
+        ? `O seu ${model}${yr ? ' ' + yr : ''} (${v.placa}) tem ${hits.length > 1 ? 'ações' : 'uma ação'} de campo em aberto junto à Porsche.`
+        : `O seu ${model}${yr ? ' ' + yr : ''} (${v.placa}) tem ${hits.length > 1 ? 'atualizações previstas' : 'uma atualização prevista'} pela Porsche.`,
+      `A execução é sem custo para você.`,
+      ``,
+      `Quer que eu reserve um horário?`,
+      v.agendamentoUrl || '',
+    ].filter(l => l !== null).join('\n').trim();
+  }
+
+  function msgGarantia_(v, hits) {
+    const nome  = String(v.cliente || '').trim().split(/\s+/)[0] || '';
+    const yr    = (v.modelo || '').match(/\b(20\d{2})\b/)?.[1] || '';
+    const model = (v.modelo || '').replace(/\s*\b(20\d{2})\b\s*/, '').trim();
+    const g = (hits[0] && hits[0].g) || {};
+    const prazo = g.limiteISO
+      ? `${ddMM_(g.limiteISO)}/${String(g.limiteISO).slice(0, 4)}` : null;
+    return [
+      `Olá${nome ? ', ' + nome : ''}! Aqui é da Porsche Service Rio.`,
+      ``,
+      `O seu ${model}${yr ? ' ' + yr : ''} (${v.placa}) ainda está no prazo para contratar a Extensão de Garantia Porsche.`,
+      prazo ? `A contratação pode ser feita até ${prazo}.` : '',
+      ``,
+      `Posso te passar as condições?`,
+    ].filter(l => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function msgDoModo_(v, hits) {
+    if (siFilter === 'RECALL')   return msgRecall_(v, hits);
+    if (siFilter === 'GARANTIA') return msgGarantia_(v, hits);
+    return msgTexto_(v, hits);
+  }
+
   function msgTexto_(v, hits) {
     const nome  = String(v.cliente || '').trim().split(/\s+/)[0] || '';
     const yr    = (v.modelo || '').match(/\b(20\d{2})\b/)?.[1] || '';
@@ -8694,7 +8952,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     const num = String(v.telefone || '').replace(/\D/g, '');
     if (!num) { SI_queueSkip(); return; }
 
-    window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msgTexto_(v, hits))}`, '_blank');
+    window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msgDoModo_(v, hits))}`, '_blank');
 
     // Marcado ao abrir a conversa: o WhatsApp não devolve confirmação de
     // envio, então "enviado" aqui quer dizer "conversa aberta e texto pronto".
@@ -8721,6 +8979,30 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       siContatos[String(v.placa).toUpperCase()] =
         { data: isoHoje_(), por: (typeof currentTech !== 'undefined' ? currentTech : '') };
     } catch (e) { console.warn('[SI] falha ao registrar contato', e); }
+
+    // v5.8.02 — oferta de garantia vai para a aba própria, que é onde o
+    // consultor externo trabalha. Registo separado do de contacto: são
+    // perguntas diferentes ("já falámos?" vs "já ofereceram e no que deu?").
+    if (siFilter === 'GARANTIA') {
+      const g = (hits[0] && hits[0].g) || {};
+      try {
+        fetch(SI_API_URL, {
+          method: 'POST', mode: 'no-cors',
+          body: JSON.stringify({
+            action: 'siLogGarantia',
+            placa: v.placa, vin: v.vin || '', cliente: v.cliente || '',
+            telefone: v.telefone || '', entrega: g.inicioISO || '',
+            prazo: g.limiteISO || '', diasRestantes: g.diasRestantes,
+            tech: (typeof currentTech !== 'undefined' ? currentTech : ''),
+            canal: 'whatsapp',
+          }),
+        });
+        siOfertas[String(v.placa).toUpperCase()] = {
+          data: isoHoje_(), por: (typeof currentTech !== 'undefined' ? currentTech : ''),
+          resultado: 'Pendente',
+        };
+      } catch (e) { console.warn('[SI] falha ao registrar oferta', e); }
+    }
 
     SI_renderList();
   };
@@ -8757,6 +9039,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     document.querySelectorAll('.si-filter-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.filter === siFilter));
     document.getElementById('si-range-bar').classList.toggle('on', siFilter === 'PERIODO');
+    document.getElementById('si-recall-bar').classList.toggle('on', siFilter === 'RECALL');
+    document.getElementById('si-garantia-bar').classList.toggle('on', siFilter === 'GARANTIA');
     if (st.preset) {
       document.querySelectorAll('.si-range-preset').forEach(b =>
         b.classList.toggle('active', b.dataset.preset === st.preset));
@@ -9664,6 +9948,8 @@ function Polaris_brl(n) {
     <button class="si-filter-btn"        data-filter="DUE_SOON" onclick="SI_setFilter(this,'DUE_SOON')">A Vencer</button>
     <button class="si-filter-btn"        data-filter="OK"       onclick="SI_setFilter(this,'OK')">Em Dia</button>
     <button class="si-filter-btn"        data-filter="PERIODO"  onclick="SI_setFilter(this,'PERIODO')">Por período</button>
+    <button class="si-filter-btn"        data-filter="RECALL"   onclick="SI_setFilter(this,'RECALL')">Recall</button>
+    <button class="si-filter-btn"        data-filter="GARANTIA" onclick="SI_setFilter(this,'GARANTIA')">Garantia</button>
   </div>
 
   <!-- v5.5.0 — barra de período (só aparece na aba "Por período") -->
@@ -9707,6 +9993,50 @@ function Polaris_brl(n) {
     </div>
 
     <div id="si-range-summary" class="si-range-summary">Escolha um período acima</div>
+  </div>
+
+  <!-- v5.8.02 — opções do modo RECALL -->
+  <div id="si-recall-bar" class="si-range-bar">
+    <div class="si-range-opts">
+      <label class="si-range-opt">
+        <input type="checkbox" onchange="SI_setOpt('soRecalls',this.checked)">
+        Só recalls (esconder campanhas)
+      </label>
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('comFone',this.checked)">
+        Só com telefone
+      </label>
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('esconderContatados',this.checked)">
+        Esconder contatados (60d)
+      </label>
+      <label class="si-range-opt" onclick="SI_selectAll()" style="margin-left:auto">
+        Marcar / desmarcar todos
+      </label>
+    </div>
+    <div id="si-recall-summary" class="si-range-summary"></div>
+  </div>
+
+  <!-- v5.8.02 — opções do modo GARANTIA ESTENDIDA -->
+  <div id="si-garantia-bar" class="si-range-bar">
+    <div class="si-range-opts">
+      <label class="si-range-opt">
+        <input type="checkbox" onchange="SI_setOpt('garantiaSemData',this.checked)">
+        Ver só os sem data de entrega
+      </label>
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('comFone',this.checked)">
+        Só com telefone
+      </label>
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('esconderOfertados',this.checked)">
+        Esconder já ofertados
+      </label>
+      <label class="si-range-opt" onclick="SI_selectAll()" style="margin-left:auto">
+        Marcar / desmarcar todos
+      </label>
+    </div>
+    <div id="si-garantia-summary" class="si-range-summary"></div>
   </div>
 
   <!-- Vehicle list -->
