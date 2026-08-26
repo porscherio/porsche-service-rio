@@ -2005,6 +2005,35 @@ input:focus{outline:none;border-color:var(--black)}
   </div>
 
   <!-- CONFIRM 100% COMPLETION MODAL (v1.14) -->
+  <!-- CAPACIDADE DA ENTREGA (v5.9.0) — substitui o confirm()/alert() do
+       navegador. Mesmo momento do fluxo (ao confirmar a criação), mas
+       dentro do app: cabe o veredito em primeiro lugar, os números que
+       sustentam a decisão, e a lista de ROs afetadas com o atraso de
+       cada uma. O confirm() nativo não conseguia mostrar nada disso e
+       no celular parecia alerta do sistema, não do PWA.
+       Não fecha por toque no fundo: é decisão obrigatória. -->
+  <div class="parts-pop-backdrop" id="cap-backdrop" style="display:none">
+    <div class="parts-pop">
+      <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:3px">
+        <span id="cap-icon" style="font-size:18px;line-height:1.2">&#x26A0;</span>
+        <div style="flex:1">
+          <div id="cap-title" class="parts-pop-title" style="font-size:15px;margin-bottom:2px"></div>
+          <div id="cap-sub" class="parts-pop-sub" style="margin-bottom:0"></div>
+        </div>
+      </div>
+
+      <div id="cap-metrics" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0"></div>
+
+      <div id="cap-why" style="font-size:12px;line-height:1.55;color:#444;background:var(--bg);border-radius:8px;padding:9px 11px;margin-bottom:12px;display:none"></div>
+
+      <div id="cap-list-lbl" style="font-size:11px;color:#888;margin-bottom:5px;display:none"></div>
+      <div id="cap-list" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;display:none"></div>
+
+      <button id="cap-btn-ok" class="bigbtn btn-ini" style="margin-bottom:8px" onclick="capDecidir(true)"></button>
+      <button id="cap-btn-no" class="bigbtn btn-sec" style="margin-bottom:0" onclick="capDecidir(false)"></button>
+    </div>
+  </div>
+
   <div class="parts-pop-backdrop" id="confirm100-backdrop" style="display:none">
     <div class="parts-pop" style="text-align:center">
       <div class="parts-pop-title" style="font-size:15px;margin-bottom:10px">&#x26A0; Confirmar conclusão</div>
@@ -2776,7 +2805,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.8.06';
+const APP_VERSION = '5.9.0';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -7351,8 +7380,104 @@ function agdChecarCapacidadeEntrega(roNumber, startISO) {
     .catch(() => null);   // falha de rede não pode travar o agendamento
 }
 
-// Texto do alerta. Fica curto de propósito: o Aprovador decide em
-// segundos, não lê relatório.
+// v5.9.0 — o aviso passou a ser um sheet do próprio app, no lugar do
+// confirm()/alert() do navegador. O nativo não mostra números nem
+// lista, e no celular aparece como alerta do sistema. Mesmo momento do
+// fluxo, mesma decisão — só que legível.
+//
+// Devolve Promise<boolean>: true = seguir com a criação.
+var capResolver = null;
+
+function capMetrica(rotulo, valor, destaque) {
+  const bg = destaque ? 'var(--amber-bg)' : 'var(--bg)';
+  const cor = destaque ? 'var(--amber-text)' : '#888';
+  const corVal = destaque ? 'var(--amber-text)' : 'var(--black)';
+  return '<div style="background:' + bg + ';border-radius:8px;padding:8px 9px">' +
+         '<div style="font-size:10px;color:' + cor + ';margin-bottom:2px">' + rotulo + '</div>' +
+         '<div style="font-size:16px;font-weight:600;color:' + corVal + '">' + valor + '</div></div>';
+}
+
+function capAbrirSheet(v) {
+  return new Promise(resolve => {
+    capResolver = resolve;
+
+    const impossivel = (v.tipo === 'IMPOSSIVEL');
+    const quebra     = (v.tipo === 'QUEBRA_PROMESSA');
+
+    document.getElementById('cap-icon').innerHTML = impossivel ? '&#x26D4;' : '&#x26A0;';
+    document.getElementById('cap-title').textContent = impossivel
+      ? 'Esta data não é possível'
+      : (quebra ? 'Atrasa entrega já prometida' : 'A data cabe, mas atrasa outros carros');
+    document.getElementById('cap-sub').textContent =
+      'RO ' + v.ro + ' — entrega em ' + agdDataBr(v.data_desejada);
+
+    const met = [];
+    if (v.horas_restantes != null) met.push(capMetrica('Serviço restante', v.horas_restantes + 'h', false));
+    if (impossivel) {
+      if (v.data_mais_cedo) met.push(capMetrica('Primeira data possível', agdDataBr(v.data_mais_cedo), true));
+      if (v.horas_restantes_hoje != null) met.push(capMetrica('Sobra de turno hoje', v.horas_restantes_hoje + 'h', false));
+    } else {
+      if (v.eta_sem_furar_fila) met.push(capMetrica('Sem furar a fila', agdDataBr(v.eta_sem_furar_fila), false));
+      met.push(capMetrica('Custo', v.total_afetadas + (v.total_afetadas === 1 ? ' RO' : ' ROs'), true));
+    }
+    document.getElementById('cap-metrics').innerHTML = met.join('');
+
+    const why = document.getElementById('cap-why');
+    if (v.explicacao) { why.textContent = v.explicacao; why.style.display = 'block'; }
+    else { why.style.display = 'none'; }
+
+    const lst = document.getElementById('cap-list');
+    const lbl = document.getElementById('cap-list-lbl');
+    const afet = v.afetadas || [];
+    if (afet.length) {
+      lbl.textContent = quebra
+        ? 'Entregas prometidas que seriam furadas:'
+        : 'Cada uma atrasa em dias úteis. Nenhuma tem entrega prometida.';
+      lbl.style.display = 'block';
+      lst.innerHTML = afet.map((a, i) => {
+        const borda = (i < afet.length - 1) ? 'border-bottom:1px solid var(--border);' : '';
+        const alerta = a.quebra_promessa
+          ? '<span style="color:var(--danger-text);font-size:10px"> prometida ' + agdDataBr(a.prometida) + '</span>'
+          : '';
+        return '<div style="' + borda + 'display:flex;justify-content:space-between;gap:8px;padding:8px 10px;font-size:12px">' +
+               '<span>RO ' + a.ro + alerta + '</span>' +
+               '<span style="color:#888;white-space:nowrap">' + agdDataBr(a.eta_antes) +
+               ' &#8594; <b style="color:var(--black)">' + agdDataBr(a.eta_depois) + '</b></span></div>';
+      }).join('');
+      lst.style.display = 'block';
+    } else {
+      lbl.style.display = 'none';
+      lst.style.display = 'none';
+    }
+
+    const btnOk = document.getElementById('cap-btn-ok');
+    const btnNo = document.getElementById('cap-btn-no');
+    if (impossivel && !v.override_permitido) {
+      // Nada a autorizar: as horas não existem no prazo. Só uma saída.
+      btnOk.style.display = 'none';
+      btnNo.textContent = v.data_mais_cedo
+        ? 'Escolher outra data (a partir de ' + agdDataBr(v.data_mais_cedo) + ')'
+        : 'Escolher outra data';
+    } else {
+      btnOk.style.display = 'block';
+      btnOk.textContent = quebra
+        ? 'Confirmar assim mesmo'
+        : 'Confirmar ' + agdDataBr(v.data_desejada);
+      btnNo.textContent = 'Escolher outra data';
+    }
+
+    document.getElementById('cap-backdrop').style.display = 'flex';
+  });
+}
+
+function capDecidir(seguir) {
+  document.getElementById('cap-backdrop').style.display = 'none';
+  const r = capResolver; capResolver = null;
+  if (r) r(!!seguir);
+}
+
+// Mantida para o caso de o sheet não existir na página (versão antiga
+// do HTML em cache): o texto continua servindo de reserva.
 function agdTextoViabilidade(v) {
   const linhas = [];
   if (v.tipo === 'IMPOSSIVEL') {
@@ -7424,16 +7549,20 @@ function agdConfirmCreate() {
 
       if (v.tipo === 'OK') { agdSeguirCriacao(false); return; }
 
-      if (v.tipo === 'IMPOSSIVEL' && !v.override_permitido) {
-        alert(agdTextoViabilidade(v));
-        return;   // não cria, e o Aprovador escolhe outra data
-      }
+      const temSheet = !!document.getElementById('cap-backdrop');
+      const decisao = temSheet
+        ? capAbrirSheet(v)
+        : Promise.resolve(
+            (v.tipo === 'IMPOSSIVEL' && !v.override_permitido)
+              ? (alert(agdTextoViabilidade(v)), false)
+              : confirm(agdTextoViabilidade(v)));
 
-      if (!confirm(agdTextoViabilidade(v))) return;
-
-      // Confirmou sabendo do custo: manda force_capacity para o portão
-      // do servidor deixar passar e registrar na auditoria.
-      agdSeguirCriacao(v.tipo === 'QUEBRA_PROMESSA' || v.tipo === 'IMPOSSIVEL');
+      decisao.then(seguir => {
+        if (!seguir) return;   // volta ao passo de revisão, data preservada
+        // Confirmou sabendo do custo: force_capacity faz o portão do
+        // servidor liberar e registrar em EntregaOverrideAudit.
+        agdSeguirCriacao(v.tipo === 'QUEBRA_PROMESSA' || v.tipo === 'IMPOSSIVEL');
+      });
     });
     return;
   }
