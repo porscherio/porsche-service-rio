@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.5.0 — Build: 2026-08-25 23:58 BRT -->
+<!-- Porsche Service Rio PWA — v5.5.1 — Build: 2026-08-26 00:12 BRT -->
+<!-- v5.5.1: CHANGELOG NUM LUGAR SO. As notas da 5.4.x estavam soltas junto
+     do APP_VERSION, mil linhas abaixo, e o cabecalho tinha parado na 5.3.1
+     — entao de cima para baixo o arquivo lia 5.5.0 → 5.3.1 e a 5.4.2
+     aparecia depois da 5.5.0, como se fosse mais nova. Subiram para ca, em
+     ordem. Sem mudanca de comportamento. -->
 <!-- v5.5.0: POR PERÍODO no painel SI — o SI deixa de responder só "o que
      este carro precisa?" e passa a responder "quem eu chamo esta semana?".
      Aba nova ao lado de Todos/Vencidos/A Vencer/Em Dia, com presets de
@@ -22,6 +27,16 @@
      ainda não grava no servidor (ver SI_Contatos, próximo passo).
      Exige SI.gs v4.2.1+ (dueISO/dueSource/nextDueISO). Com cache velho a aba
      fica vazia e o resto do SI segue intacto. -->
+<!-- v5.4.2: switch "Mostrar resolvidos" removido — o caminho de desfazer é
+     a pill do card da RO, não esta tela, então a lista SERVICOS esconde
+     resolvidos sem exceção. Volta a ser exclusiva da ENTREGA, como antes. -->
+<!-- v5.4.1: lista SERVICOS vira fila de trabalho — some por padrão o que já
+     foi resolvido (chegada confirmada ou não compareceu). Ordenação por DATA
+     ascendente. Pills Confirmar Chegada e Não compareceu ganham cores
+     distintas — eram as duas cinzas, fáceis de trocar no toque. -->
+<!-- v5.4.0: pill "Não compareceu" nos cards SERVICOS do Agendamento. Não
+     apaga o evento: marca que o horário passou e o carro não veio, tirando
+     o item de Aguardando chegada sem perder o registro. Reversível. -->
 <!-- v5.3.1: FEEDBACK NO "Criar agendamento". O botão já se desabilitava
      durante o envio, mas .bigbtn não tem estilo de :disabled — então
      nada mudava na tela e, entre o toque e o toast, não havia como
@@ -2627,25 +2642,13 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.5.0';
-// v5.4.2: switch "Mostrar resolvidos" removido — o caminho de desfazer e a
-//   pill do card da RO, nao esta tela, entao a lista SERVICOS esconde
-//   resolvidos sem excecao. Volta a ser exclusiva da ENTREGA, como antes.
-// v5.4.1: lista SERVICOS vira fila de trabalho — some por padrao o que ja
-//   foi resolvido (chegada confirmada ou nao compareceu), com o switch
-//   "Mostrar resolvidos" para trazer de volta e poder DESFAZER.
-//   Ordenacao por DATA ascendente (era por numero de RO desde a v2.7.15;
-//   a busca por RO ja resolve achar uma OS especifica, e para uma fila o
-//   que importa e o que vem primeiro).
-//   Pills: Confirmar Chegada azul claro, Nao compareceu vermelho claro —
-//   eram as duas iguais e cinzas, faceis de trocar no toque.
-// v5.4.0: pill "Nao compareceu" nos cards SERVICOS da lista de
-//   Agendamento. Nao apaga o evento (o Cancelar agendamento continua
-//   sendo o botao destrutivo, para cancelamento de verdade) — so marca
-//   que o horario passou e o carro nao veio, tirando o item da area
-//   Aguardando chegada do Patio sem perder o registro.
-//   Reversivel: Confirmar Chegada limpa o no-show sozinho, entao cliente
-//   atrasado se resolve com o fluxo normal, sem destaguear antes.
+const APP_VERSION = '5.5.1';
+// v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
+//   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
+//   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
+//   linhas depois — parecia que a 5.5 vinha antes da 5.4.2. Notas movidas
+//   para o cabecalho, em ordem. Daqui para a frente o changelog mora num
+//   lugar so: o topo do arquivo. Nenhuma mudanca de comportamento.
 
 // ── v5.2.0 — FEEDBACK DE PILL PENDENTE ──────────────────────────
 // Toda pill que grava no servidor (Confirmar Chegada, entrega,
