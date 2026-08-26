@@ -2776,7 +2776,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.8.03';
+const APP_VERSION = '5.8.04';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -7315,8 +7315,114 @@ function agdSelectCreateSlot(btn) {
   document.getElementById('agd-c-confirm-btn').disabled = false;
 }
 
+// v5.8.04 — CHECAGEM DE CAPACIDADE antes de criar ENTREGA.
+//
+// POR QUE AQUI, e não na resposta do POST: o POST vai com
+// mode:'no-cors' (imposição do /exec — mandar Content-Type dispara
+// preflight OPTIONS que o Apps Script não atende), então a resposta é
+// OPACA. O .then() dispara com sucesso mesmo quando o servidor recusou.
+// Se dependêssemos dele, uma entrega barrada mostraria "Agendamento
+// criado." e nada teria sido criado — pior que erro genérico.
+// Por isso a checagem vai num GET, que é legível, ANTES do POST.
+// O portão no servidor (Code.gs v4.9.9) continua valendo como rede de
+// segurança; esta função é quem torna o resultado visível.
+function agdChecarCapacidadeEntrega(roNumber, startISO) {
+  const dia = String(startISO).slice(0, 10);   // 'AAAA-MM-DD'
+  return fetch(API_URL + '?action=previewEntrega&ro=' + encodeURIComponent(roNumber) +
+               '&data=' + encodeURIComponent(dia))
+    .then(r => r.json())
+    .catch(() => null);   // falha de rede não pode travar o agendamento
+}
+
+// Texto do alerta. Fica curto de propósito: o Aprovador decide em
+// segundos, não lê relatório.
+function agdTextoViabilidade(v) {
+  const linhas = [];
+  if (v.tipo === 'IMPOSSIVEL') {
+    linhas.push('Esta data NÃO é possível para a RO ' + v.ro + '.');
+    if (v.data_mais_cedo) linhas.push('Data mais cedo possível: ' + agdDataBr(v.data_mais_cedo) + '.');
+    if (v.motivo) linhas.push('');
+    if (v.motivo) linhas.push(v.motivo);
+  } else if (v.tipo === 'QUEBRA_PROMESSA') {
+    const q = (v.afetadas || []).filter(a => a.quebra_promessa);
+    linhas.push('Esta data atrasa entrega(s) JÁ PROMETIDA(S) a outro cliente:');
+    q.slice(0, 5).forEach(a => {
+      linhas.push('  • RO ' + a.ro + ' — prometida ' + agdDataBr(a.prometida) +
+                  ', passaria para ' + agdDataBr(a.eta_depois));
+    });
+    linhas.push('');
+    linhas.push('Confirmar assim mesmo? A decisão fica registrada.');
+  } else if (v.tipo === 'ATRASA') {
+    linhas.push('Esta data atrasa ' + v.total_afetadas +
+                ' RO(s), nenhuma com entrega prometida ao cliente:');
+    (v.afetadas || []).slice(0, 5).forEach(a => {
+      linhas.push('  • RO ' + a.ro + ': ' + agdDataBr(a.eta_antes) + ' → ' +
+                  agdDataBr(a.eta_depois) + ' (+' + a.atraso_dias_uteis + 'd)');
+    });
+    if ((v.afetadas || []).length < v.total_afetadas) {
+      linhas.push('  • ... e mais ' + (v.total_afetadas - v.afetadas.length) + ' RO(s)');
+    }
+    linhas.push('');
+    linhas.push('Confirmar?');
+  }
+  return linhas.join('\n');
+}
+
+function agdDataBr(iso) {
+  if (!iso) return '-';
+  const p = String(iso).split('-');
+  return (p.length === 3) ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso);
+}
+
 function agdConfirmCreate() {
   if (!agdCreateSlot) { showToast('Selecione um horário primeiro.'); return; }
+
+  // ENTREGA passa pela checagem antes de qualquer coisa. SERVICOS não —
+  // agendamento de serviço não compromete prazo de saída.
+  if (agdCreateCalendar === 'entrega' && !agdCapacidadeJaConferida) {
+    const btnPre = document.getElementById('agd-c-confirm-btn');
+    const rotuloPre = btnPre.innerHTML;
+    btnPre.disabled = true;
+    btnPre.classList.add('btn-pending');
+    btnPre.innerHTML = 'Conferindo capacidade\u2026';
+
+    agdChecarCapacidadeEntrega(agdEntregaGateRO, agdCreateSlot.start).then(res => {
+      btnPre.classList.remove('btn-pending');
+      btnPre.innerHTML = rotuloPre;
+      btnPre.disabled = false;
+
+      // Sem resposta legível (rede, rota ausente, erro): segue em frente.
+      // O portão do servidor ainda barra o que precisa ser barrado.
+      if (!res || !res.ok || !res.viabilidade) { agdSeguirCriacao(false); return; }
+
+      const v = res.viabilidade;
+
+      if (v.tipo === 'OK') { agdSeguirCriacao(false); return; }
+
+      if (v.tipo === 'IMPOSSIVEL' && !v.override_permitido) {
+        alert(agdTextoViabilidade(v));
+        return;   // não cria, e o Aprovador escolhe outra data
+      }
+
+      if (!confirm(agdTextoViabilidade(v))) return;
+
+      // Confirmou sabendo do custo: manda force_capacity para o portão
+      // do servidor deixar passar e registrar na auditoria.
+      agdSeguirCriacao(v.tipo === 'QUEBRA_PROMESSA' || v.tipo === 'IMPOSSIVEL');
+    });
+    return;
+  }
+
+  agdSeguirCriacao(agdForcarCapacidade);
+}
+
+// Quem realmente monta e envia o POST. Separado do agdConfirmCreate
+// para a checagem poder chamá-lo depois da decisão do Aprovador.
+var agdCapacidadeJaConferida = false;
+var agdForcarCapacidade = false;
+
+function agdSeguirCriacao(forcar) {
+  agdForcarCapacidade = !!forcar;
 
   const body = {
     action:   'createAgendamento',
@@ -7345,6 +7451,9 @@ function agdConfirmCreate() {
     body.mobile      = agdEntregaSourceEvent ? agdEntregaSourceEvent.mobile      : '';
     body.cpf         = agdEntregaSourceEvent ? agdEntregaSourceEvent.cpf         : '';
     body.location_key = document.getElementById('agd-c-f-location').value;
+    // v5.8.04 — só vai como true quando o Aprovador confirmou um alerta
+    // de quebra de promessa. O servidor registra em EntregaOverrideAudit.
+    if (forcar) body.force_capacity = true;
   } else {
     body.ro_number   = document.getElementById('agd-c-f-ro').value.trim();
     body.client_name = document.getElementById('agd-c-f-client').value.trim();
@@ -7384,6 +7493,8 @@ function agdConfirmCreate() {
       btnCriar.classList.remove('btn-pending');
       btnCriar.innerHTML = rotuloOriginal;
       showToast('Agendamento criado.');
+      agdCapacidadeJaConferida = false;
+      agdForcarCapacidade = false;
       agdGoStep1();
     })
     .catch(() => {
