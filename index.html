@@ -2669,7 +2669,7 @@ input:focus{outline:none;border-color:var(--black)}
           <div class="sec-lbl">RO</div>
           <label class="field-lbl" for="agd-c-ro-entrega">Número da RO</label>
           <input type="text" id="agd-c-ro-entrega" class="agd-field-input" inputmode="numeric" placeholder="Ex: 29890">
-          <button class="bigbtn btn-ini" onclick="agdCheckEntregaGate()">&#x1F50D; Verificar</button>
+          <button id="agd-entrega-verify-btn" class="bigbtn btn-ini" onclick="agdCheckEntregaGate()">&#x1F50D; Verificar</button>
           <div id="agd-entrega-gate-msg" style="font-size:13px;color:#c00;margin-top:4px;margin-bottom:10px;display:none"></div>
           <!-- v3.4.0: informational only — never blocks. See
                agdCheckEntregaGate()/checkEntregaGate() in Code.gs. -->
@@ -2776,7 +2776,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.8.04';
+const APP_VERSION = '5.8.05';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -7072,9 +7072,26 @@ function agdCheckEntregaGate() {
   warnEl.style.display = 'none';
   if (!ro) { msgEl.textContent = 'Informe o número da RO.'; msgEl.style.display = 'block'; return; }
 
+  // v5.8.05 — botão trava e pisca enquanto busca. Sem isso o Aprovador
+  // clica de novo achando que não pegou, e dispara duas buscas.
+  const vBtn = document.getElementById('agd-entrega-verify-btn');
+  const vLabel = vBtn ? vBtn.innerHTML : '';
+  const agdSoltarVerificar = () => {
+    if (!vBtn) return;
+    vBtn.disabled = false;
+    vBtn.classList.remove('btn-pending');
+    vBtn.innerHTML = vLabel;
+  };
+  if (vBtn) {
+    vBtn.disabled = true;
+    vBtn.classList.add('btn-pending');
+    vBtn.innerHTML = 'Buscando RO\u2026';
+  }
+
   fetch(API_URL + '?action=hasServicosEvent&ro_number=' + encodeURIComponent(ro))
     .then(r => r.json())
     .then(data => {
+      agdSoltarVerificar();
       if (!data.ok) { msgEl.textContent = 'Erro ao verificar. Tente novamente.'; msgEl.style.display = 'block'; return; }
       if (!data.exists) {
         msgEl.textContent = 'Nenhum agendamento de SERVIÇOS encontrado para esta RO. Crie o agendamento de SERVIÇOS primeiro.';
@@ -7109,7 +7126,7 @@ function agdCheckEntregaGate() {
         })
         .catch(() => {});
     })
-    .catch(() => { msgEl.textContent = 'Erro ao verificar. Tente novamente.'; msgEl.style.display = 'block'; });
+    .catch(() => { agdSoltarVerificar(); msgEl.textContent = 'Erro ao verificar. Tente novamente.'; msgEl.style.display = 'block'; });
 }
 
 // ── SERVICOS Path A: RO already exists ──
