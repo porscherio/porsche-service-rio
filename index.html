@@ -1,5 +1,16 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.8.02 — Build: 2026-08-26 03:30 BRT -->
+<!-- Porsche Service Rio PWA — v5.8.03 — Build: 2026-08-26 04:40 BRT -->
+<!-- v5.8.03: A LINHA "RECALL" DO CARD PASSA A DIZER ALGUMA COISA.
+     Ela nasce da SI_MATRIX como qualquer outro serviço e é casada por
+     palavra-chave contra as joblines — como nunca há jobline com a palavra
+     "recall", dava SEM REGISTRO em TODOS os 755 carros, inclusive nos 178
+     que têm campanha aberta de facto. A linha existia e mentia nos dois
+     sentidos: alarme falso em quem não tem nada, silêncio em quem tem.
+     Agora, quando o VIN é conhecido do WWS, a linha mostra os códigos em
+     aberto e diz que a execução é sem custo — ou confirma que não há nada.
+     Barra de progresso vai a 100% ou 0%: recall não tem intervalo.
+     VIN desconhecido do WWS ou cache antigo: fica como estava, porque aí
+     não sabemos, e não saber não é o mesmo que não ter. -->
 <!-- v5.8.02: DUAS ABAS NOVAS NO SI — RECALL e GARANTIA — com a mesma
      mecânica do "Por período": escolher, filtrar, marcar, enviar em fila.
      As três partilham lista, seleção, fila, registo de contacto e aviso de
@@ -2765,7 +2776,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.8.02';
+const APP_VERSION = '5.8.03';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -9294,8 +9305,33 @@ window.SI_shareCard = async function() {
     const yr    = (v.modelo||'').match(/\b(20\d{2})\b/)?.[1]||'';
     const model = (v.modelo||'').replace(/\s*\b20\d{2}\b\s*/,'').trim();
 
+    // v5.8.03 — a linha RECALL do card nasce da SI_MATRIX como qualquer outro
+    // serviço, e como nunca há jobline com a palavra "recall" ela dava
+    // SEM REGISTRO em TODOS os carros — inclusive nos 178 que têm coisa
+    // aberta de verdade. Ou seja: a linha existia e mentia nos dois sentidos.
+    // Agora ela é preenchida com o que o WWS sabe daquele VIN.
+    // Sem dado do WWS (v.wws vazio, cache antigo) fica exatamente como estava.
+    const _w     = v.wws || {};
+    const _wRec  = _w.recalls   || [];
+    const _wCamp = _w.campanhas || [];
+    const _wPend = _wRec.concat(_wCamp);
+
     const itemsHTML = items.map(item => {
-      const sc    = item.statusCode;
+      let sc = item.statusCode;
+      let descOverride = null;
+
+      if (_norm(item.grupo) === 'recall' && _w.encontrado) {
+        if (_wPend.length) {
+          sc = 'OVERDUE';
+          const codigos = _wPend.map(c => c.codigo).join(', ');
+          const quantos = _wPend.length === 1 ? '1 ação' : `${_wPend.length} ações`;
+          descOverride = `${quantos} de campo em aberto na Porsche: ${codigos}. Execução sem custo.`;
+        } else {
+          sc = 'OK';
+          descOverride = 'Nenhuma ação de campo em aberto para este chassi.';
+        }
+      }
+
       const col   = STATUS_COLOR[sc]||'#000';
       const lbl   = STATUS_LABEL[sc]||sc;
       const bg    = STATUS_BG[sc]||'#fff';
@@ -9305,7 +9341,10 @@ window.SI_shareCard = async function() {
       // server-side from actual interval/date/km math). Fall back to the old
       // estimate only for cache rows written before that backend was deployed.
       let pct;
-      if (Number.isFinite(item.pct)) {
+      if (descOverride !== null) {
+        // Recall não tem intervalo: ou há ação aberta ou não há.
+        pct = _wPend.length ? 100 : 0;
+      } else if (Number.isFinite(item.pct)) {
         pct = item.pct;
       } else if (sc==='OVERDUE'||sc==='SEM_REGISTRO') {
         pct = 100;
@@ -9348,7 +9387,7 @@ window.SI_shareCard = async function() {
           </div>
           <div style="font-size:7.5px;font-weight:800;letter-spacing:.1em;padding:3px 8px;background:${col};color:#fff;white-space:nowrap;flex-shrink:0;">${lbl}</div>
         </div>
-        <div style="font-size:10px;color:#000;margin-bottom:8px;padding-left:${iconKey?'30px':'0'}">${item.descricao||''}</div>
+        <div style="font-size:10px;color:#000;margin-bottom:8px;padding-left:${iconKey?'30px':'0'}">${descOverride || item.descricao || ''}</div>
         <div style="position:relative;height:3px;background:#E5E7EB;margin-bottom:9px;">
           <div style="position:absolute;left:0;top:0;bottom:0;width:${pct}%;background:${col};"></div>
           <div style="position:absolute;left:${pct}%;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:${col};box-shadow:0 0 0 2px #fff;"></div>
