@@ -1,5 +1,26 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.7.0 — Build: 2026-08-26 01:05 BRT -->
+<!-- Porsche Service Rio PWA — v5.8.0 — Build: 2026-08-26 01:45 BRT -->
+<!-- v5.8.0: REGISTRO DE CONTATOS NO SERVIDOR (aba SI_Contatos).
+     O "ENVIADO" da fila era local — Set em memoria (v5.5.0), sobrevivendo a
+     recarga (v5.7.0), mas preso ao aparelho e ao turno. Na pratica: o Eytan
+     trabalhava a lista de setembro de manha, o Sidney abria a mesma lista a
+     tarde e via os mesmos clientes como se ninguem tivesse falado com eles.
+     O cliente levava duas mensagens iguais de pessoas diferentes.
+     Agora cada envio grava no servidor (SiContatos.gs) e o painel carrega o
+     log ao abrir: os tres Aprovadores veem o mesmo estado, e ele dura alem
+     do turno.
+     NOVO TOGGLE "Esconder contatados (60d)", LIGADO por omissao — e o que
+     faz a lista ser trabalhavel dia apos dia em vez de repetir os mesmos
+     nomes. Desligue para ver todo mundo, com "falado ha Xd por Fulano" na
+     linha.
+     FALHA EM SILENCIO: sem rede o log nao carrega e nada e escondido — a
+     fila funciona como na v5.7.0. Melhor mostrar demais do que esconder
+     alguem por causa de uma falha de rede.
+     REGISTRA INTENCAO, NAO ENTREGA: o wa.me nao devolve confirmacao, entao
+     a linha significa "conversa aberta com o texto pronto".
+     EXIGE: SiContatos.gs colado no projeto + duas linhas no roteador do
+     Code.gs (instrucoes no cabecalho daquele arquivo). Sem isso o painel
+     funciona igual, so nunca esconde ninguem. -->
 <!-- v5.7.0: DOIS BUGS, ambos reportados pelo Eytan.
      (1) AVISO DE VERSAO AO CONTRARIO. checkAppVersion comparava com !==, ou
      seja QUALQUER diferenca disparava o aviso — inclusive com o cliente mais
@@ -1207,6 +1228,7 @@ input:focus{outline:none;border-color:var(--black)}
   padding: 0 3px; border-radius: 2px;
 }
 .si-veh-nofone { color: #E5484D; font-size: 10px; }
+.si-veh-contato { color: rgba(37,211,102,0.75); font-size: 10px; }
 
 /* Fila de envio, ancorada em baixo. O wa.me abre uma conversa de cada vez —
    não existe envio em lote — então a fila guarda o lugar em vez de fingir
@@ -2680,7 +2702,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.7.0';
+const APP_VERSION = '5.8.0';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -8071,6 +8093,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   window.SI_openPanel = function () {
     document.getElementById('si-panel').classList.add('si-open');
     if (!siCards.length) SI_loadCards();
+    SI_loadContatos().then(() => { if (siFilter === 'PERIODO') SI_renderList(); });
   };
 
   window.SI_closePanel = function () {
@@ -8317,7 +8340,28 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   // período simplesmente não acha nada, e os filtros de status seguem iguais.
 
   let siRange = null;          // { start:'yyyy-mm-dd', end:'yyyy-mm-dd', label }
-  let siOpts  = { vencidos: true, comFone: true, comLink: false };
+  let siOpts  = { vencidos: true, comFone: true, comLink: false, esconderContatados: true };
+  let siContatos = {};          // v5.8.0 — { PLACA: {data, por} }, do servidor
+  const SI_DIAS_CONTATO = 60;   // janela do "já falamos com ele"
+
+  // v5.8.0 — o log de contatos vem do SERVIDOR, entao os tres Aprovadores
+  // veem o mesmo estado. Antes o "enviado" era local: o Eytan trabalhava a
+  // lista de manha, o Sidney abria a mesma lista a tarde e mandava tudo de
+  // novo. Falha em silencio de proposito — sem rede, a fila continua a
+  // funcionar como na v5.7.0, so sem esconder ninguem.
+  window.SI_loadContatos = function () {
+    return fetch(`${SI_API_URL}?action=siContatos&dias=${SI_DIAS_CONTATO}`)
+      .then(r => r.json())
+      .then(res => { siContatos = (res && res.data) || {}; })
+      .catch(err => { console.warn('[SI] log de contatos indisponível', err); siContatos = {}; });
+  };
+
+  function contatoDe_(placa) { return siContatos[String(placa || '').toUpperCase()] || null; }
+
+  function diasDesde_(iso) {
+    if (!iso) return null;
+    return Math.round((Date.now() - new Date(iso + 'T12:00:00').getTime()) / 864e5);
+  }
   const siSel  = new Set();    // placas selecionadas
   const siSent = new Set();    // placas já enviadas NESTA sessão
 
@@ -8411,7 +8455,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     const hoje = isoHoje_();
     return siCards
       .map(v => ({ v, hits: itensNoPeriodo_(v) }))
-      .filter(x => x.hits.length && (!siOpts.comFone || temFone_(x.v)))
+      .filter(x => x.hits.length && (!siOpts.comFone || temFone_(x.v))
+                && !(siOpts.esconderContatados && contatoDe_(x.v.placa)))
       .sort((a, b) => a.hits[0].dueISO.localeCompare(b.hits[0].dueISO)
                    || (a.v.placa || '').localeCompare(b.v.placa || ''));
   }
@@ -8501,6 +8546,10 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
             <div>
               <span class="si-veh-name">${esc(v.cliente)}</span>
               ${fone ? '' : '<span class="si-veh-nofone">· sem telefone</span>'}
+              ${(() => { const c = contatoDe_(v.placa); if (!c) return '';
+                  const d = diasDesde_(c.data);
+                  return `<span class="si-veh-contato" title="Último contato registrado">· falado há ${d}d${c.por ? ' por ' + esc(c.por.split(' ')[0]) : ''}</span>`;
+                })()}
             </div>
           </div>
           <div class="si-due-list">${itens}</div>
@@ -8607,6 +8656,25 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     // v5.7.0 — grava JA, sem esperar pelo pagehide: o window.open pode
     // congelar a aba antes de qualquer evento de ciclo de vida disparar.
     if (typeof sesGravar_ === 'function') sesGravar_({ si: SI_captureState() });
+
+    // v5.8.0 — registra no servidor. no-cors e fire-and-forget: se a rede
+    // falhar, o envio ja aconteceu e nao ha nada a desfazer — o marcador
+    // local da sessao segura o duplo envio ate a proxima carga do painel.
+    try {
+      fetch(SI_API_URL, {
+        method: 'POST', mode: 'no-cors',
+        body: JSON.stringify({
+          action: 'siLogContato',
+          placa: v.placa, cliente: v.cliente || '', telefone: v.telefone || '',
+          tech: (typeof currentTech !== 'undefined' ? currentTech : ''),
+          itens: hits.map(i => i.grupo).join('; '),
+          periodo: (siRange && siRange.label) || '', canal: 'whatsapp',
+        }),
+      });
+      siContatos[String(v.placa).toUpperCase()] =
+        { data: isoHoje_(), por: (typeof currentTech !== 'undefined' ? currentTech : '') };
+    } catch (e) { console.warn('[SI] falha ao registrar contato', e); }
+
     SI_renderList();
   };
 
@@ -8651,7 +8719,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     if (st.fim) document.getElementById('si-range-fim').value = st.fim;
 
     document.querySelectorAll('.si-range-opt input').forEach((el, i) => {
-      const chaves = ['vencidos', 'comFone', 'comLink'];
+      const chaves = ['vencidos', 'comFone', 'comLink', 'esconderContatados'];
       if (chaves[i]) el.checked = !!siOpts[chaves[i]];
     });
 
@@ -9581,6 +9649,10 @@ function Polaris_brl(n) {
       <label class="si-range-opt">
         <input type="checkbox" onchange="SI_setOpt('comLink',this.checked)">
         Incluir link do card
+      </label>
+      <label class="si-range-opt">
+        <input type="checkbox" checked onchange="SI_setOpt('esconderContatados',this.checked)">
+        Esconder contatados (60d)
       </label>
       <label class="si-range-opt" onclick="SI_selectAll()" style="margin-left:auto">
         Marcar / desmarcar todos
