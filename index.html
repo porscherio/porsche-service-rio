@@ -1,5 +1,21 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.8.0 — Build: 2026-08-26 01:45 BRT -->
+<!-- Porsche Service Rio PWA — v5.8.01 — Build: 2026-08-26 02:10 BRT -->
+<!-- NUMERACAO: a partir daqui o incremento e centesimal (5.8.01, 5.8.02...),
+     a pedido do Eytan — as versoes estavam a queimar um minor por correcao.
+     cmpVersion_ le "01" como 1, entao 5.8.01 e 5.8.1 comparam igual e nao ha
+     risco de o aviso de versao se confundir com o formato antigo. -->
+<!-- v5.8.01: AVISO DE CONTATO RECENTE NO CARD. A v5.8.0 so mostrava o
+     contato nas linhas da aba "Por período". Quem chegasse ao card por
+     Todos, Vencidos, A Vencer — ou a partir de uma RO — nao via nada e podia
+     mandar por cima de um colega, que e exatamente o que o registo existe
+     para evitar. Agora o card mostra "Já contatado há Xd por Fulano" numa
+     faixa ambar acima dos botoes, em qualquer caminho de entrada.
+     ACIMA e nao abaixo dos botoes: tem de ser lido antes do dedo chegar no
+     MENSAGEM. AMBAR e nao vermelho: reenviar nao e erro — o cliente pode ter
+     pedido de novo — e uma decisao informada.
+     SEM CONFIRMACAO, por agora: um dialogo em cada envio atrapalha um fluxo
+     que se usa o dia todo. Se a faixa sozinha nao chegar, acrescenta-se.
+     Escondida na impressao: o cliente nao tem nada com isto. -->
 <!-- v5.8.0: REGISTRO DE CONTATOS NO SERVIDOR (aba SI_Contatos).
      O "ENVIADO" da fila era local — Set em memoria (v5.5.0), sobrevivendo a
      recarga (v5.7.0), mas preso ao aparelho e ao turno. Na pratica: o Eytan
@@ -1229,6 +1245,19 @@ input:focus{outline:none;border-color:var(--black)}
 }
 .si-veh-nofone { color: #E5484D; font-size: 10px; }
 .si-veh-contato { color: rgba(37,211,102,0.75); font-size: 10px; }
+
+/* v5.8.01 — faixa de aviso no topo do card. Âmbar e nao vermelho: reenviar
+   nao e erro, e uma decisao que o Aprovador deve tomar com a informacao na
+   frente. Vermelho sugeriria que algo esta errado. */
+.si-card-contato {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 14px;
+  background: rgba(239,159,39,0.14);
+  border-bottom: 1px solid rgba(239,159,39,0.34);
+  color: #EF9F27; font-size: 11.5px; font-weight: 600;
+  font-family: 'PorscheNext', sans-serif;
+}
+@media print { .si-card-contato { display: none !important; } }
 
 /* Fila de envio, ancorada em baixo. O wa.me abre uma conversa de cada vez —
    não existe envio em lote — então a fila guarda o lugar em vez de fingir
@@ -2702,7 +2731,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.8.0';
+const APP_VERSION = '5.8.01';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -8282,7 +8311,25 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     const bodyMatch = fullDoc.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     const cardInner = bodyMatch ? bodyMatch[1] : fullDoc;
 
+    // v5.8.01 — AVISO DE CONTATO RECENTE. O indicador so existia nas linhas
+    // da aba "Por período". Quem chegasse ao card por Todos/Vencidos/A
+    // Vencer — ou pela RO — nao via nada, e mandava por cima de um colega.
+    // Fica ACIMA dos botoes de propósito: o aviso tem de ser lido antes do
+    // dedo chegar no MENSAGEM, nao depois.
+    // Sem confirmacao: reenviar e legitimo (cliente pede de novo, mensagem
+    // nao chegou), e um dialogo em cada envio irrita mais do que protege.
+    const _ct = (typeof contatoDe_ === 'function') ? contatoDe_(v.placa) : null;
+    const _ctDias = _ct ? diasDesde_(_ct.data) : null;
+    const _aviso = _ct ? `
+      <div class="si-card-contato">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>Já contatado ${_ctDias === 0 ? 'hoje' : `há ${_ctDias} dia${_ctDias === 1 ? '' : 's'}`}${_ct.por ? ` por ${esc(_ct.por.split(' ')[0])}` : ''}</span>
+      </div>` : '';
+
     return `
+      ${_aviso}
       <!-- Action bar -->
       <div class="si-card-closebar">
         <button class="si-card-action-btn wpp" id="si-btn-msg" onclick="SI_sendMessage()">
