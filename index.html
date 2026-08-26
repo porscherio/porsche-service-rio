@@ -2805,7 +2805,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.9.0';
+const APP_VERSION = '5.10.0';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -4078,6 +4078,17 @@ function relRenderMenu() {
   if (!relCategorias) { el.innerHTML = '<div class="rel-vazio">Nada disponível.</div>'; return; }
 
   const h = [];
+
+  // v5.10.0 — entrada da prévia de capacidade. Fica no cliente porque o
+  // catálogo de relatórios é montado no servidor (relDados) e esta tela
+  // não é um relatório tabular como os outros. Sempre no topo: é a
+  // pergunta que o Aprovador faz antes de marcar qualquer entrega.
+  h.push('<div class="rel-cat">' +
+    '<div class="rel-cat-head" onclick="relAbrirRelatorio(\'capacidade_dia\')">' +
+      '<span class="rel-cat-nome">&#x1F527; Capacidade da oficina</span>' +
+      '<span class="rel-cat-chev">&#8250;</span>' +
+    '</div></div>');
+
   relCategorias.forEach((c, i) => {
     const aberta = relCatAberta === c.id;
     h.push('<div class="rel-cat">' +
@@ -4111,7 +4122,151 @@ function relToggleCat(id) {
   relRenderMenu();
 }
 
+/* ── PRÉVIA DE CAPACIDADE (v5.10.0) ────────────────────────────────
+   Quem faz o quê, por técnico, nos próximos dias úteis. Mesma
+   simulação que decide as datas de ENTREGA — se esta tela mostrasse
+   outra conta, o Aprovador veria técnico livre e ainda assim levaria
+   "não é possível", sem meio de reconciliar as duas coisas.
+
+   As horas do dia corrente são contra o turno QUE RESTA (às 15h20
+   sobram ~2,6h), não contra 8h: senão, de tarde, a oficina inteira
+   pareceria ociosa.                                                  */
+var capPrevDados = null;
+var capPrevDiaAtivo = 0;
+var capPrevAberto = {};   // "dia|técnico" -> expandido
+
+async function capPrevAbrir(dias) {
+  const el = document.getElementById('rel-conteudo');
+  document.getElementById('rel-titulo').textContent = 'Capacidade da oficina';
+  el.innerHTML = '<div class="loading-box"><div class="spinner"></div>' +
+                 '<div style="font-size:12px;color:#888">Simulando a fila\u2026</div></div>';
+  try {
+    const d = await (await fetch(API_URL + '?action=previsaoCapacidade&dias=' + (dias || 5))).json();
+    if (!d || !d.ok) {
+      el.innerHTML = '<div class="rel-vazio">' + escapeHtml((d && d.error) || 'falhou') + '</div>';
+      return;
+    }
+    capPrevDados = d; capPrevDiaAtivo = 0; capPrevAberto = {};
+    capPrevRender();
+  } catch (e) {
+    el.innerHTML = '<div class="rel-vazio">Não consegui carregar. Toque de novo.</div>';
+  }
+}
+
+function capPrevTrocarDia(i) { capPrevDiaAtivo = i; capPrevRender(); }
+
+function capPrevToggle(nome) {
+  const k = capPrevDiaAtivo + '|' + nome;
+  capPrevAberto[k] = !capPrevAberto[k];
+  capPrevRender();
+}
+
+function capPrevRender() {
+  const d = capPrevDados;
+  const dia = d.dias[capPrevDiaAtivo];
+  const h = [];
+
+  h.push('<div class="rel-filtro">');
+  d.dias.forEach((dd, i) => {
+    h.push('<button class="' + (i === capPrevDiaAtivo ? 'on' : '') + '" ' +
+           'onclick="capPrevTrocarDia(' + i + ')">' + escapeHtml(dd.rotulo) + '</button>');
+  });
+  h.push('</div>');
+
+  const pct = dia.capacidade_total > 0
+    ? Math.round((dia.alocado / dia.capacidade_total) * 100) : 0;
+  h.push('<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px">' +
+    capPrevTile('Capacidade', dia.capacidade_total + 'h', false) +
+    capPrevTile('Alocado', dia.alocado + 'h (' + pct + '%)', false) +
+    capPrevTile('Livre', dia.livre + 'h', dia.livre > 0.1) + '</div>');
+
+  h.push('<div style="font-size:11px;color:#888;margin-bottom:12px;line-height:1.5">' +
+    'Turno de ' + dia.turno_por_tecnico + 'h por técnico' +
+    (dia.eh_hoje ? ' (o que resta de hoje)' : '') + ' · ' +
+    d.ros_na_fila + ' ROs na fila, ' + dia.ros_com_trabalho + ' recebem trabalho neste dia' +
+    '</div>');
+
+  dia.tecnicos.forEach(t => {
+    const k = capPrevDiaAtivo + '|' + t.nome;
+    const aberto = !!capPrevAberto[k];
+    const fundo = t.livre ? 'background:var(--amber-bg);' : '';
+    const corH = t.livre ? 'var(--amber-text)' : 'var(--black)';
+
+    h.push('<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden">');
+    h.push('<div onclick="capPrevToggle(\'' + escapeHtml(t.nome).replace(/'/g, "\\'") + '\')" ' +
+      'style="' + fundo + 'display:flex;gap:10px;align-items:center;padding:9px 11px;cursor:pointer">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:13px;font-weight:500">' + escapeHtml(t.nome) +
+          (t.estetica ? ' <span style="font-size:10px;color:#888;font-weight:400">estética</span>' : '') + '</div>' +
+        '<div style="font-size:11px;color:' + (t.livre ? 'var(--amber-text)' : '#888') + ';margin-top:1px">' +
+          (t.livre ? 'sem trabalho alocado'
+                   : t.itens.length + ' jobline(s) · ' +
+                     escapeHtml(capPrevResumoRos(t.itens))) + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;white-space:nowrap">' +
+        '<div style="font-size:13px;color:' + corH + '">' + t.horas_alocadas + ' / ' + t.horas_turno + 'h</div>' +
+        '<div style="font-size:10px;color:#888">' +
+          (t.livre ? 'livre' : (t.horas_livres > 0.05 ? t.horas_livres + 'h livre' : 'cheio')) + '</div>' +
+      '</div>' +
+      '<span style="font-size:11px;color:#bbb">' + (aberto ? '&#9650;' : '&#9660;') + '</span>' +
+    '</div>');
+
+    if (aberto) {
+      h.push('<div style="border-top:1px solid var(--border);padding:2px 0">');
+      if (t.itens.length) {
+        t.itens.forEach(i => {
+          h.push('<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 11px;font-size:12px">' +
+            '<span style="flex:1;min-width:0"><b>RO ' + escapeHtml(String(i.ro)) + '</b> · ' +
+              escapeHtml(i.descricao) + (i.conclui ? ' <span style="color:var(--green-text)">conclui</span>' : '') + '</span>' +
+            '<span style="color:#888;white-space:nowrap">' + i.horas + 'h</span></div>');
+        });
+      }
+      // O motivo de estar livre é o ponto da tela: "livre" sozinho
+      // parece folga, quando quase sempre é jobline que ele não pode pegar.
+      if (t.motivo_livre) {
+        h.push('<div style="padding:8px 11px;font-size:11px;color:var(--amber-text);line-height:1.5">' +
+               'Por que está livre: ' + escapeHtml(t.motivo_livre) + '</div>');
+      }
+      h.push('</div>');
+    }
+    h.push('</div>');
+  });
+
+  const livres = dia.tecnicos.filter(t => t.livre);
+  if (livres.length) {
+    h.push('<div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:10px;' +
+      'font-size:11px;color:#555;line-height:1.55">' +
+      '<b>' + livres.length + ' técnico(s) sem trabalho</b> — toque no nome para ver o motivo. ' +
+      'Quase sempre não é folga: é que nenhuma jobline pendente pode ir para essa pessoa.' +
+      '</div>');
+  }
+
+  h.push('<div style="font-size:10px;color:#aaa;margin-top:12px;text-align:center">' +
+         'gerado em ' + escapeHtml(d.gerado_em) + '</div>');
+
+  document.getElementById('rel-conteudo').innerHTML = h.join('');
+}
+
+function capPrevTile(rot, val, alerta) {
+  return '<div style="background:' + (alerta ? 'var(--amber-bg)' : 'var(--bg)') +
+    ';border-radius:8px;padding:8px 9px">' +
+    '<div style="font-size:10px;color:' + (alerta ? 'var(--amber-text)' : '#888') + ';margin-bottom:2px">' + rot + '</div>' +
+    '<div style="font-size:16px;font-weight:600;color:' + (alerta ? 'var(--amber-text)' : 'var(--black)') + '">' + val + '</div></div>';
+}
+
+function capPrevResumoRos(itens) {
+  const ros = [];
+  itens.forEach(i => { if (ros.indexOf(i.ro) < 0) ros.push(i.ro); });
+  const txt = ros.slice(0, 2).map(r => 'RO ' + r).join(', ');
+  return ros.length > 2 ? (txt + ' +' + (ros.length - 2)) : txt;
+}
+
 async function relAbrirRelatorio(relId, dias, ord) {
+  // v5.10.0 — a prévia de capacidade não passa por relDados: o payload
+  // tem dias, técnicos e joblines aninhados, e a tabela genérica de
+  // relatórios é plana. Intercepta aqui e renderiza sozinha.
+  if (relId === 'capacidade_dia') return capPrevAbrir(dias || 5);
+
   const el = document.getElementById('rel-conteudo');
   el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
   try {
