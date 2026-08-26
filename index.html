@@ -1,5 +1,29 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.6.0 — Build: 2026-08-26 00:34 BRT -->
+<!-- Porsche Service Rio PWA — v5.7.0 — Build: 2026-08-26 01:05 BRT -->
+<!-- v5.7.0: DOIS BUGS, ambos reportados pelo Eytan.
+     (1) AVISO DE VERSAO AO CONTRARIO. checkAppVersion comparava com !==, ou
+     seja QUALQUER diferenca disparava o aviso — inclusive com o cliente mais
+     NOVO que o servidor. Depois da v5.5.0 o app anunciava a 5.4.2 do
+     LATEST_PWA_VERSION como "uma nova versao disponivel". Agora compara
+     campo a campo (cmpVersion_) e so avisa quando o servidor esta a frente.
+     ATENCAO: e preciso actualizar LATEST_PWA_VERSION no Code.gs para 5.7.0,
+     senao os aparelhos ficam a pensar que estao a frente do servidor — o que
+     agora e silencioso, mas continua errado.
+     (2) A PWA CAIA NO LOGIN AO VOLTAR DE OUTRO APP. currentTech vivia so em
+     memoria; quando o telemovel descarrega o processo — rotina no iOS mal se
+     abre o WhatsApp ou se atende uma chamada — a pagina recarregava do zero
+     e caia no s0, no meio do trabalho. Agora a sessao (tech + tela) persiste
+     em localStorage com TTL de 8h (um turno) e e retomada no arranque, pelo
+     MESMO caminho do login: o doLogin foi dividido em entrarApp_(), que os
+     dois usam, para nao existirem dois caminhos a divergir.
+     Sair continua a ser Sair: doLogout apaga a sessao.
+     Telas com estado vivo (camera, gravacao) NAO sao retomadas — voltam ao
+     s1. O s4 tambem nao: quem decide sobre o temporizador e o
+     checkForActiveLock, e nao vale a pena ter dois donos da mesma decisao.
+     O PAINEL DO SI VOLTA COMO ESTAVA — periodo, selecao e quem ja recebeu.
+     Sem isto a fila da v5.5.0 nao servia para nada no iOS: o ciclo dela E
+     sair para o WhatsApp e voltar, e cada envio custava um login. De brinde,
+     o "enviado" passa a sobreviver a um reload dentro do turno. -->
 <!-- v5.6.0: BOTAO "MSG + LINK" no card do SI, e opcao equivalente na fila.
      ADITIVO: MENSAGEM, PDF e AGENDAMENTO nao mudaram uma linha. O fluxo que
      esta funcionando continua igual — isto so acrescenta uma terceira
@@ -2656,7 +2680,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.6.0';
+const APP_VERSION = '5.7.0';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -2855,6 +2879,13 @@ async function doLogin() {
   const pin  = document.getElementById('inp-pin').value;
   if (!tech || USERS[tech] !== pin) { document.getElementById('login-err').style.display='flex'; return; }
   document.getElementById('login-err').style.display = 'none';
+  entrarApp_(tech, 's1');
+}
+
+// v5.7.0 — extraido do doLogin sem alterar nada do que ele fazia, para que a
+// retoma de sessao passe exatamente pelo mesmo caminho. A UNICA diferenca
+// entre entrar com PIN e retomar e o PIN: dali para a frente e o mesmo codigo.
+function entrarApp_(tech, tela) {
   currentTech = tech;
   const h = new Date().getHours();
   const saudacao = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
@@ -2874,7 +2905,8 @@ async function doLogin() {
   // again. The suggestion flow runs fully in the background and
   // surfaces itself as a popup over whatever screen the tech is
   // already looking at, instead of deciding what screen to show.
-  goTo('s1');
+  goTo(tela || 's1');
+  sesGravar_({ tela: tela || 's1' });
   loadROs();
   checkSuggestedTasksBackground(); // fire-and-forget — see below, never blocks login
   checkForActiveLock(); // v3.0.0 — pode abrir o modal de retomar/liberar por cima de s1
@@ -2953,6 +2985,7 @@ async function openSuggestedTasksScreen() {
 }
 
 function doLogout() {
+  sesLimpar_();   // v5.7.0 — Sair e Sair: nao retoma no proximo arranque
   currentTech=''; activeTask=null; activeRO=null;
   liveROs=[]; liveJoblines={}; approvalCache={}; partsSummaryCache={}; partsDetailCache={};
   isApproverTech=false;
@@ -2988,12 +3021,94 @@ function doLogout() {
   goTo('s0');
 }
 
+// v5.7.0 — arranque: tenta retomar a sessao antes de mostrar o login. Se nao
+// houver sessao valida, o s0 ja esta visivel por omissao (class="screen on")
+// e nada muda em relacao a antes.
+(function bootRetomarSessao_() {
+  const tentar = () => { try { sesRetomar_(); } catch (e) { console.warn('[sessao]', e); } };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tentar);
+  else tentar();
+})();
+
+// ── SESSAO QUE SOBREVIVE A TROCA DE APP (v5.7.0) ──────────────────
+// PROBLEMA: currentTech era so uma variavel em memoria. Quando o telemovel
+// descarrega o processo da PWA — o que acontece o tempo todo no iOS assim
+// que se abre o WhatsApp, atende uma chamada ou troca de app — a pagina
+// recarrega do zero e cai no s0. O utilizador voltava e estava na tela de
+// login, no meio do que estava a fazer.
+//
+// Isto mordia mais ainda a fila do SI (v5.5.0), cujo ciclo E sair para o
+// WhatsApp e voltar: cada envio custava um login novo.
+//
+// localStorage e nao sessionStorage: quando o iOS mata o processo, o
+// sessionStorage vai junto — que e exatamente o caso que precisamos cobrir.
+//
+// TTL DE 8 HORAS (um turno): retomar sem PIN e conveniencia para quem nao
+// largou o telemovel, nao "login permanente". Passado o turno, ou depois de
+// Sair, pede PIN outra vez. Quem quiser encurtar, e so mudar SES_TTL_MS.
+const SES_KEY = 'psr_sessao';
+const SES_TTL_MS = 8 * 60 * 60 * 1000;
+// Telas seguras para retomar. De fora ficam as que dependem de estado vivo
+// que o reload destruiu — camera, gravacao, e o s4, cujo temporizador ja tem
+// dono: o checkForActiveLock() decide se retoma ou liberta, e nao queremos
+// duas coisas a disputar isso.
+const SES_TELAS_OK = ['s1','s2','s3','s5','s-hist','s-rel','s-no-patio'];
+
+function sesGravar_(patch) {
+  if (!currentTech) return;
+  try {
+    const atual = sesLer_() || {};
+    localStorage.setItem(SES_KEY, JSON.stringify(
+      Object.assign({ tech: currentTech, tela: 's1' }, atual, patch || {}, { ts: Date.now() })));
+  } catch (e) { /* modo privado / quota — sessao simplesmente nao persiste */ }
+}
+
+function sesLer_() {
+  try {
+    const raw = localStorage.getItem(SES_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !d.tech || !d.ts || (Date.now() - d.ts) > SES_TTL_MS) return null;
+    if (typeof USERS === 'object' && USERS && !(d.tech in USERS)) return null; // tech removido
+    return d;
+  } catch (e) { return null; }
+}
+
+function sesLimpar_() { try { localStorage.removeItem(SES_KEY); } catch (e) {} }
+
+// Chamado no arranque, antes de qualquer coisa desenhar. Devolve true se
+// retomou — nesse caso o s0 nunca chega a aparecer.
+function sesRetomar_() {
+  const d = sesLer_();
+  if (!d) return false;
+  try {
+    entrarApp_(d.tech, SES_TELAS_OK.includes(d.tela) ? d.tela : 's1');
+    if (d.si) setTimeout(() => { try { SI_restoreState(d.si); } catch (e) {} }, 300);
+    return true;
+  } catch (e) {
+    console.warn('[sessao] falha ao retomar:', e);
+    sesLimpar_();
+    return false;
+  }
+}
+
+// Grava tarde e cedo: visibilitychange cobre a troca de app no Android,
+// pagehide cobre o iOS, que muitas vezes nao dispara mais nada antes de
+// congelar o processo.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') sesGravar_({ si: (typeof SI_captureState === 'function' ? SI_captureState() : null) });
+});
+window.addEventListener('pagehide', () => {
+  sesGravar_({ si: (typeof SI_captureState === 'function' ? SI_captureState() : null) });
+});
+
 // ── Navigation ────────────────────────────────────────────────────
 const SCREENS_WITH_TECH_BAR = ['s2','s3','s4','s5','s6p','s6c'];
 
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
+  if (id !== 's0') sesGravar_({ tela: id });   // v5.7.0
   const sbarTech = document.getElementById('sbar-tech');
   if (sbarTech) {
     if (SCREENS_WITH_TECH_BAR.includes(id)) {
@@ -3032,11 +3147,27 @@ function goTo(id) {
 // a one-time, dismissible warning. A network failure here is silently
 // ignored - not knowing whether an update exists is not worth bothering
 // the tech about on top of an already-flaky connection.
+// Compara "5.6.0" com "5.4.2" campo a campo: >0 se a for mais nova, <0 se
+// mais velha, 0 se iguais. Campo faltando conta como 0, entao "5.6" == "5.6.0".
+function cmpVersion_(a, b) {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
 async function checkAppVersion() {
   try {
     const res  = await fetch(API_URL + '?action=latestVersion');
     const data = await res.json();
-    if (data.latest_version && data.latest_version !== APP_VERSION) {
+    // v5.7.0 — era !== , ou seja QUALQUER diferenca disparava o aviso,
+    // inclusive com o cliente MAIS NOVO que o servidor. Depois da v5.5.0 o
+    // app dizia que a 5.4.2 do LATEST_PWA_VERSION era "uma nova versao".
+    // Agora compara de verdade e so avisa quando o servidor esta a frente.
+    if (data.latest_version && cmpVersion_(data.latest_version, APP_VERSION) > 0) {
       document.getElementById('version-warning-text').textContent =
         'Uma nova versão do aplicativo está disponível (' + data.latest_version + ' - você está usando ' + APP_VERSION + '). ' +
         'Peça para o administrador atualizar o dispositivo quando possível.';
@@ -8473,7 +8604,60 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     // envio, então "enviado" aqui quer dizer "conversa aberta e texto pronto".
     // Vale de proteção contra mandar duas vezes, não de comprovativo.
     siSent.add(v.placa);
+    // v5.7.0 — grava JA, sem esperar pelo pagehide: o window.open pode
+    // congelar a aba antes de qualquer evento de ciclo de vida disparar.
+    if (typeof sesGravar_ === 'function') sesGravar_({ si: SI_captureState() });
     SI_renderList();
+  };
+
+  // v5.7.0 — captura/retoma do painel. O ciclo da fila E sair para o
+  // WhatsApp e voltar, entao sem isto cada envio perdia o periodo escolhido,
+  // a selecao e a marca de quem ja recebeu — e a fila nao servia para nada.
+  // Bonus: "enviado" passa a sobreviver a um reload dentro do turno, o que
+  // era a ressalva da v5.5.0.
+  window.SI_captureState = function () {
+    const painel = document.getElementById('si-panel');
+    if (!painel || !painel.classList.contains('si-open')) return null;
+    return {
+      filtro: siFilter,
+      range:  siRange,
+      opts:   siOpts,
+      sel:    [...siSel],
+      sent:   [...siSent],
+      preset: (document.querySelector('.si-range-preset.active') || {}).dataset?.preset || null,
+      ini:    (document.getElementById('si-range-ini') || {}).value || '',
+      fim:    (document.getElementById('si-range-fim') || {}).value || '',
+    };
+  };
+
+  window.SI_restoreState = function (st) {
+    if (!st) return;
+    SI_openPanel();
+    siFilter = st.filtro || 'ALL';
+    siRange  = st.range  || null;
+    if (st.opts) siOpts = Object.assign(siOpts, st.opts);
+    siSel.clear();  (st.sel  || []).forEach(p => siSel.add(p));
+    siSent.clear(); (st.sent || []).forEach(p => siSent.add(p));
+
+    document.querySelectorAll('.si-filter-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.filter === siFilter));
+    document.getElementById('si-range-bar').classList.toggle('on', siFilter === 'PERIODO');
+    if (st.preset) {
+      document.querySelectorAll('.si-range-preset').forEach(b =>
+        b.classList.toggle('active', b.dataset.preset === st.preset));
+      document.getElementById('si-range-dates').classList.toggle('on', st.preset === 'CUSTOM');
+    }
+    if (st.ini) document.getElementById('si-range-ini').value = st.ini;
+    if (st.fim) document.getElementById('si-range-fim').value = st.fim;
+
+    document.querySelectorAll('.si-range-opt input').forEach((el, i) => {
+      const chaves = ['vencidos', 'comFone', 'comLink'];
+      if (chaves[i]) el.checked = !!siOpts[chaves[i]];
+    });
+
+    // Os cards podem ainda nao ter chegado do servidor; SI_loadCards chama
+    // SI_renderList no fim, entao a lista desenha certa nos dois casos.
+    if (siCards.length) SI_renderList(); else SI_loadCards();
   };
 
   window.SI_queueSkip = function () {
