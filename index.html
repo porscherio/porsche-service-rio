@@ -2805,7 +2805,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.1';
+const APP_VERSION = '5.10.2';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -4244,10 +4244,21 @@ function capPrevRender() {
       h.push('<div style="border-top:1px solid var(--border);padding:2px 0">');
       if (t.itens.length) {
         t.itens.forEach(i => {
-          h.push('<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 11px;font-size:12px">' +
-            '<span style="flex:1;min-width:0"><b>RO ' + escapeHtml(String(i.ro)) + '</b> · ' +
-              escapeHtml(i.descricao) + (i.conclui ? ' <span style="color:var(--green-text)">conclui</span>' : '') + '</span>' +
-            '<span style="color:#888;white-space:nowrap">' + i.horas + 'h</span></div>');
+          // v5.10.2 — placa e cliente na linha de cima. Número de RO
+          // sozinho não identifica o carro para quem está no balcão.
+          const ident = [];
+          if (i.placa)   ident.push(escapeHtml(i.placa));
+          if (i.cliente) ident.push(escapeHtml(i.cliente));
+          h.push('<div style="padding:7px 11px;font-size:12px">' +
+            '<div style="display:flex;justify-content:space-between;gap:8px">' +
+              '<span style="flex:1;min-width:0"><b>RO ' + escapeHtml(String(i.ro)) + '</b>' +
+                (ident.length ? ' <span style="color:#666">· ' + ident.join(' · ') + '</span>' : '') +
+              '</span>' +
+              '<span style="color:#888;white-space:nowrap">' + i.horas + 'h</span>' +
+            '</div>' +
+            '<div style="color:#888;margin-top:1px;font-size:11px">' + escapeHtml(i.descricao) +
+              (i.conclui ? ' <span style="color:var(--green-text)">conclui</span>' : '') + '</div>' +
+          '</div>');
         });
       }
       // O motivo de estar livre é o ponto da tela: "livre" sozinho
@@ -4284,10 +4295,17 @@ function capPrevTile(rot, val, alerta) {
 }
 
 function capPrevResumoRos(itens) {
-  const ros = [];
-  itens.forEach(i => { if (ros.indexOf(i.ro) < 0) ros.push(i.ro); });
-  const txt = ros.slice(0, 2).map(r => 'RO ' + r).join(', ');
-  return ros.length > 2 ? (txt + ' +' + (ros.length - 2)) : txt;
+  // Linha fechada: RO + placa, que é como o Aprovador reconhece o carro
+  // de relance. O nome do cliente só aparece ao expandir — não cabe aqui
+  // sem truncar tudo no celular.
+  const vistos = [], out = [];
+  itens.forEach(i => {
+    if (vistos.indexOf(i.ro) >= 0) return;
+    vistos.push(i.ro);
+    out.push('RO ' + i.ro + (i.placa ? ' ' + i.placa : ''));
+  });
+  const txt = out.slice(0, 2).join(', ');
+  return out.length > 2 ? (txt + ' +' + (out.length - 2)) : txt;
 }
 
 async function relAbrirRelatorio(relId, dias, ord) {
