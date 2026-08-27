@@ -952,6 +952,12 @@ input:focus{outline:none;border-color:var(--black)}
 /* v5.4.1 — as duas acoes da fila SERVICOS, visualmente distintas.
    Antes as duas usavam .chegada-chip-off (branco/cinza) e so o texto
    diferenciava, num alvo de toque de 9px. */
+/* v5.10.5 — pill Editar. Neutra de proposito: nao e uma acao de
+   estado como Confirmar/Nao compareceu, e sim a porta para o detalhe. */
+.chip-editar{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:10px;
+  background:#eef2f7;color:#475569;font-size:10px;font-weight:700;cursor:pointer;
+  border:1px solid #dbe3ec;vertical-align:middle}
+.chip-editar:active{background:#dbe3ec}
 .chip-chegada-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#dceeff;color:#12507f;border:1px solid #9fcbec;cursor:pointer}
 .chip-noshow-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#ffdcdc;color:#8f2020;border:1px solid #eca0a0;cursor:pointer}
 .chegada-chip-off{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;margin-left:6px;white-space:nowrap;vertical-align:middle;background:#fff;color:#888;border:1px solid var(--border);cursor:pointer}
@@ -2805,7 +2811,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.2';
+const APP_VERSION = '5.10.5';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -6900,11 +6906,19 @@ function agdRenderList(events) {
       }
     }
 
+    // v5.10.5 — pill EDITAR explicita. O card inteiro sempre abriu o
+    // detalhe (onde ficam editar, reagendar e cancelar), mas nada dizia
+    // isso: quem procurava como apagar um agendamento duplicado nao
+    // achava, porque a unica coisa com cara de botao era "Confirmar".
+    // Fica em SERVICOS e ENTREGA — cancelar um agendamento errado
+    // precisa ser possivel nos dois.
+    const editChip = '<span class="chip-editar" data-editar-evt-id="' + escapeHtml(ev.id) + '">&#x270F;&#xFE0F; Editar</span>';
+
     return (
       '<div class="card" data-evt-id="' + escapeHtml(ev.id) + '" style="cursor:pointer">' +
         '<div class="crow">' +
           '<div>' +
-            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + noShowChip + entregueChip + edocReentryIcon + '</div>' +
+            '<div class="cro">RO #' + escapeHtml(ev.ro_number) + linkWarning + chegadaChip + noShowChip + entregueChip + edocReentryIcon + editChip + '</div>' +
             '<div class="cjob">' + dateLbl + ' às ' + timeLbl + '</div>' +
             '<div class="cdesc">' + escapeHtml(ev.title) + '</div>' +
           '</div>' +
@@ -6919,7 +6933,17 @@ function agdRenderList(events) {
       if (clickEvent.target.closest('[data-noshow-evt-id]')) return;   // no-show chip handles its own click
       if (clickEvent.target.closest('[data-entrega-evt-id]')) return;  // entregue chip handles its own click
       if (clickEvent.target.closest('[data-edoc-reentry-ro]')) return; // re-entry icon handles its own click
+      if (clickEvent.target.closest('[data-editar-evt-id]')) return;   // pill Editar tem o proprio handler
       const ev = events.find(e => e.id === card.dataset.evtId);
+      if (ev) agdOpenEventDetail(ev);
+    });
+  });
+  // Abre o mesmo detalhe do clique no card — a pill existe para dizer
+  // que ele existe, nao para fazer outra coisa.
+  el.querySelectorAll('[data-editar-evt-id]').forEach(chip => {
+    chip.addEventListener('click', (clickEvent) => {
+      clickEvent.stopPropagation();
+      const ev = events.find(e => e.id === chip.dataset.editarEvtId);
       if (ev) agdOpenEventDetail(ev);
     });
   });
@@ -7726,6 +7750,41 @@ function agdDataBr(iso) {
   return (p.length === 3) ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso);
 }
 
+// v5.10.4 — reagenda o evento que já existe, em vez de criar outro.
+// Usa updateAgendamento, que desde o Code.gs v4.10.12 passa pelo portão
+// de capacidade e avisa o cliente — as duas coisas que faltavam e que
+// tornavam "criar de novo" o caminho mais atraente.
+function agdReagendarExistente(eventId, calendario) {
+  const btn = document.getElementById('agd-c-confirm-btn');
+  const rot = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.classList.add('btn-pending'); btn.innerHTML = 'Reagendando…'; }
+
+  const body = {
+    action:   'updateAgendamento',
+    tech:     currentTech,
+    calendar: calendario,
+    event_id: eventId,
+    start:    agdCreateSlot.start,
+    end:      agdCreateSlot.end,
+    ro_number: agdEntregaGateRO || document.getElementById('agd-c-f-ro').value.trim()
+  };
+
+  fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(body) })
+    .then(() => {
+      // POST no-cors: resposta opaca, não dá para confirmar de verdade.
+      // A tela de gestão do agendamento mostra a data efetiva.
+      if (btn) { btn.disabled = false; btn.classList.remove('btn-pending'); btn.innerHTML = rot; }
+      showToast('Reagendado. O cliente foi avisado da nova data.');
+      agdCapacidadeJaConferida = false;
+      agdForcarCapacidade = false;
+      agdGoStep1();
+    })
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.classList.remove('btn-pending'); btn.innerHTML = rot; }
+      showToast('Falha ao reagendar.');
+    });
+}
+
 function agdConfirmCreate() {
   if (!agdCreateSlot) { showToast('Selecione um horário primeiro.'); return; }
 
@@ -7745,6 +7804,29 @@ function agdConfirmCreate() {
 
       // Sem resposta legível (rede, rota ausente, erro): segue em frente.
       // O portão do servidor ainda barra o que precisa ser barrado.
+      // v5.10.3 — o servidor recusa criar uma segunda ENTREGA para a
+      // mesma RO (Code.gs v4.10.11). Aqui a recusa vira uma escolha:
+      // reagendar o evento que existe, ou desistir. Antes dessa guarda
+      // dava para acabar com dois eventos, como na RO 30040.
+      // v5.10.4 — o servidor recusa criar um segundo evento do mesmo
+      // tipo para a RO (Code.gs v4.10.12). Em vez de mandar o Aprovador
+      // procurar outra tela, oferece REAGENDAR o que existe ali mesmo:
+      // mandar procurar é o que fazia todo mundo criar um segundo
+      // evento, como na RO 30040.
+      if (res && res.error === 'agendamento_ja_existe' && res.agendamento_atual) {
+        const at = res.agendamento_atual;
+        const tipo = (res.calendario === 'entrega') ? 'ENTREGA' : 'SERVIÇO';
+        const ok = confirm(
+          'Esta RO já tem ' + tipo + ' marcado para ' + agdDataBr(at.data) + ' às ' + at.hora + '.' +
+          '\n\nDeseja REAGENDAR esse evento para ' +
+          agdDataBr(String(agdCreateSlot.start).slice(0,10)) + ' às ' +
+          String(agdCreateSlot.start).slice(11,16) + '?' +
+          '\n\nO cliente recebe a confirmação da nova data por WhatsApp.' +
+          '\n\nCancelar mantém a data atual.');
+        if (ok) agdReagendarExistente(at.event_id, res.calendario);
+        return;
+      }
+
       if (!res || !res.ok || !res.viabilidade) { agdSeguirCriacao(false); return; }
 
       const v = res.viabilidade;
