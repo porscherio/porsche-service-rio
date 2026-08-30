@@ -1100,6 +1100,19 @@ input:focus{outline:none;border-color:var(--black)}
 .pls-flag-eta{background:var(--bg);color:#666}
 .pls-nome{font-size:12px;color:#444;margin-top:9px;line-height:1.35}
 .pls-load{font-size:12px;color:#aaa;text-align:center;padding:10px 0}
+/* v5.10.7 — o "a carregar" do estoque agora e preto piscando, nao cinza:
+   cinza le-se como texto desativado e o Eytan concluiu que nada estava
+   a acontecer. Mesmo tratamento das pills em processamento (v5.2.0). */
+.pls-load-live{display:block;text-align:center;margin-top:14px;padding:10px;border-radius:8px;
+  background:var(--black);color:#fff;font-size:11.5px;font-weight:700;letter-spacing:.06em;
+  animation:pls-blink 1.1s ease-in-out infinite}
+@keyframes pls-blink{0%,100%{opacity:1}50%{opacity:.45}}
+.pls-acoes{display:flex;gap:8px;margin-top:12px}
+.pls-btn{flex:1;padding:10px 8px;border:none;border-radius:6px;font-size:12px;font-weight:700;
+  letter-spacing:.03em;cursor:pointer;text-align:center;text-decoration:none;display:block}
+.pls-btn-loja{background:var(--black);color:#fff}
+.pls-btn-zap{background:#25D366;color:#fff}
+.pls-preco{font-size:15px;font-weight:700;color:var(--black);margin-top:9px}
 
 /* ── SERVICE INTELLIGENCE · v4.0.0 ── */
 /* ── SI Panel overlay ─────────────────────────────────────────────────────── */
@@ -2827,7 +2840,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.6';
+const APP_VERSION = '5.10.7';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -10336,7 +10349,7 @@ function Polaris_search() {
   const btn = document.getElementById('polaris-search-btn');
   const status = document.getElementById('polaris-status');
   btn.disabled = true;
-  status.textContent = 'Buscando…';
+  Polaris_tick(status, 'Buscando');
   document.getElementById('polaris-result').innerHTML = '';
   polarisLastRec = null;
 
@@ -10344,13 +10357,31 @@ function Polaris_search() {
     .then(r => r.json())
     .then(Polaris_render)
     .catch(e => {
+      Polaris_tickStop();
       btn.disabled = false;
       status.textContent = 'Erro na busca.';
       console.warn('polarisSearch failed', e);
     });
 }
 
+// v5.10.7 — contador de segundos durante a busca. Uma peca ausente da
+// lista cai no TextFinder e leva ~5s; sem contador a tela fica parada
+// e parece travada. Ver o numero subir e a prova de que esta a correr.
+let polarisTickTimer = null;
+function Polaris_tick(el, rotulo) {
+  Polaris_tickStop();
+  const t0 = Date.now();
+  el.textContent = rotulo + '… 0s';
+  polarisTickTimer = setInterval(function () {
+    el.textContent = rotulo + '… ' + Math.round((Date.now() - t0) / 1000) + 's';
+  }, 1000);
+}
+function Polaris_tickStop() {
+  if (polarisTickTimer) { clearInterval(polarisTickTimer); polarisTickTimer = null; }
+}
+
 function Polaris_render(res) {
+  Polaris_tickStop();
   document.getElementById('polaris-search-btn').disabled = false;
   const status = document.getElementById('polaris-status');
   const out = document.getElementById('polaris-result');
@@ -10431,20 +10462,28 @@ function Polaris_lifestyle(part) {
   if (!el) return;
   if (!part || part.trim().toUpperCase().indexOf('WAP') !== 0) return;
 
-  el.innerHTML = '<div class="pls-load">Consultando estoque Lifestyle…</div>';
+  el.innerHTML = '<div class="pls-load-live" id="pls-load">CONSULTANDO ESTOQUE LIFESTYLE… 0s</div>';
+  Polaris_tick(document.getElementById('pls-load'), 'CONSULTANDO ESTOQUE LIFESTYLE');
 
   fetch(API_URL + '?action=polarisLifestyle&sku=' + encodeURIComponent(part) +
         '&tech=' + encodeURIComponent(currentTech))
     .then(r => r.json())
     .then(function (d) {
+      Polaris_tickStop();
       if (!d || !d.ok || !d.aplicavel) { el.innerHTML = ''; return; }
+      polarisLastLs = d;
       el.innerHTML = Polaris_lifestyleHtml(d);
     })
     .catch(function (e) {
+      Polaris_tickStop();
       el.innerHTML = '<div class="pls-load">Estoque Lifestyle indisponível.</div>';
       console.warn('polarisLifestyle failed', e);
     });
 }
+
+// Guardado para os botoes da Loja Integrada, que sao clicados depois
+// de a resposta ja ter sido desenhada.
+let polarisLastLs = null;
 
 // A tarja INDISPONÍVEL aparece MESMO havendo peça no RJ, e é de
 // propósito: as duas coisas não se contradizem — o RJ é o que está na
@@ -10474,6 +10513,19 @@ function Polaris_lifestyleHtml(d) {
     flags += '<span class="pls-flag pls-flag-eta">' + escapeHtml(d.eta) + '</span>';
   }
 
+  const preco = d.precoCheio != null
+    ? '<div class="pls-preco">' + Polaris_brl(d.precoCheio) + '</div>' : '';
+
+  // Botoes so quando o SKU e produto de verdade: sem linha em
+  // estoque_atual nao ha pagina na Loja Integrada para abrir.
+  const acoes = (d.cadastrado && d.urlLoja)
+    ? '<div class="pls-acoes">' +
+        '<a class="pls-btn pls-btn-loja" href="' + escapeHtml(d.urlLoja) +
+          '" target="_blank" rel="noopener">VER NA LOJA</a>' +
+        '<button class="pls-btn pls-btn-zap" onclick="Polaris_lsWhatsApp()">ENVIAR LINK</button>' +
+      '</div>'
+    : '';
+
   return '<div class="pls-box">' +
            '<div class="pls-head">ESTOQUE LIFESTYLE</div>' +
            '<div class="pls-grid">' +
@@ -10484,7 +10536,34 @@ function Polaris_lifestyleHtml(d) {
            '</div>' +
            (flags ? '<div class="pls-flags">' + flags + '</div>' : '') +
            (d.nome ? '<div class="pls-nome">' + escapeHtml(d.nome) + '</div>' : '') +
+           preco +
+           acoes +
          '</div>';
+}
+
+// v5.10.7 — manda o link da Loja Integrada ao cliente para ele comprar
+// direto. O telefone e digitado na hora: quem consulta o POLARIS esta
+// ao telefone com o cliente, e nao ha cadastro dele aqui.
+// Reaproveita telefoneDigitos() (poe o 55 quando falta).
+function Polaris_lsWhatsApp() {
+  const d = polarisLastLs;
+  if (!d || !d.urlLoja) return;
+
+  const bruto = prompt('Telefone do cliente (com DDD):');
+  if (bruto === null) return;
+  const num = telefoneDigitos(bruto);
+  if (num.length < 12) {
+    alert('Número incompleto. Use DDD + número, ex.: 21994494183');
+    return;
+  }
+
+  const linhas = ['Olá! Segue o produto que vimos:', ''];
+  linhas.push(d.nome || d.sku);
+  if (d.precoCheio != null) linhas.push(Polaris_brl(d.precoCheio));
+  linhas.push('', d.urlLoja);
+  if (d.rj > 0) linhas.push('', 'Temos ' + d.rj + ' em estoque aqui no Rio.');
+
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(linhas.join('\n')), '_blank');
 }
 
 // Show the "Recalcular" button whenever a factor is edited, instead of
