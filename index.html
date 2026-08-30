@@ -2840,7 +2840,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.7';
+const APP_VERSION = '5.10.8';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -10563,9 +10563,30 @@ function Polaris_lsWhatsApp() {
   linhas.push('', d.urlLoja);
   if (d.rj > 0) linhas.push('', 'Temos ' + d.rj + ' em estoque aqui no Rio.');
 
-  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(linhas.join('\n')), '_blank');
+  Polaris_abrirWhatsApp_(num, linhas.join('\n'));
 }
 
+// v5.10.8 — no telemovel, abrir o wa.me numa aba nova entrega o link ao
+// NAVEGADOR, que cai no WhatsApp Web em vez de abrir o app. O esquema
+// whatsapp:// na propria aba chama o app direto. No desktop continua o
+// wa.me em aba nova, que e o que funciona la.
+function Polaris_abrirWhatsApp_(num, texto) {
+  const t = encodeURIComponent(texto);
+  const url = 'https://wa.me/' + num + '?text=' + t;
+  const movel = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+
+  if (!movel) { window.open(url, '_blank'); return; }
+
+  // Se o app abrir, a pagina fica escondida — e a rede de seguranca
+  // abaixo nao dispara. Se nao houver app instalado, nada acontece e o
+  // wa.me entra como alternativa, em vez de o botao morrer em silencio.
+  const t0 = Date.now();
+  setTimeout(function () {
+    if (!document.hidden && Date.now() - t0 < 2500) window.location.href = url;
+  }, 1500);
+
+  window.location.href = 'whatsapp://send?phone=' + num + '&text=' + t;
+}
 // Show the "Recalcular" button whenever a factor is edited, instead of
 // recalculating on every keystroke — Eytan wants an explicit action so
 // the displayed sale price doesn't silently drift while typing a new
