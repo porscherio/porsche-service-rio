@@ -1084,6 +1084,22 @@ input:focus{outline:none;border-color:var(--black)}
 .polaris-sale{margin-top:16px;background:var(--red);color:#fff;border-radius:8px;padding:14px;text-align:center}
 .polaris-sale-label{font-size:10.5px;letter-spacing:.05em;opacity:.85}
 .polaris-sale-value{font-size:26px;font-weight:800;margin-top:3px}
+/* Estoque Lifestyle no card do POLARIS (só SKU WAP) — v5.10.6 */
+.pls-box{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.pls-head{font-size:11px;font-weight:700;letter-spacing:.12em;color:#888;margin-bottom:10px}
+.pls-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pls-cell{background:var(--bg);border-radius:6px;padding:8px 4px;text-align:center}
+.pls-cell.has{background:#e8f5e9}
+.pls-qtd{font-size:18px;font-weight:700;color:var(--black);line-height:1.1}
+.pls-cell.has .pls-qtd{color:#1b5e20}
+.pls-lbl{font-size:9.5px;font-weight:700;letter-spacing:.08em;color:#888;margin-top:3px}
+.pls-flags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pls-flag{font-size:10.5px;font-weight:700;letter-spacing:.06em;border-radius:20px;padding:4px 10px}
+.pls-flag-indisp{background:var(--danger-bg);color:var(--danger-text)}
+.pls-flag-novo{background:var(--amber-bg);color:var(--amber-text)}
+.pls-flag-eta{background:var(--bg);color:#666}
+.pls-nome{font-size:12px;color:#444;margin-top:9px;line-height:1.35}
+.pls-load{font-size:12px;color:#aaa;text-align:center;padding:10px 0}
 
 /* ── SERVICE INTELLIGENCE · v4.0.0 ── */
 /* ── SI Panel overlay ─────────────────────────────────────────────────────── */
@@ -2811,7 +2827,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.5';
+const APP_VERSION = '5.10.6';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -10398,9 +10414,77 @@ function Polaris_render(res) {
         Polaris_row('Data preço', r.price_date || '—') +
       '</table>' +
       '<div id="polaris-sale"></div>' +
+      '<div id="polaris-lifestyle"></div>' +
     '</div>';
   Polaris_recalc();
   document.getElementById('polaris-recalc-btn').style.display = 'none';
+  Polaris_lifestyle(r.part);
+}
+
+// v5.10.6 — Estoque Lifestyle (só SKU WAP). Chamada SEPARADA do
+// polarisSearch de propósito: aquele resultado fica 6h em cache, e
+// estoque não pode. A quantidade do RJ muda quando alguém conta as
+// peças; PBR/PAG mudam a cada importação do PDS. Aqui o cache é de
+// 5 min, só para não repetir a consulta na mesma busca.
+function Polaris_lifestyle(part) {
+  const el = document.getElementById('polaris-lifestyle');
+  if (!el) return;
+  if (!part || part.trim().toUpperCase().indexOf('WAP') !== 0) return;
+
+  el.innerHTML = '<div class="pls-load">Consultando estoque Lifestyle…</div>';
+
+  fetch(API_URL + '?action=polarisLifestyle&sku=' + encodeURIComponent(part) +
+        '&tech=' + encodeURIComponent(currentTech))
+    .then(r => r.json())
+    .then(function (d) {
+      if (!d || !d.ok || !d.aplicavel) { el.innerHTML = ''; return; }
+      el.innerHTML = Polaris_lifestyleHtml(d);
+    })
+    .catch(function (e) {
+      el.innerHTML = '<div class="pls-load">Estoque Lifestyle indisponível.</div>';
+      console.warn('polarisLifestyle failed', e);
+    });
+}
+
+// A tarja INDISPONÍVEL aparece MESMO havendo peça no RJ, e é de
+// propósito: as duas coisas não se contradizem — o RJ é o que está na
+// prateleira, o indisponível é o abastecimento da PAG. Junto, dizem a
+// única coisa que importa na hora de vender: só dá para vender o que
+// está aqui, porque não vem reposição.
+function Polaris_lifestyleHtml(d) {
+  const cell = function (qtd, rotulo) {
+    return '<div class="pls-cell' + (qtd > 0 ? ' has' : '') + '">' +
+             '<div class="pls-qtd">' + qtd + '</div>' +
+             '<div class="pls-lbl">' + rotulo + '</div>' +
+           '</div>';
+  };
+
+  let flags = '';
+  if (!d.cadastrado) {
+    flags += '<span class="pls-flag pls-flag-novo">' +
+             (d.novo ? 'NOVOS — pendente de cadastro' : 'sem produto cadastrado') +
+             '</span>';
+  }
+  if (d.indisponivel) {
+    flags += '<span class="pls-flag pls-flag-indisp">INDISPONÍVEL</span>';
+  }
+  if (d.aguardando > 0 && d.etaAguardando) {
+    flags += '<span class="pls-flag pls-flag-eta">ETA ' + escapeHtml(d.etaAguardando) + '</span>';
+  } else if (d.eta) {
+    flags += '<span class="pls-flag pls-flag-eta">' + escapeHtml(d.eta) + '</span>';
+  }
+
+  return '<div class="pls-box">' +
+           '<div class="pls-head">ESTOQUE LIFESTYLE</div>' +
+           '<div class="pls-grid">' +
+             cell(d.rj, 'RJ') +
+             cell(d.pbr, 'PBR') +
+             cell(d.pag, 'PAG') +
+             cell(d.aguardando, 'AGUARD') +
+           '</div>' +
+           (flags ? '<div class="pls-flags">' + flags + '</div>' : '') +
+           (d.nome ? '<div class="pls-nome">' + escapeHtml(d.nome) + '</div>' : '') +
+         '</div>';
 }
 
 // Show the "Recalcular" button whenever a factor is edited, instead of
