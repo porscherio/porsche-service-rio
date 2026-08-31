@@ -1113,6 +1113,9 @@ input:focus{outline:none;border-color:var(--black)}
 .pls-btn-loja{background:var(--black);color:#fff}
 .pls-btn-zap{background:#25D366;color:#fff}
 .pls-preco{font-size:15px;font-weight:700;color:var(--black);margin-top:9px}
+/* v5.11.0 — marca as pecas em que o custo mostrado veio do cost_alt */
+.pol-alt{font-size:9.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--black);
+  border-radius:10px;padding:2px 7px;margin-left:6px;vertical-align:middle}
 
 /* ── SERVICE INTELLIGENCE · v4.0.0 ── */
 /* ── SI Panel overlay ─────────────────────────────────────────────────────── */
@@ -2840,7 +2843,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.9';
+const APP_VERSION = '5.11.0';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -10438,9 +10441,11 @@ function Polaris_render(res) {
       '<div class="polaris-part">' + escapeHtml(r.part) + '</div>' +
       '<div class="polaris-desc">' + descLine + '</div>' +
       '<table class="polaris-tbl">' +
-        Polaris_row('Custo', Polaris_brl(r.cost)) +
+        Polaris_row('Custo', Polaris_brl(r.cost) +
+          (r.cost_alt_usado ? ' <span class="pol-alt">c/ imposto</span>' : '')) +
+        (r.cost_alt_usado
+          ? Polaris_row('Custo s/ imposto', Polaris_brl(r.cost_base)) : '') +
         Polaris_row('MSRP', Polaris_brl(r.msrp)) +
-        Polaris_row('NCM', r.ncm || '—') +
         Polaris_row('Categoria', r.category || '—') +
         Polaris_row('Data preço', r.price_date || '—') +
       '</table>' +
