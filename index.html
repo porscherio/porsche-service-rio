@@ -1,5 +1,18 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.8 — Build: 2026-09-06 02:22 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.9 — Build: 2026-09-06 02:47 BRT -->
+<!-- v5.10.9: FILTRO DE ENTREGUES NA LISTA DE ORDENS, so para Aprovador.
+     O Aprovador ve todas as ROs e a lista so cresce; as entregues ficam
+     na lista pela janela de 48h de reversao e afogam as abertas.
+     Caixa "Mostrar tambem as entregues", desmarcada por omissao — o
+     estado normal passa a ser a lista limpa, que e o problema a
+     resolver. A contagem ao lado diz quantas estao ocultas, para o
+     filtro nao parecer perda de dados.
+     Filtra dentro do renderROList, que e por onde passam TANTO o
+     carregamento como a busca — um ponto so, sem duplicar regra.
+     Escolha guardada no localStorage: quem limpou a lista hoje quer
+     amanha limpa tambem.
+     NAO MEXE NO TECNICO: roFiltrarEntregues devolve a lista intacta se
+     nao for Aprovador. -->
 <!-- v5.10.8: "Procurando boletins" passa a pulsar. A primeira busca de
      cada modelo/ano leva 5-8 s (duas chamadas a NHTSA mais o ranking) e
      um texto parado nesse tempo parece app travado — o tecnico toca de
@@ -1901,6 +1914,18 @@ input:focus{outline:none;border-color:var(--black)}
         <button id="ro-search-clear" onclick="clearROSearch()" style="display:none;background:none;border:none;font-size:16px;color:#aaa;cursor:pointer;padding:0">&#x2715;</button>
       </div>
     </div>
+    <!-- v5.10.9 — filtro de entregues, so para Aprovador. O Aprovador ve
+         TODAS as ROs e a lista so cresce; as entregues ficam la pela
+         janela de 48h de reversao e afogam as abertas. Escondido para
+         tecnico, que nao tem esse problema. Mesmo padrao de exibicao dos
+         botoes do cabecalho: display none ate o isApprover responder. -->
+    <div id="ro-entregue-row" style="display:none;padding:7px 16px;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
+      <label for="ro-mostrar-entregues" style="font-size:12px;color:var(--black);display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="ro-mostrar-entregues" onchange="roToggleEntregues()" style="width:17px;height:17px;accent-color:var(--black);cursor:pointer">
+        <span>Mostrar tamb&#xE9;m as entregues</span>
+        <span id="ro-entregue-cnt" style="margin-left:auto;font-size:11px;color:var(--muted)"></span>
+      </label>
+    </div>
     <div class="scroll" id="ro-list-content">
       <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
     </div>
@@ -2903,7 +2928,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.8';
+const APP_VERSION = '5.10.9';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3713,11 +3738,58 @@ function filterAndRenderROList(q) {
     return;
   }
   renderROList(filtered);
-  document.getElementById('t1-sub').textContent = filtered.length+' resultado(s) para "'+q+'"';
+  // v5.10.9 — conta o que ficou VISIVEL, nao o que casou com a busca.
+  document.getElementById('t1-sub').textContent =
+    roFiltrarEntregues(filtered).length+' resultado(s) para "'+q+'"';
+}
+
+// ── v5.10.9 — FILTRO DE ENTREGUES (Aprovador) ─────────────────────
+// So afeta o Aprovador. O tecnico nunca teve o problema e o
+// comportamento dele fica exatamente como estava.
+// Estado guardado no aparelho: quem desliga as entregues quer a lista
+// limpa amanha tambem, nao so nesta sessao.
+const RO_KEY_ENTREGUES = 'psr_mostrar_entregues';
+
+function roMostrarEntregues() {
+  return localStorage.getItem(RO_KEY_ENTREGUES) === '1';
+}
+
+function roFiltrarEntregues(lista) {
+  if (!isApproverTech) return lista;
+  if (roMostrarEntregues()) return lista;
+  return lista.filter(r => !r.entregue);
+}
+
+function roToggleEntregues() {
+  const cb = document.getElementById('ro-mostrar-entregues');
+  localStorage.setItem(RO_KEY_ENTREGUES, cb && cb.checked ? '1' : '0');
+  // Redesenha respeitando a busca em curso, senao alternar o filtro
+  // apagaria o texto que o Aprovador acabou de digitar.
+  const q = (document.getElementById('ro-search').value || '').trim();
+  if (q) filterAndRenderROList(q); else renderROList(liveROs);
+}
+
+// Chamado quando o isApprover responde. Antes disso a linha fica
+// escondida, para o tecnico nunca a ver piscar.
+function roMostrarLinhaEntregues() {
+  const row = document.getElementById('ro-entregue-row');
+  const cb  = document.getElementById('ro-mostrar-entregues');
+  if (!row || !cb) return;
+  row.style.display = isApproverTech ? 'block' : 'none';
+  cb.checked = roMostrarEntregues();
 }
 
 function renderROList(ros) {
   if (ros.length) console.log('[PSR] cust_name sample:', ros[0].ro_number, '|', ros[0].cust_name);
+  // Conta ANTES de filtrar: o Aprovador precisa saber quantas estao
+  // escondidas, senao o filtro parece perda de dados.
+  const nEntregues = isApproverTech ? ros.filter(r => r.entregue).length : 0;
+  const cntEl = document.getElementById('ro-entregue-cnt');
+  if (cntEl) cntEl.textContent = nEntregues
+    ? (roMostrarEntregues() ? nEntregues + ' entregue(s) na lista'
+                            : nEntregues + ' entregue(s) oculta(s)')
+    : '';
+  ros = roFiltrarEntregues(ros);
   const sug    = ros.filter(r => r.suggested === currentTech && r.lock_status !== 'locked');
   const free   = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'free');
   const paused = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'paused');
@@ -5928,6 +6000,15 @@ async function checkAndShowApprovalButton() {
       const btnSI = document.getElementById('btn-si-nav'); if (btnSI) btnSI.style.display = ''; // approver-only
     }
   } catch(e) { console.warn('isApprover check failed', e); }
+  // v5.10.9 — a linha do filtro de entregues aparece aqui, junto com os
+  // outros controlos de Aprovador. Depois redesenha: o isApprover pode
+  // responder DEPOIS do loadROs, e nesse caso a primeira lista foi
+  // desenhada sem filtro nenhum.
+  roMostrarLinhaEntregues();
+  if (isApproverTech && liveROs && liveROs.length) {
+    const q = (document.getElementById('ro-search').value || '').trim();
+    if (q) filterAndRenderROList(q); else renderROList(liveROs);
+  }
 }
 
 // POLARIS access is broader than full Aprovador rights — some techs
