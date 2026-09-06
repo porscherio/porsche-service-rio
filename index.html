@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.9 — Build: 2026-09-06 02:47 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.10 — Build: 2026-09-06 02:52 BRT -->
+<!-- v5.10.10: a contagem do filtro de entregues passa a ser
+     mostradas/total (59/100) em vez de duas frases diferentes conforme
+     a caixa. Um numero so, sempre com o mesmo sentido: marcada da
+     100/100, desmarcada da 59/100 — e a diferenca ja diz quantas
+     ficaram de fora. -->
 <!-- v5.10.9: FILTRO DE ENTREGUES NA LISTA DE ORDENS, so para Aprovador.
      O Aprovador ve todas as ROs e a lista so cresce; as entregues ficam
      na lista pela janela de 48h de reversao e afogam as abertas.
@@ -2928,7 +2933,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.9';
+const APP_VERSION = '5.10.10';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3781,15 +3786,19 @@ function roMostrarLinhaEntregues() {
 
 function renderROList(ros) {
   if (ros.length) console.log('[PSR] cust_name sample:', ros[0].ro_number, '|', ros[0].cust_name);
-  // Conta ANTES de filtrar: o Aprovador precisa saber quantas estao
-  // escondidas, senao o filtro parece perda de dados.
-  const nEntregues = isApproverTech ? ros.filter(r => r.entregue).length : 0;
-  const cntEl = document.getElementById('ro-entregue-cnt');
-  if (cntEl) cntEl.textContent = nEntregues
-    ? (roMostrarEntregues() ? nEntregues + ' entregue(s) na lista'
-                            : nEntregues + ' entregue(s) oculta(s)')
-    : '';
+  // v5.10.10 — mostradas/total, sempre com o mesmo significado, em vez
+  // de duas frases diferentes conforme o estado da caixa. Marcada da
+  // 100/100 e desmarcada da 59/100, entao o proprio numero diz quantas
+  // ficaram de fora sem precisar de o escrever.
+  const roTotal = ros.length;
   ros = roFiltrarEntregues(ros);
+  const cntEl = document.getElementById('ro-entregue-cnt');
+  if (cntEl) {
+    cntEl.textContent = isApproverTech ? (ros.length + '/' + roTotal) : '';
+    cntEl.title = isApproverTech
+      ? (ros.length + ' de ' + roTotal + ' ordens nesta lista')
+      : '';
+  }
   const sug    = ros.filter(r => r.suggested === currentTech && r.lock_status !== 'locked');
   const free   = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'free');
   const paused = ros.filter(r => r.suggested !== currentTech && r.lock_status === 'paused');
