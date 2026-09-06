@@ -1,5 +1,27 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.8.03 — Build: 2026-08-26 04:40 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.7 — Build: 2026-09-05 22:05 BRT -->
+<!-- v5.10.7: PILL "DIAGNOSTICO" NO CARD DA RO. O tecnico descreve o
+     sintoma numa caixa e recebe os boletins tecnicos da NHTSA para
+     aquele modelo e ano. Modelo e ano ja estavam no card (r.vehicle e
+     vinToModelYear), entao nao se escolhe nada: so se descreve.
+     PORQUE PILL PROPRIA e nao dentro da de Campanhas: sao coisas
+     diferentes. Campanhas responde o que o VIN DEVE; Diagnostico e uma
+     acao que so devolve algo depois de o tecnico escrever. Partilham o
+     padrao (fetch ao /exec, painel no fim do card), nao o botao — e nao
+     partilham a classe, senao a delegacao de clique cruzava as duas.
+     A pill nasce NEUTRA e nao carrega nada sozinha: ao contrario da de
+     Campanhas, nao tem contagem para mostrar. Se tivesse o mesmo ar, o
+     tecnico leria "esta RO tem N boletins", que e falso.
+     Os dois paineis fecham-se um ao outro: no telemovel, dois paineis
+     abertos no mesmo card tornam-no alto demais.
+     AVISO NA TELA, de proposito: isto e a fatia de TIs que a PCNA
+     depositou num regulador americano, nao a PPN, e nao sabe de
+     aplicabilidade no Brasil. E indicio, para confirmar na PPN.
+     APP_VERSION VOLTA DE 5.11.0 PARA 5.10.7. O 5.11.0 subia o digito
+     menor numa entrega de feature, contra a convencao (depois de 5.10.x
+     vem 5.10.7), e ficava ACIMA do LATEST_PWA_VERSION do servidor
+     (5.10.6), o que fazia o cmpVersion_ dar negativo e o aviso de nova
+     versao nunca disparar. Servidor vai a 5.10.7 na mesma entrega. -->
 <!-- v5.8.03: A LINHA "RECALL" DO CARD PASSA A DIZER ALGUMA COISA.
      Ela nasce da SI_MATRIX como qualquer outro serviço e é casada por
      palavra-chave contra as joblines — como nunca há jobline com a palavra
@@ -1648,6 +1670,33 @@ input:focus{outline:none;border-color:var(--black)}
 .camp-pill.loading{background:#F5F5F5;color:#bbb;cursor:default}
 .camp-panel{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);cursor:default}
 .camp-panel[hidden]{display:none}
+/* v5.10.7 — Diagnostico. Classe propria, nao variante da .camp-pill: a
+   delegacao de clique casa por classe, e partilhar faria uma pill abrir
+   o painel da outra. Tom neutro por nao ter estado a comunicar. */
+.diag-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:10px;background:#E8EEF6;color:#2B4C7E;cursor:pointer;
+  border:1px solid #C7D6E8}
+.diag-pill.off{background:#F5F5F5;color:#999;cursor:default;border-color:var(--border)}
+.diag-panel{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);cursor:default}
+.diag-panel[hidden]{display:none}
+.diag-box{display:flex;gap:6px;margin-bottom:8px}
+.diag-box input{flex:1;min-width:0;font-size:13px;padding:7px 9px;border:1px solid var(--border);
+  border-radius:8px;font-family:inherit}
+.diag-box button{font-size:11px;font-weight:700;padding:7px 12px;border:0;border-radius:8px;
+  background:#2B4C7E;color:#fff;cursor:pointer}
+.diag-box button:disabled{opacity:.5;cursor:default}
+.diag-msg{font-size:11px;color:var(--muted);padding:4px 0}
+.diag-msg.err{color:#B00020}
+.diag-item{padding:7px 0;border-top:1px dashed var(--border)}
+.diag-item:first-of-type{border-top:0}
+.diag-num{font-size:12px;font-weight:700;color:var(--fg)}
+.diag-meta{font-size:10px;color:var(--muted);margin-left:6px;font-weight:400}
+.diag-tit{font-size:11px;color:var(--fg);margin-top:2px}
+.diag-why{font-size:11px;color:#2B4C7E;margin-top:3px;font-style:italic}
+.diag-pdf{font-size:10px;font-weight:700;color:#2B4C7E;text-decoration:none;
+  display:inline-block;margin-top:4px}
+.diag-aviso{font-size:10px;color:var(--muted);margin-top:9px;padding-top:7px;
+  border-top:1px solid var(--border);line-height:1.35}
 .camp-grp{margin-top:11px}
 .camp-grp:first-child{margin-top:0}
 .camp-grp-t{font-size:10px;font-weight:700;letter-spacing:.04em;color:#888;margin-bottom:5px}
@@ -2843,7 +2892,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.11.0';
+const APP_VERSION = '5.10.7';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3676,6 +3725,8 @@ function renderROList(ros) {
     if (ev.target.closest('.sync-now-pill')) return; // sync-now icon handles its own click
     if (ev.target.closest('.camp-pill')) return;    // campanhas pill handles its own click
     if (ev.target.closest('.camp-panel')) return;   // clique dentro do painel nao abre a RO
+    if (ev.target.closest('.diag-pill')) return;    // v5.10.7 — idem para diagnostico
+    if (ev.target.closest('.diag-panel')) return;
     openRO(c.dataset.ro);
   }));
   el.querySelectorAll('.parts-badge').forEach(b => b.addEventListener('click', (ev)=>{
@@ -3797,6 +3848,20 @@ function roCard(r) {
     ? '<div class="camp-panel" data-camp-panel data-ro="' + r.ro_number + '" hidden></div>'
     : '';
 
+  // v5.10.7 — Diagnostico. Precisa de MODELO e ANO, nao de VIN — mas o
+  // ano sai do VIN (vinToModelYear), entao sem VIN nao ha ano e a pill
+  // fica desligada, com o mesmo motivo da de Campanhas: o chassi desce
+  // da OI depois de a RO ser criada.
+  const diagAno = vinToModelYear(r.vin);
+  const diagPill = (r.vehicle && diagAno)
+    ? '<span class="diag-pill" data-diag-pill data-ro="' + r.ro_number +
+      '" data-vin="' + (r.vin || '') + '" data-modelo="' + escapeHtml(r.vehicle) +
+      '" data-ano="' + diagAno + '" role="button" aria-expanded="false">Diagn\u00f3stico</span>'
+    : '<span class="diag-pill off" title="Precisa de modelo e ano. O ano vem do chassi, que a OI ainda nao mandou para esta RO.">Diagn\u00f3stico</span>';
+  const diagPanel = (r.vehicle && diagAno)
+    ? '<div class="diag-panel" data-diag-panel data-ro="' + r.ro_number + '" hidden></div>'
+    : '';
+
   // ── v5.1.0 — FAIXA DE PILLS ──────────────────────────────────
   // Ordem fixa: primeiro o que TRAVA o trabalho (em espera, peças,
   // aprovação, quilometragem por confirmar), depois o status, depois o
@@ -3811,6 +3876,7 @@ function roCard(r) {
     mileagePill,
     '<span class="badge ' + bc + '">' + bt + '</span>',
     campPill,
+    diagPill,
     chegadaPill,
     entregueTag,
     priorityPill,
@@ -3852,6 +3918,7 @@ function roCard(r) {
       '<div class="ro-progress"><div class="ro-prog-bar"><div class="ro-prog-fill" style="width:' + pct + '%"></div></div>' +
       '<span class="ro-prog-txt">' + done + '/' + total + ' joblines</span></div>' +
       campPanel +
+      diagPanel +
     '</div>'
   );
 }
@@ -3901,10 +3968,197 @@ async function campCarregarPills(scope) {
 // listener preso ao elemento morre no primeiro refresh.
 document.addEventListener('click', function (ev) {
   const pill = ev.target.closest('[data-camp-pill]');
-  if (pill) { ev.stopPropagation(); campTogglePainel(pill); return; }
+  if (pill) { ev.stopPropagation(); diagFechar(pill.dataset.ro); campTogglePainel(pill); return; }
   const btn = ev.target.closest('[data-camp-incluir]');
   if (btn) { ev.stopPropagation(); campSolicitar(btn); }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// v5.10.7 — DIAGNOSTICO (pill do card da RO)
+// Backend: Nhtsa.gs v1.0.0 — ?action=diagBuscar / diagTexto
+//
+// O tecnico descreve o sintoma; o servidor pergunta a NHTSA os boletins
+// daquele modelo/ano e ordena por relevancia. Modelo e ano saem do card.
+//
+// Cache por RO e so da sessao: o tecnico costuma reabrir o painel logo a
+// seguir a fecha-lo, e refazer a busca custaria a espera outra vez. Uma
+// pesquisa NOVA (texto diferente) ignora o cache.
+// ═══════════════════════════════════════════════════════════════
+const diagCache = {};
+
+document.addEventListener('click', function (ev) {
+  const pill = ev.target.closest('[data-diag-pill]');
+  if (pill && !pill.classList.contains('off')) {
+    ev.stopPropagation();
+    campFechar(pill.dataset.ro);
+    diagTogglePainel(pill);
+    return;
+  }
+  const btn = ev.target.closest('[data-diag-go]');
+  if (btn) { ev.stopPropagation(); diagBuscar(btn.dataset.ro); }
+});
+
+// Enter na caixa procura, para nao obrigar a acertar no botao.
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter') return;
+  const inp = ev.target.closest('[data-diag-input]');
+  if (!inp) return;
+  ev.preventDefault();
+  diagBuscar(inp.dataset.ro);
+});
+
+function diagPainelDaRo(ro) {
+  return document.querySelector('.diag-panel[data-ro="' + ro + '"]');
+}
+
+// Os dois paineis fecham-se um ao outro: no telemovel, campanhas e
+// diagnostico abertos ao mesmo tempo fazem um card alto demais.
+function diagFechar(ro) {
+  const p = diagPainelDaRo(ro);
+  if (p && !p.hidden) {
+    p.hidden = true;
+    const pill = document.querySelector('[data-diag-pill][data-ro="' + ro + '"]');
+    if (pill) pill.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function campFechar(ro) {
+  const p = campPainelDaRo(ro);
+  if (p && !p.hidden) {
+    p.hidden = true;
+    const pill = document.querySelector('[data-camp-pill][data-ro="' + ro + '"]');
+    if (pill) pill.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function diagTogglePainel(pill) {
+  const ro = pill.dataset.ro;
+  const painel = diagPainelDaRo(ro);
+  if (!painel) return;
+
+  if (!painel.hidden) {
+    painel.hidden = true;
+    pill.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  painel.hidden = false;
+  pill.setAttribute('aria-expanded', 'true');
+
+  if (!painel.dataset.pronto) {
+    painel.innerHTML = diagCaixaHtml(ro, pill.dataset.modelo, pill.dataset.ano);
+    painel.dataset.pronto = '1';
+    painel.dataset.vin    = pill.dataset.vin || '';
+    painel.dataset.modelo = pill.dataset.modelo;
+    painel.dataset.ano    = pill.dataset.ano;
+  }
+  const inp = painel.querySelector('[data-diag-input]');
+  if (inp) inp.focus();
+}
+
+function diagCaixaHtml(ro, modelo, ano) {
+  return (
+    '<div class="diag-box">' +
+      '<input type="text" data-diag-input data-ro="' + ro +
+        '" placeholder="Sintoma \u2014 ex.: erro de sensor sujo, sensor limpo" />' +
+      '<button data-diag-go data-ro="' + ro + '">BUSCAR</button>' +
+    '</div>' +
+    '<div class="diag-msg">' + escapeHtml(modelo) + ' ' + ano + '</div>' +
+    '<div data-diag-res></div>'
+  );
+}
+
+async function diagBuscar(ro) {
+  const painel = diagPainelDaRo(ro);
+  if (!painel) return;
+  const inp = painel.querySelector('[data-diag-input]');
+  const btn = painel.querySelector('[data-diag-go]');
+  const res = painel.querySelector('[data-diag-res]');
+  const sintoma = (inp && inp.value || '').trim();
+  if (sintoma.length < 4) {
+    res.innerHTML = '<div class="diag-msg err">Descreva o sintoma com um pouco mais de detalhe.</div>';
+    return;
+  }
+
+  const ck = ro + '|' + sintoma.toLowerCase();
+  if (diagCache[ck]) { diagRender(res, diagCache[ck]); return; }
+
+  if (btn) btn.disabled = true;
+  res.innerHTML = '<div class="diag-msg">Procurando boletins\u2026</div>';
+  try {
+    const r = await fetch(API_URL + '?action=diagBuscar' +
+      '&modelo=' + encodeURIComponent(painel.dataset.modelo) +
+      '&ano='    + encodeURIComponent(painel.dataset.ano) +
+      '&sintoma=' + encodeURIComponent(sintoma) +
+      '&ro_number=' + encodeURIComponent(ro) +
+      '&vin='    + encodeURIComponent(painel.dataset.vin || '') +
+      '&tech='   + encodeURIComponent(currentTech));
+    const data = await r.json();
+    diagCache[ck] = data;
+    diagRender(res, data);
+  } catch (e) {
+    res.innerHTML = '<div class="diag-msg err">N\u00e3o consegui consultar. Toque de novo.</div>';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+const DIAG_AVISO =
+  '<div class="diag-aviso">Boletins que a Porsche depositou no regulador dos EUA. ' +
+  'N\u00e3o \u00e9 a PPN e n\u00e3o sabe de aplicabilidade no Brasil. ' +
+  '\u00c9 ind\u00edcio \u2014 confirmar na PPN antes de executar.</div>';
+
+function diagRender(res, d) {
+  if (!d || d.ok === false) {
+    res.innerHTML = '<div class="diag-msg err">' +
+      escapeHtml(d && d.erro || 'Dado indispon\u00edvel.') + '</div>';
+    return;
+  }
+  if (d.semDados) {
+    res.innerHTML = '<div class="diag-msg">' + escapeHtml(d.motivo || 'Sem boletins.') + '</div>';
+    return;
+  }
+  if (!d.itens || !d.itens.length) {
+    res.innerHTML = '<div class="diag-msg">Nenhum boletim casou com este sintoma ' +
+      '(' + (d.total || 0) + ' verificados). Tente outras palavras.</div>' + DIAG_AVISO;
+    return;
+  }
+  const h = d.itens.map(it =>
+    '<div class="diag-item">' +
+      '<span class="diag-num">' + escapeHtml(it.numero || ('NHTSA ' + it.nhtsa_id)) + '</span>' +
+      '<span class="diag-meta">' + escapeHtml(it.data || '') +
+        (it.componente ? ' \u00b7 ' + escapeHtml(it.componente) : '') + '</span>' +
+      '<div class="diag-tit">' + escapeHtml(it.titulo || '') + '</div>' +
+      (it.motivo ? '<div class="diag-why">' + escapeHtml(it.motivo) + '</div>' : '') +
+      '<a class="diag-pdf" href="#" data-diag-pdf="' + it.nhtsa_id + '" ' +
+        'onclick="diagAbrirPdf(event,' + it.nhtsa_id + ')">ABRIR PDF \u2192</a>' +
+    '</div>'
+  ).join('');
+  res.innerHTML = h +
+    '<div class="diag-msg">' + d.itens.length + ' de ' + d.total + ' boletins.</div>' +
+    DIAG_AVISO;
+}
+
+// O PDF so e resolvido quando alguem quer ler: uma chamada por boletim
+// aberto, em vez de resolver os cinco a cada busca.
+async function diagAbrirPdf(ev, nhtsaId) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const a = ev.target;
+  const txt = a.textContent;
+  a.textContent = 'Abrindo\u2026';
+  try {
+    const r = await fetch(API_URL + '?action=diagTexto&nhtsa_id=' + encodeURIComponent(nhtsaId));
+    const d = await r.json();
+    if (d && d.ok && d.docs && d.docs.length) {
+      window.open(d.docs[0].url, '_blank');
+      a.textContent = txt;
+    } else {
+      a.textContent = 'PDF indispon\u00edvel';
+    }
+  } catch (e) {
+    a.textContent = 'PDF indispon\u00edvel';
+  }
+}
 
 function campPainelDaRo(ro) {
   return document.querySelector('.camp-panel[data-ro="' + ro + '"]');
