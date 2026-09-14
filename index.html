@@ -1,5 +1,25 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.10 — Build: 2026-09-06 02:52 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.11 — Build: 2026-09-14 17:14 BRT -->
+<!-- v5.10.11: CABECALHO DO CARD AUTOSSUFICIENTE. Depois do numero da
+     RO passam a vir, na mesma linha: as tags de estado (EM ANDAMENTO
+     com o nome de quem esta trabalhando, PAUSADA, URGENTE com o
+     numero da prioridade), o NOME DO CLIENTE e a PLACA. A linha
+     quebra sozinha quando nao couber — em celular de 380px com nome
+     longo ela usa duas linhas em vez de cortar.
+     Motivo: hoje, para saber se o carro esta em andamento ou e
+     urgente, era preciso varrer a faixa de pills; e cliente e placa
+     ficavam em linhas separadas abaixo. Numa lista de 40 cards o
+     olho le o cabecalho e so.
+     NADA SUMIU, so mudou de lugar: o VEICULO desceu para a segunda
+     linha, junto da quilometragem e do telefone do cliente (que
+     continua clicavel para o WhatsApp). O nome e a placa sairam das
+     linhas de baixo para nao aparecerem duas vezes.
+     A priority-pill saiu da faixa porque virou a tag URGENTE do
+     cabecalho — mesma informacao, um lugar so. O badge de
+     disponibilidade (Livre/Sugerida/Bloqueada) FICA na faixa: ele
+     tambem responde pelos casos que a tag nao cobre.
+     So front. Backend intocado — a ordem da lista continua como
+     estava, ainda por decidir. -->
 <!-- v5.10.10: a contagem do filtro de entregues passa a ser
      mostradas/total (59/100) em vez de duas frases diferentes conforme
      a caixa. Um numero so, sempre com o mesmo sentido: marcada da
@@ -869,7 +889,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .card.retomar{border-color:var(--amber);border-width:1.5px;border-left:3px solid var(--amber)}
 .crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .cright{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
-.cro{font-size:13px;font-weight:600;color:var(--black)}
+/* v5.10.11 — o cabecalho virou uma faixa que QUEBRA. Era uma linha so
+   de texto; agora leva tags, cliente e placa, e num aparelho estreito
+   precisa poder usar duas linhas em vez de cortar o nome. */
+.cro{font-size:13px;font-weight:600;color:var(--black);display:flex;flex-wrap:wrap;align-items:center;gap:6px;line-height:1.45}
+.head-tag{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.ht-run{background:#FDE7E9;color:#8B1A1A}
+.ht-pause{background:#FFF4D6;color:#7A5200}
+.ht-urg{background:#1a1a1a;color:#fff}
+.head-cust{font-size:12px;font-weight:600;color:#444}
+.head-plate{font-size:11px;font-weight:700;letter-spacing:.06em;color:#111;background:#F0F0F0;border-radius:3px;padding:1px 7px;white-space:nowrap}
 .cjob{font-size:12px;color:#666;margin-top:2px}
 .cdesc{font-size:11px;color:#999;margin-top:3px;font-style:italic}
 .cdates{font-size:10px;color:#888;margin-top:4px}
@@ -2933,7 +2962,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.10';
+const APP_VERSION = '5.10.11';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3852,9 +3881,33 @@ function roCard(r) {
     : r.approval_status === 'not_approved'
       ? '<span class="apr-pill apr-no">&#x26A0; N&#xC3;O APROVADO</span>'
       : '';
-  const custLine = r.cust_name
-    ? '<div class="cjob">&#x1F464; ' + r.cust_name + telefoneHtml(r.phone) + '</div>'
+  // ── v5.10.11 — PECAS DO CABECALHO ───────────────────────────────
+  // Tudo que vem depois do numero da RO. Sao spans soltos, nao uma
+  // string montada, porque a .cro e flex: quem decide a quebra e o
+  // navegador, com a largura que tiver.
+  // EM ANDAMENTO / PAUSADA repetem o que a .trow ja diz no rodape do
+  // card, de proposito: a .trow so e lida quando alguem ja parou
+  // naquele card, e a questao aqui e varrer a lista.
+  const tagAndamento = isLocked
+    ? '<span class="head-tag ht-run">&#x1F527; EM ANDAMENTO &middot; ' + escapeHtml(String(r.locked_by || '')) + '</span>'
+    : isPaused
+      ? '<span class="head-tag ht-pause">&#x23F8; PAUSADA &middot; ' + escapeHtml(String(r.locked_by || '')) + '</span>'
+      : '';
+  // Mesma regra da antiga priority-pill: so existe quando alguem
+  // priorizou de verdade. null/undefined nao vira "#0".
+  const tagUrgente = (r.priority !== null && r.priority !== undefined)
+    ? '<span class="head-tag ht-urg" title="Prioridade ' + r.priority + '">&#x26A1; URGENTE &middot; #' + r.priority + '</span>'
     : '';
+  const headCliente = r.cust_name
+    ? '<span class="head-cust">&#x1F464; ' + escapeHtml(String(r.cust_name)) + '</span>'
+    : '';
+  const headPlaca = r.plate
+    ? '<span class="head-plate">' + escapeHtml(String(r.plate)) + '</span>'
+    : '';
+  // Segunda linha: veiculo, quilometragem e telefone. Montada com
+  // guarda porque mileageTexto ja vem com o separador na frente — sem
+  // veiculo (RO de balcao, cadastro incompleto) a linha comecaria com
+  // um " · " solto. Sem nada dos tres, nao se desenha a div.
   const partsBadge = partsBadgeHtml(r.ro_number);
   // Chegada pill (v2.7.0) — read-only here, matched server-side by
   // plate against the closest SERVICOS Agendamento event (see
@@ -3971,7 +4024,10 @@ function roCard(r) {
     diagPill,
     chegadaPill,
     entregueTag,
-    priorityPill,
+    // v5.10.11 — priorityPill saiu daqui: virou a tag URGENTE do
+    // cabecalho. A const continua definida logo acima porque e a
+    // mesma regra de existencia, e para o dia em que alguem quiser a
+    // pill de volta na faixa.
   ].filter(Boolean).join('');
 
   const pillsAprovador = [marcarEntregaPill, syncNowPill].filter(Boolean).join('');
@@ -3979,6 +4035,15 @@ function roCard(r) {
   const faixaPills = (pillsEstado || pillsAprovador)
     ? '<div class="pill-strip">' + pillsEstado +
         (pillsAprovador ? '<span class="pill-strip-sep"></span>' + pillsAprovador : '') +
+      '</div>'
+    : '';
+  // v5.10.11 — ver comentario junto de headPlaca. Definida aqui, e nao
+  // la em cima, porque depende do mileageTexto.
+  const veicTxt  = r.vehicle ? vehicleWithYear(r.vehicle, r.vin) : '';
+  const veicLinha = (veicTxt || mileageTexto || r.phone)
+    ? '<div class="cjob">' +
+        (veicTxt ? veicTxt + mileageTexto : mileageTexto.replace(/^ &middot; /, '')) +
+        telefoneHtml(r.phone) +
       '</div>'
     : '';
   const datesLine = (createdTxt || entregaPill)
@@ -3999,9 +4064,13 @@ function roCard(r) {
       // a faixa. A coluna da direita sumiu de propósito: com a faixa
       // ela viraria um segundo lugar para procurar status.
       '<div class="crow"><div>' +
-        '<div class="cro">RO #' + r.ro_number + ' &mdash; ' + vehicleWithYear(r.vehicle, r.vin) + '</div>' +
-        '<div class="cjob">Placa: ' + r.plate + mileageTexto + '</div>' +
-        custLine +
+        // v5.10.11 — numero, estado, cliente e placa numa faixa que
+        // quebra; veiculo, quilometragem e telefone descem uma linha.
+        '<div class="cro">' +
+          '<span>RO #' + r.ro_number + '</span>' +
+          tagAndamento + tagUrgente + headCliente + headPlaca +
+        '</div>' +
+        veicLinha +
         '<div class="cdesc">' + r.complaint + '</div>' +
         datesLine +
       '</div></div>' +
