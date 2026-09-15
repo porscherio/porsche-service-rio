@@ -1,5 +1,28 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.11 — Build: 2026-09-14 17:14 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.12 — Build: 2026-09-15 10:20 BRT -->
+<!-- v5.10.12: AVISO AO MEXER NA PRIORIDADE DE OUTRO APROVADOR.
+     setPriorityForRO agora consulta action=getPriorityImpact (Code.gs
+     v4.10.18) ANTES de postar, e mostra um confirm quando a mudanca
+     passa por cima de alguem.
+     POR QUE (Eytan, 15/09/2026): um Aprovador nem sempre sabe POR QUE
+     outro priorizou uma RO. Existe um motivo, e ele precisa ver esse
+     motivo antes de decidir.
+     DOIS CASOS, os dois avisados:
+       (a) a RO alvo ja tem prioridade posta por OUTRO Aprovador;
+       (b) a posicao pedida esta OCUPADA por uma RO de OUTRO Aprovador,
+           que vai descer um lugar. Este e o caso silencioso: ninguem
+           mexeu na RO dele, e mesmo assim ela desceu.
+     NAO avisa quando quem definiu foi o proprio Aprovador que esta
+     mexendo agora — incomodar ai so ensina a clicar OK sem ler.
+     POR QUE A CHECAGEM E UM GET ANTES DO POST, e nao uma guarda no
+     servidor: o POST vai com mode:'no-cors' e a resposta e OPACA. Uma
+     recusa do servidor viraria clique sem efeito e sem explicacao. A
+     unica coisa que o front consegue LER e um GET, entao a decisao
+     acontece antes.
+     Se o GET falhar (sem rede, endpoint velho no ar), NAO trava o
+     fluxo: segue e posta. O aviso e informativo, nao e trava de
+     seguranca, e deixar o Aprovador sem conseguir priorizar por causa
+     de uma leitura auxiliar seria pior que nao avisar. -->
 <!-- v5.10.11: CABECALHO DO CARD AUTOSSUFICIENTE. Depois do numero da
      RO passam a vir, na mesma linha: as tags de estado (EM ANDAMENTO
      com o nome de quem esta trabalhando, PAUSADA, URGENTE com o
@@ -2962,7 +2985,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.11';
+const APP_VERSION = '5.10.12';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -5173,12 +5196,62 @@ async function renderPriorityRow(ro) {
     '</div>';
 }
 
-function setPriorityForRO(roNumber) {
+// v5.10.12 — "Sidney Lubicz, 12/09 14:20 — Cliente VIP" a partir do
+// que o PriorityAudit guardou. Sem timestamp legível, mostra só o nome.
+function fmtAutoria(o) {
+  let t = o.aprovador || 'alguém não identificado';
+  const d = o.quando ? new Date(o.quando) : null;
+  if (d && !isNaN(d.getTime())) {
+    t += ', ' + String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') +
+         ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+  if (o.motivo) t += ' — ' + o.motivo;
+  return t;
+}
+
+async function setPriorityForRO(roNumber) {
   const input  = document.getElementById('s2-priority-input');
   const motivo = document.getElementById('s2-priority-motivo');
   const val    = parseInt(input.value, 10);
   if (isNaN(val) || val < 1) { showToast('Informe um número de prioridade válido (≥ 1).'); return; }
   if (!motivo.value) { showToast('Selecione um motivo.'); return; }
+
+  // v5.10.12 — consulta o impacto antes de gravar. Ver o cabeçalho:
+  // falha de leitura NÃO bloqueia o POST.
+  try {
+    const imp = await fetch(API_URL + '?action=getPriorityImpact' +
+      '&ro_number=' + encodeURIComponent(roNumber) +
+      '&priority='  + encodeURIComponent(val)).then(r => r.json());
+
+    if (imp && imp.ok) {
+      const blocos = [];
+
+      // (a) a própria RO já tinha prioridade de outra pessoa
+      if (imp.alvo && imp.alvo.prioridade_atual != null &&
+          imp.alvo.aprovador && imp.alvo.aprovador !== currentTech) {
+        blocos.push('A RO #' + roNumber + ' já está em #' + imp.alvo.prioridade_atual +
+                    ', definida por ' + fmtAutoria(imp.alvo) + '.');
+      }
+
+      // (b) a posição pedida está ocupada por RO de outra pessoa
+      const oc = imp.ocupante;
+      if (oc && oc.aprovador && oc.aprovador !== currentTech) {
+        blocos.push('A posição #' + val + ' é hoje da RO #' + oc.ro_number +
+                    ', definida por ' + fmtAutoria(oc) + '.' +
+                    (oc.para ? '\nEla vai ser empurrada para #' + oc.para + '.' : ''));
+      }
+
+      if (blocos.length) {
+        const outras = Math.max((imp.total_deslocadas || 0) - (oc ? 1 : 0), 0);
+        const texto = 'ATENÇÃO\n\n' + blocos.join('\n\n') +
+          (outras ? '\n\nMais ' + outras + ' RO(s) descem uma posição.' : '') +
+          '\n\nExiste um motivo por trás da prioridade de quem veio antes. Tem certeza que quer mudar?';
+        if (!confirm(texto)) { showToast('Prioridade não alterada.'); return; }
+      }
+    }
+  } catch (e) {
+    // Sem impacto lido: segue sem aviso, de propósito.
+  }
 
   fetch(API_URL, {
     method: 'POST', mode: 'no-cors',
