@@ -1,5 +1,27 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.12 — Build: 2026-09-15 10:20 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.13 — Build: 2026-09-15 23:05 BRT -->
+<!-- v5.10.13: SI — ITENS ESTÉTICA/PPF E SEGURO NO CARD (acompanha SI.gs v4.3.3).
+     O SI.gs v4.3.3 passou a mandar dois itens novos de 10 meses, grupos
+     'estetica' e 'seguro', só para carros com histórico. Aqui:
+     1) NOME: SI_nomeGrupo_() dá nome legível aos dois ('Manutenção estética
+        / PPF' e 'Renovação do seguro') no card, na linha da aba Por período
+        e na mensagem da fila. Os outros grupos continuam com o texto de
+        sempre — nada muda para eles.
+     2) ÍCONE: estetica usa o ícone de polimento que já existia; seguro ganhou
+        um escudo em traço, colorido pelo status como recall/combustível.
+     3) LINHA DO SEGURO: seguro não tem RO. Onde os outros mostram "Última
+        realização: RO #…" (e, sem RO, "Não localizado" em vermelho), o
+        seguro mostra "Apólice: início dd/mm/aaaa · seguradora · até
+        dd/mm/aaaa". A 3ª coluna vira "Contatar em" — o vencimento de 10
+        meses é a data de chamar o cliente, não o fim da apólice.
+     4) MENSAGEM: o texto de manutenção não serve para seguro.
+        - só o seguro pendente → texto próprio de renovação, sem link de
+          agendamento (não há serviço para agendar);
+        - manutenção E seguro pendentes → texto de manutenção de sempre,
+          mais um parágrafo sobre o seguro no fim;
+        - sem seguro pendente → texto idêntico ao da v5.10.12.
+     Cache antigo (sem os itens novos): nada muda. Code.gs: só subir
+     LATEST_PWA_VERSION para 5.10.13. -->
 <!-- v5.10.12: AVISO AO MEXER NA PRIORIDADE DE OUTRO APROVADOR.
      setPriorityForRO agora consulta action=getPriorityImpact (Code.gs
      v4.10.18) ANTES de postar, e mostra um confirm quando a mudanca
@@ -2985,7 +3007,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.12';
+const APP_VERSION = '5.10.13';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -9870,7 +9892,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       return `
         <div class="si-due-item">
           <span class="si-due-date ${i.dueISO < hoje ? 'venc' : ''}">${ddMM_(i.dueISO)}</span>
-          <span>${esc(i.grupo)}</span>
+          <span>${esc(window.SI_nomeGrupo_ ? window.SI_nomeGrupo_(i.grupo) : i.grupo)}</span>
           ${i.dueSource === 'estimado' ? '<span class="si-due-est" title="Projeção pelo ritmo de km — não é registo">EST</span>' : ''}
         </div>`;
     }).join('')
@@ -10017,7 +10039,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     const model = (v.modelo || '').replace(/\s*\b(20\d{2})\b\s*/, '').trim();
     const linhas = hits.slice(0, 6).map(i => {
       const [yy, mm] = i.dueISO.split('-');
-      return `• ${i.grupo} — ${MESES[+mm - 1]}/${yy}`;
+      const nomeG = window.SI_nomeGrupo_ ? window.SI_nomeGrupo_(i.grupo) : i.grupo;
+      return `• ${nomeG} — ${MESES[+mm - 1]}/${yy}`;
     }).join('\n');
     return [
       `Olá${nome ? ', ' + nome : ''}! Aqui é da Porsche Service Rio.`,
@@ -10257,6 +10280,8 @@ window.SI_shareCard = async function() {
   const _ICONS = {
     recall:      '<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17h.01"/>',
     combustivel: '<path d="M5 21V6a2 2 0 012-2h5a2 2 0 012 2v15M4 21h11M14 8h2l3 3v6a1.5 1.5 0 01-3 0v-2h-2"/>',
+    // v5.10.13 — escudo com check (seguro). Provisório, como os dois acima.
+    seguro:      '<path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M8.5 12.2l2.4 2.4 4.6-4.8"/>',
   };
 
   // Uploaded reference icons (full self-contained <svg> markup, fixed
@@ -10297,6 +10322,17 @@ window.SI_shareCard = async function() {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   }
 
+  // v5.10.13 — nome legível dos grupos extras. Global porque a lista Por
+  // período vive noutro bloco. Grupo sem entrada aqui devolve o texto como
+  // veio — os grupos da SI_MATRIX aparecem exatamente como antes.
+  const _NOME_GRUPO = {
+    'estetica': 'Manutenção estética / PPF',
+    'seguro':   'Renovação do seguro',
+  };
+  window.SI_nomeGrupo_ = function (g) {
+    return _NOME_GRUPO[_norm(g)] || g || '';
+  };
+
   // grupo → icon key. Best-guess Portuguese phrasings for each category —
   // if a grupo from SI_MATRIX doesn't show an icon, check its exact text
   // against SI_MATRIX and add a matching entry here (all keys are already
@@ -10326,6 +10362,9 @@ window.SI_shareCard = async function() {
     'palhetas do limpador':'palhetas','palhetas':'palhetas','limpador de parabrisa':'palhetas',
     'pneus':'pneus','rodizio de pneus':'pneus','troca de pneus':'pneus',
     'recall':'recall','campanha de recall':'recall',
+    // v5.10.13 — itens extras do SI.gs v4.3.3
+    'estetica':'polimento','manutencao estetica':'polimento','ppf':'polimento',
+    'seguro':'seguro','renovacao do seguro':'seguro',
     'suspensao':'suspensao','amortecedor':'suspensao','amortecedores':'suspensao','molas':'suspensao',
     'transmissao':'transmissao','cambio':'transmissao','embreagem':'transmissao',
     'trava de portas':'trava','travas eletricas':'trava','trava eletrica':'trava','fechadura':'trava',
@@ -10415,6 +10454,8 @@ window.SI_shareCard = async function() {
       const bg    = STATUS_BG[sc]||'#fff';
       const iconKey = _GI[_norm(item.grupo)];
       const iconImg = _iconSvg(iconKey, col);
+      // v5.10.13 — seguro não tem RO; muda a 2ª e a 3ª coluna.
+      const ehSeguro = item.origem === 'seguro' || _norm(item.grupo) === 'seguro';
       // Progress bar pct: prefer the real value from SI.gs (v2.3.0+ — computed
       // server-side from actual interval/date/km math). Fall back to the old
       // estimate only for cache rows written before that backend was deployed.
@@ -10461,7 +10502,7 @@ window.SI_shareCard = async function() {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
           <div style="display:flex;align-items:flex-start;gap:8px;flex:1;">
             ${iconImg}
-            <div style="font-size:13px;font-weight:700;color:#000;line-height:1.2;">${item.grupo}</div>
+            <div style="font-size:13px;font-weight:700;color:#000;line-height:1.2;">${window.SI_nomeGrupo_(item.grupo)}</div>
           </div>
           <div style="font-size:7.5px;font-weight:800;letter-spacing:.1em;padding:3px 8px;background:${col};color:#fff;white-space:nowrap;flex-shrink:0;">${lbl}</div>
         </div>
@@ -10476,11 +10517,13 @@ window.SI_shareCard = async function() {
             <div style="font-size:10.5px;color:#000;">${item.intervalo||'—'}</div>
           </div>
           <div>
-            <div style="font-size:7px;font-weight:700;letter-spacing:.2em;color:#000;text-transform:uppercase;margin-bottom:2px;">Última realização</div>
-            <div style="font-size:10.5px;color:#000;">${item.lastRo?`RO #${item.lastRo} · ${item.lastData||''}${item.lastKm?' · '+item.lastKm.toLocaleString('pt-BR')+' km':''}` : '<span style="color:#DC2626;font-style:italic;">Não localizado</span>'}</div>
+            <div style="font-size:7px;font-weight:700;letter-spacing:.2em;color:#000;text-transform:uppercase;margin-bottom:2px;">${ehSeguro ? 'Apólice' : 'Última realização'}</div>
+            <div style="font-size:10.5px;color:#000;">${ehSeguro
+              ? [`início ${item.lastData||'—'}`, item.seguradora || '', item.vigenciaFim ? `até ${item.vigenciaFim}` : ''].filter(Boolean).join(' · ')
+              : item.lastRo?`RO #${item.lastRo} · ${item.lastData||''}${item.lastKm?' · '+item.lastKm.toLocaleString('pt-BR')+' km':''}` : '<span style="color:#DC2626;font-style:italic;">Não localizado</span>'}</div>
           </div>
           <div>
-            <div style="font-size:7px;font-weight:700;letter-spacing:.2em;color:#000;text-transform:uppercase;margin-bottom:2px;">Vencimento</div>
+            <div style="font-size:7px;font-weight:700;letter-spacing:.2em;color:#000;text-transform:uppercase;margin-bottom:2px;">${ehSeguro ? 'Contatar em' : 'Vencimento'}</div>
             <div style="font-size:10.5px;color:${sc==='OK'?'#000':col};font-weight:${sc==='OK'?'400':'700'}">${item.dueBy||'—'}</div>
           </div>
         </div>
@@ -10660,9 +10703,26 @@ window.SI_shareCard = async function() {
 
   function SI_buildMessageText_(vehicle) {
     const firstName = (vehicle.cliente || '').trim().split(/\s+/)[0] || '';
+    // v5.10.13 — seguro pendente muda o texto. Sem seguro pendente o
+    // resultado é idêntico ao da v5.10.12.
+    const itens  = vehicle.items || [];
+    const ehSeg  = i => i && (i.origem === 'seguro' || _norm(i.grupo) === 'seguro');
+    const seg    = itens.find(i => ehSeg(i) && i.statusCode !== 'OK');
+    const manut  = itens.some(i => i && !ehSeg(i) && i.statusCode !== 'OK');
+    const fraseSeguro = seg
+      ? `o seguro do seu Porsche ${vehicle.modelo} está chegando na época de renovação${seg.vigenciaFim ? ` (vigência até ${seg.vigenciaFim})` : ''}. Podemos te ajudar com isso?`
+      : '';
+
+    if (seg && !manut) {
+      return `Oi ${firstName}, ${fraseSeguro}`;
+    }
+
     let text = `Oi ${firstName}, o seu Porsche ${vehicle.modelo} precisa de manutenção. De acordo com o Plano de Manutenção Porsche e com os registros dos serviços anteriormente executados no nosso Porsche Service Rio, segue a nossa recomendação:`;
     if (vehicle.agendamentoUrl) {
       text += `\n\nPara agendar, é só acessar: ${vehicle.agendamentoUrl}`;
+    }
+    if (seg) {
+      text += `\n\nAlém disso, ${fraseSeguro}`;
     }
     return text;
   }
