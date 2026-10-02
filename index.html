@@ -1,5 +1,12 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.15 — Build: 2026-10-02 18:40 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.16 — Build: 2026-10-02 19:00 BRT -->
+<!-- v5.10.16: SI — CARD DE DETALHE CABE NA TELA DO CELULAR. O card retrato
+     nasce com width:600px inline (é a largura em que o PDF e a imagem de
+     WhatsApp são rasterizados, e isso NÃO muda). Na tela, o mesmo HTML ia
+     para o modal com os 600px fixos e transbordava em telas de 390px. Uma
+     regra de CSS (si-card #si-portrait-card { width:100% !important })
+     vale só dentro do modal; o iframe do PDF não carrega o CSS do PWA, então
+     continua em 600px. Code.gs: LATEST_PWA_VERSION 5.10.16. -->
 <!-- v5.10.15: SI — LISTA EM FUNDO CLARO, LOGO PORSCHE | RJ, LINHAS COMPACTAS, BUSCA.
      Só o painel de LISTA do SI muda (classe si-claro no #si-panel); o card
      de detalhe (retrato, MENSAGEM / PDF / AGENDAMENTO / MSG + LINK) é o
@@ -1691,6 +1698,12 @@ input:focus{outline:none;border-color:var(--black)}
   box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 32px 64px rgba(0,0,0,0.85);
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
+/* v5.10.16 — na tela o card retrato acompanha a largura do modal; o
+   width:600px inline continua valendo no iframe do PDF/imagem. */
+.si-card #si-portrait-card { width: 100% !important; max-width: 600px; }
+.si-card #si-portrait-card * { box-sizing: border-box; }
+.si-card .si-pc-header { flex-wrap: wrap; gap: 8px 12px; }
+.si-card .si-pc-header-right { flex: 1 1 auto; min-width: 0; }
 
 /* Card close bar */
 .si-card-closebar {
@@ -3113,7 +3126,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.15';
+const APP_VERSION = '5.10.16';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -10667,14 +10680,14 @@ window.SI_shareCard = async function() {
     <div id="si-portrait-card" style="width:600px;background:#fff;box-shadow:none;">
       <div style="height:4px;background:#C8102E;"></div>
       <!-- HEADER -->
-      <div style="background:#111;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #C8102E;">
-        <div style="display:flex;align-items:stretch;height:38px;">
+      <div class="si-pc-header" style="background:#111;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #C8102E;">
+        <div style="display:flex;align-items:stretch;height:38px;flex-shrink:0;">
           <div style="display:flex;align-items:center;font-family:'PorscheLogo',sans-serif;font-size:20px;color:#fff;letter-spacing:.04em;line-height:1;">&nbsp;PORSCHE&nbsp;</div>
           <div style="width:3px;background:#C8102E;margin:5px 10px 3px;"></div>
           <div style="display:flex;align-items:center;font-family:'PorscheNext',sans-serif;font-weight:700;font-size:24px;color:#fff;letter-spacing:.08em;transform:translateY(5px);">RJ</div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:8px;font-weight:700;letter-spacing:.3em;color:#C8102E;margin-bottom:2px;">SERVICE INTELLIGENCE</div>
+        <div class="si-pc-header-right" style="text-align:right;">
+          <div style="font-size:8px;font-weight:700;letter-spacing:.3em;color:#C8102E;margin-bottom:2px;white-space:nowrap;">SERVICE INTELLIGENCE</div>
           <div style="font-size:9px;color:rgba(255,255,255,.7);">Gerado em ${dateStr}</div>
         </div>
       </div>
@@ -10691,7 +10704,7 @@ window.SI_shareCard = async function() {
           <div style="font-size:16px;font-weight:700;color:#000;margin-bottom:4px;">${model} <span style="font-weight:400;color:#999">${yr}</span></div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <span style="font-size:12px;font-weight:700;color:#000;letter-spacing:.06em;">${v.placa}</span>
-            ${v.kmEstimado?`<span style="background:#FFF2F4;border:1px solid rgba(200,16,46,.25);color:#C8102E;font-size:9.5px;font-weight:700;padding:2px 8px;">~ ${v.kmEstimado.toLocaleString('pt-BR')} km</span>`:''}</div>
+            ${v.kmEstimado?`<span style="background:#FFF2F4;border:1px solid rgba(200,16,46,.25);color:#C8102E;font-size:9.5px;font-weight:700;padding:2px 8px;white-space:nowrap;">~ ${v.kmEstimado.toLocaleString('pt-BR')} km</span>`:''}</div>
           <div style="position:relative;height:3px;background:#E5E7EB;margin-top:2px;">
             <div style="position:absolute;left:0;top:0;bottom:0;width:${kmPct}%;background:linear-gradient(90deg,#C8102E,#E83358);"></div>
             <div style="position:absolute;left:${kmPct}%;top:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#C8102E;box-shadow:0 0 0 2px #fff;"></div>
