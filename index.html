@@ -1,5 +1,17 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.14 — Build: 2026-10-02 01:35 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.15 — Build: 2026-10-02 18:40 BRT -->
+<!-- v5.10.15: SI — LISTA EM FUNDO CLARO, LOGO PORSCHE | RJ, LINHAS COMPACTAS, BUSCA.
+     Só o painel de LISTA do SI muda (classe si-claro no #si-panel); o card
+     de detalhe (retrato, MENSAGEM / PDF / AGENDAMENTO / MSG + LINK) é o
+     mesmo. 1) Fundo branco em toda a lista — um bloco de CSS no fim do CSS
+     do SI sobrescreve as cores escuras, sem mexer nas regras antigas.
+     2) Logo Porsche | RJ (PNG de 6,7 KB embutido, o mesmo desenho do
+     PORSCHE_RJ_LOGO_BASE64 do Code.gs) no lugar do brasão vermelho.
+     3) Linha do veículo em 52 px: faixa de status, placa + modelo/ano,
+     cliente · km · origem do plano, pill + nº de itens, seta. 10–11 carros
+     por tela em vez de 6. 4) Campo de busca (placa, modelo ou cliente) nas
+     abas Todos / Vencidos / A Vencer / Em Dia, filtrado em memória.
+     Mockup aprovado em 02/10/2026. Code.gs: LATEST_PWA_VERSION 5.10.15. -->
 <!-- v5.10.14: SI — ORIGEM DO PLANO NO RODAPÉ DO CARD (acompanha SI.gs v4.3.6).
      O SI.gs v4.3.6 passou a calcular o card a partir dos formulários
      oficiais Porsche (aba SI_PLANO) quando o VIN decodifica, e manda no
@@ -1573,6 +1585,92 @@ input:focus{outline:none;border-color:var(--black)}
 }
 @keyframes si-spin { to { transform: rotate(360deg); } }
 
+/* ══ v5.10.15 — LISTA DO SI EM FUNDO CLARO ═══════════════════════════════════
+   Sobrescreve as cores do painel de lista (não do card). Tudo sob
+   .si-overlay.si-claro, para que tirar a classe devolva o escuro. */
+.si-overlay.si-claro { background: #FFFFFF; color: #111; }
+.si-claro .si-topbar { background: #fff; border-bottom: 1px solid #E3E3E6; padding: 12px 16px 10px; }
+.si-claro .si-topbar-crest { display: none; }
+.si-claro .si-topbar-logo { height: 26px; width: auto; display: block; }
+.si-claro .si-topbar-title { display: none; }
+.si-claro .si-topbar-sub { color: #C8102E; margin-top: 3px; }
+.si-claro .si-run-btn { background: #fff; border: 1px solid #C8102E; color: #C8102E; white-space: nowrap; }
+.si-claro .si-run-btn:hover { background: #C8102E; color: #fff; }
+.si-claro .si-close-btn { background: #fff; border: 1px solid #E3E3E6; color: #6B6B70; }
+.si-claro .si-close-btn:hover { background: #F6F6F7; color: #111; }
+.si-claro .si-metabar { background: #F6F6F7; border-bottom: 1px solid #E3E3E6; padding: 8px 16px; gap: 6px 14px; }
+.si-claro .si-meta-run { color: #6B6B70; font-size: 11px; }
+.si-claro .si-meta-count { color: #6B6B70; font-size: 11px; }
+.si-claro .si-meta-count strong.red   { color: #DC2626; }
+.si-claro .si-meta-count strong.amber { color: #D97706; }
+.si-claro .si-meta-count strong.green { color: #16A34A; }
+.si-claro .si-filters { background: #fff; border-bottom: 1px solid #E3E3E6; padding: 0 8px; }
+.si-claro .si-filter-btn { color: #6B6B70; font-size: 12px; letter-spacing: 0.02em; padding: 11px 10px 9px; }
+.si-claro .si-filter-btn:hover { color: #111; }
+.si-claro .si-filter-btn.active { color: #111; border-bottom-color: #C8102E; }
+.si-claro .si-busca { display: flex; align-items: center; gap: 8px; margin: 10px 12px 2px; padding: 0 12px; border: 1px solid #E3E3E6; border-radius: 6px; background: #F6F6F7; }
+.si-claro .si-busca span { color: #9A9AA0; font-size: 14px; }
+.si-claro .si-busca input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-size: 13px; color: #111; padding: 9px 0; outline: none; }
+.si-claro .si-busca input::placeholder { color: #9A9AA0; }
+.si-claro .si-busca.oculta { display: none; }
+.si-claro .si-range-bar { background: #F6F6F7; border-bottom: 1px solid #E3E3E6; }
+.si-claro .si-range-preset { background: #fff; border-color: #D6D6DA; color: #444; }
+.si-claro .si-range-preset:hover { color: #111; border-color: #999; }
+.si-claro .si-range-preset.active { background: #FFF2F4; border-color: #C8102E; color: #C8102E; }
+.si-claro .si-range-dates input[type="date"] { background: #fff; border-color: #D6D6DA; color: #111; }
+.si-claro .si-range-dates label, .si-claro .si-range-opt { color: #6B6B70; }
+.si-claro .si-range-opt:hover { color: #111; }
+.si-claro .si-range-summary { color: #6B6B70; }
+.si-claro .si-range-summary strong { color: #111; }
+.si-claro .si-month-head { border-bottom-color: #E3E3E6; }
+.si-claro .si-month-name { color: #111; }
+.si-claro .si-month-name.venc { color: #DC2626; }
+.si-claro .si-month-count { color: #6B6B70; }
+.si-claro .si-list { padding: 6px 12px 16px; }
+.si-claro .si-list::-webkit-scrollbar-thumb { background: #D6D6DA; }
+.si-claro .si-veh-card { background: #fff; border: 1px solid #E3E3E6; border-left-width: 4px; border-radius: 6px; }
+.si-claro .si-veh-card:hover { background: #F6F6F7; border-color: #D6D6DA; }
+.si-claro .si-veh-card.overdue, .si-claro .si-veh-card.sem_reg { border-left-color: #DC2626; }
+.si-claro .si-veh-card.due_soon { border-left-color: #D97706; }
+.si-claro .si-veh-card.ok { border-left-color: #16A34A; }
+.si-claro .si-veh-card.si-sel { background: #FFF2F4 !important; }
+.si-claro .si-veh-plate { color: #111; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; letter-spacing: 0.04em; }
+.si-claro .si-veh-model { color: #111; font-size: 12px; font-weight: 600; }
+.si-claro .si-veh-model .si-veh-ano { color: #6B6B70; font-weight: 500; }
+.si-claro .si-veh-name { color: #6B6B70; font-size: 11px; }
+.si-claro .si-veh-km, .si-claro .si-veh-plano { color: #6B6B70; font-size: 11px; margin-left: 0; }
+.si-claro .si-veh-badge { font-size: 8.5px; letter-spacing: 0.08em; border-radius: 3px; color: #fff; border: 0; margin-bottom: 0; }
+.si-claro .si-veh-badge.overdue, .si-claro .si-veh-badge.sem_reg { background: #DC2626; }
+.si-claro .si-veh-badge.due_soon { background: #D97706; }
+.si-claro .si-veh-badge.ok { background: #16A34A; }
+.si-claro .si-veh-issue-count { color: #6B6B70; font-size: 10.5px; }
+.si-claro .si-due-item { color: #444; }
+.si-claro .si-due-date { color: #6B6B70; }
+.si-claro .si-due-date.venc { color: #DC2626; }
+.si-claro .si-due-est { color: #6B6B70; border-color: #D6D6DA; }
+.si-claro .si-due-tag { color: #6B6B70; border-color: #D6D6DA; }
+.si-claro .si-due-tag.rec { color: #DC2626; border-color: #DC2626; }
+.si-claro .si-veh-nofone { color: #DC2626; }
+.si-claro .si-veh-contato { color: #15803D; }
+.si-claro .si-veh-oferta { color: #1D4ED8; }
+.si-claro .si-queue { background: #fff; border-top: 2px solid #C8102E; box-shadow: 0 -8px 20px rgba(0,0,0,0.12); margin: 8px -12px -16px; }
+.si-claro .si-queue-info { color: #6B6B70; }
+.si-claro .si-queue-info strong, .si-claro .si-queue-target { color: #111; }
+.si-claro .si-queue-btn { background: #25D366; border-color: #25D366; color: #fff; }
+.si-claro .si-queue-btn:hover { background: #1EB85A; }
+.si-claro .si-queue-btn.ghost { background: #fff; border-color: #D6D6DA; color: #6B6B70; }
+.si-claro .si-queue-btn.ghost:hover { color: #111; }
+.si-claro .si-veh-card.si-done { opacity: 0.45; }
+.si-claro .si-veh-sent { color: #15803D; border-color: #15803D; }
+.si-claro .si-empty { color: #9A9AA0; }
+/* linha compacta (lista principal) */
+.si-claro .si-veh-card.si-linha { grid-template-columns: 1fr auto 12px; gap: 0 10px; padding: 7px 10px 7px 10px; min-height: 52px; }
+.si-claro .si-linha .si-veh-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.si-claro .si-linha .si-veh-l1 .si-veh-model { overflow: hidden; text-overflow: ellipsis; margin-left: 0; }
+.si-claro .si-linha .si-veh-l2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.si-claro .si-linha .si-veh-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.si-claro .si-linha .si-veh-seta { color: #B8B8BE; font-size: 16px; line-height: 1; }
+
 /* ══════════════════════════════════════════════════════════════════════════════
    SI CARD MODAL
    ══════════════════════════════════════════════════════════════════════════ */
@@ -3015,7 +3113,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.14';
+const APP_VERSION = '5.10.15';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -9256,6 +9354,12 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   // ── STATE ─────────────────────────────────────────────────────────────────
   let siCards       = [];   // raw array from server
   let siFilter      = 'ALL';
+  let siBusca       = '';   // v5.10.15 — texto da busca, normalizado
+  const _siNorm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  window.SI_setBusca = function (txt) {
+    siBusca = _siNorm(txt).trim();
+    if (typeof window.SI_renderList === 'function') window.SI_renderList();
+  };
 
   const PILL_LABEL = {
     OVERDUE:      'VENCIDO',
@@ -9319,7 +9423,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       })
       .finally(() => {
         btn.disabled = false;
-        btn.textContent = 'ANALISAR AGORA';
+        btn.textContent = 'ANALISAR';
       });
   };
 
@@ -9341,6 +9445,10 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   // ── RENDER LIST ───────────────────────────────────────────────────────────
   window.SI_renderList = function () {
     const container = document.getElementById('si-list');
+
+    // v5.10.15 — a busca só vale nas abas de status; nas outras some.
+    const buscaEl = document.getElementById('si-busca');
+    if (buscaEl) buscaEl.classList.toggle('oculta', !['ALL','OVERDUE','DUE_SOON','OK'].includes(siFilter));
 
     // v5.5.0 — modo período assume a lista inteira: agrupa por mês, mostra os
     // itens que casaram e traz seleção + fila. Os outros filtros seguem iguais.
@@ -9364,6 +9472,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     }
 
     const filtered  = siCards.filter(c => {
+      if (siBusca && !_siNorm(`${c.placa} ${c.modelo} ${c.cliente}`).includes(siBusca)) return false;   // v5.10.15
       if (siFilter === 'ALL')      return true;
       if (siFilter === 'OVERDUE')  return c.statusCode === 'OVERDUE' || c.statusCode === 'SEM_REGISTRO';
       if (siFilter === 'DUE_SOON') return c.statusCode === 'DUE_SOON';
@@ -9386,22 +9495,27 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       const issues  = (v.items || []).filter(i => i.statusCode !== 'OK').length;
       const yr      = v.modelo.match(/\b(20\d{2})\b/)?.[1] || '';
       const model   = v.modelo.replace(/\s*\b(20\d{2})\b\s*/,'').trim();
+      // v5.10.15 — linha compacta: 2 linhas de texto, pill à direita, seta.
+      const nome  = (v.cliente || '').trim();
+      const plano = v.plano && v.plano.fonte === 'form'
+        ? `formulário ${v.plano.geracao || ''}`.trim()
+        : (v.plano && v.plano.fonte === 'matrix' ? 'tabela genérica' : '');
+      const l2 = [nome, v.kmEstimado ? `~${v.kmEstimado.toLocaleString('pt-BR')} km` : '', plano]
+        .filter(Boolean).join(' · ');
       return `
-        <div class="si-veh-card ${css}" onclick="SI_openCard('${v.placa}')">
+        <div class="si-veh-card si-linha ${css}" onclick="SI_openCard('${v.placa}')">
           <div class="si-veh-main">
-            <div>
+            <div class="si-veh-l1">
               <span class="si-veh-plate">${v.placa}</span>
-              <span class="si-veh-model">${model}${yr ? ` · ${yr}` : ''}</span>
+              <span class="si-veh-model">${model}${yr ? ` <span class="si-veh-ano">${yr}</span>` : ''}</span>
             </div>
-            <div>
-              <span class="si-veh-name">${v.cliente}</span>
-              ${v.kmEstimado ? `<span class="si-veh-km">· ~${v.kmEstimado.toLocaleString('pt-BR')} km</span>` : ''}
-            </div>
+            <div class="si-veh-l2"><span class="si-veh-name">${l2}</span></div>
           </div>
           <div class="si-veh-right">
-            <div><span class="si-veh-badge ${css}">${label}</span></div>
-            ${issues > 0 ? `<div class="si-veh-issue-count">${issues} item${issues !== 1 ? 's' : ''}</div>` : ''}
+            <span class="si-veh-badge ${css}">${label}</span>
+            ${issues > 0 ? `<span class="si-veh-issue-count">${issues} item${issues !== 1 ? 's' : ''}</span>` : ''}
           </div>
+          <span class="si-veh-seta" aria-hidden="true">&rsaquo;</span>
         </div>`;
     }).join('');
   };
@@ -11243,7 +11357,7 @@ function Polaris_brl(n) {
   </div>
 </div>
 
-<div id="si-panel" class="si-overlay" role="dialog" aria-label="Service Intelligence">
+<div id="si-panel" class="si-overlay si-claro" role="dialog" aria-label="Service Intelligence">
 
   <!-- Top bar -->
   <div class="si-topbar">
@@ -11254,12 +11368,13 @@ function Polaris_brl(n) {
         </svg>
       </div>
       <div>
+        <img class="si-topbar-logo" alt="Porsche | RJ" src="data:image/png;base64,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">
         <div class="si-topbar-title">PORSCHE</div>
         <div class="si-topbar-sub">SERVICE INTELLIGENCE</div>
       </div>
     </div>
     <div class="si-topbar-right">
-      <button id="si-run-btn" class="si-run-btn" onclick="SI_runAnalysis()">ANALISAR AGORA</button>
+      <button id="si-run-btn" class="si-run-btn" onclick="SI_runAnalysis()">ANALISAR</button>
       <button class="si-close-btn" onclick="SI_closePanel()" aria-label="Fechar">✕</button>
     </div>
   </div>
@@ -11290,6 +11405,12 @@ function Polaris_brl(n) {
     <button class="si-filter-btn"        data-filter="PERIODO"  onclick="SI_setFilter(this,'PERIODO')">Por período</button>
     <button class="si-filter-btn"        data-filter="RECALL"   onclick="SI_setFilter(this,'RECALL')">Recall</button>
     <button class="si-filter-btn"        data-filter="GARANTIA" onclick="SI_setFilter(this,'GARANTIA')">Garantia</button>
+  </div>
+
+  <!-- v5.10.15 — busca em memória (placa, modelo ou cliente) -->
+  <div id="si-busca" class="si-busca">
+    <span aria-hidden="true">&#9906;</span>
+    <input type="search" id="si-busca-input" placeholder="Placa, modelo ou cliente" autocomplete="off" oninput="SI_setBusca(this.value)">
   </div>
 
   <!-- v5.5.0 — barra de período (só aparece na aba "Por período") -->
