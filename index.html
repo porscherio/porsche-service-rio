@@ -1,5 +1,13 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.13 — Build: 2026-09-15 23:05 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.14 — Build: 2026-10-02 01:35 BRT -->
+<!-- v5.10.14: SI — ORIGEM DO PLANO NO RODAPÉ DO CARD (acompanha SI.gs v4.3.6).
+     O SI.gs v4.3.6 passou a calcular o card a partir dos formulários
+     oficiais Porsche (aba SI_PLANO) quando o VIN decodifica, e manda no
+     cache um bloco `plano` {fonte:'form'|'matrix', familia, geracao,
+     anoModelo, variante}. Aqui só o rodapé do card muda: "Plano: formulário
+     Porsche 911 991 Carrera 4S · MY2019" ou "Plano: tabela genérica", para o
+     Aprovador saber de onde saiu a recomendação. Cache antigo (sem `plano`)
+     mostra o rodapé de sempre. Code.gs: subir LATEST_PWA_VERSION para 5.10.14. -->
 <!-- v5.10.13: SI — ITENS ESTÉTICA/PPF E SEGURO NO CARD (acompanha SI.gs v4.3.3).
      O SI.gs v4.3.3 passou a mandar dois itens novos de 10 meses, grupos
      'estetica' e 'seguro', só para carros com histórico. Aqui:
@@ -3007,7 +3015,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.13';
+const APP_VERSION = '5.10.14';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -10407,6 +10415,15 @@ window.SI_shareCard = async function() {
   };
   window.SI_ensurePortraitFonts_(); // inject immediately — modal shouldn't wait on first open
 
+  // v5.10.14 — origem do plano (SI.gs v4.3.6). Vazio em cache antigo.
+  function SI_planoRodape_(v) {
+    const p = v && v.plano;
+    if (!p || !p.fonte) return '';
+    if (p.fonte !== 'form') return ' · Plano: tabela genérica';
+    const partes = ['formulário Porsche', p.familia, p.geracao, p.variante].filter(Boolean);
+    return ` · Plano: ${partes.join(' ')}${p.anoModelo ? ' · MY' + p.anoModelo : ''}`;
+  }
+
   window.SI_generatePortraitHTML = function(vehicle) {
     const v = vehicle;
     const items = (v.items || []).slice().sort((a,b) => {
@@ -10584,7 +10601,7 @@ window.SI_shareCard = async function() {
       </div>
       <!-- FOOTER -->
       <div style="padding:12px 20px;border-top:1px solid #EBEBEB;display:flex;justify-content:space-between;background:#FAFAFA;">
-        <span style="font-size:9px;color:#000;">Análise baseada em histórico de OS · Porsche Service Rio</span>
+        <span style="font-size:9px;color:#000;">Análise baseada em histórico de OS · Porsche Service Rio${SI_planoRodape_(v)}</span>
         <span style="font-size:9px;color:#000;font-family:monospace;">SI · v2.0</span>
       </div>
       <div style="height:4px;background:#C8102E;"></div>
