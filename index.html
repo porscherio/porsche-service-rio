@@ -1,5 +1,19 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.16 — Build: 2026-10-02 19:00 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.17 — Build: 2026-10-02 19:40 BRT -->
+<!-- v5.10.17: SI — DOIS STATUS NOVOS (acompanha SI.gs v4.3.9).
+     1) SEM REGISTRO vira estado próprio, em amarelo-ácido (fundo #E6FF00,
+        texto preto), e NÃO conta mais como vencido — nem no badge do
+        carro, nem na aba Vencidos, nem nos contadores. Ganha aba própria e
+        contador próprio na barra de resumo.
+     2) INSPEÇÃO (azul): ponto de verificação vencido (acao = verificacao
+        no SI_PLANO). Aba e contador próprios. Status do carro:
+        VENCIDO > A VENCER > INSPEÇÃO > SEM REGISTRO > EM DIA.
+     3) Item sem registro mas com linha de base (item.semRegistro + item.base,
+        do SI.gs 4.3.9) mostra na coluna "Última realização": "Sem registro
+        aqui · desde a entrega 10/04/2023" (ou "desde o ano-modelo 2025") e
+        a pill traz "· S/REG" para o Aprovador saber que a data é contada
+        da base, não de uma OS. Cache antigo: tudo como antes.
+     Code.gs: LATEST_PWA_VERSION 5.10.17. -->
 <!-- v5.10.16: SI — CARD DE DETALHE CABE NA TELA DO CELULAR. O card retrato
      nasce com width:600px inline (é a largura em que o PDF e a imagem de
      WhatsApp são rasterizados, e isso NÃO muda). Na tela, o mesmo HTML ia
@@ -1637,7 +1651,7 @@ input:focus{outline:none;border-color:var(--black)}
 .si-claro .si-list::-webkit-scrollbar-thumb { background: #D6D6DA; }
 .si-claro .si-veh-card { background: #fff; border: 1px solid #E3E3E6; border-left-width: 4px; border-radius: 6px; }
 .si-claro .si-veh-card:hover { background: #F6F6F7; border-color: #D6D6DA; }
-.si-claro .si-veh-card.overdue, .si-claro .si-veh-card.sem_reg { border-left-color: #DC2626; }
+.si-claro .si-veh-card.overdue { border-left-color: #DC2626; }
 .si-claro .si-veh-card.due_soon { border-left-color: #D97706; }
 .si-claro .si-veh-card.ok { border-left-color: #16A34A; }
 .si-claro .si-veh-card.si-sel { background: #FFF2F4 !important; }
@@ -1647,9 +1661,15 @@ input:focus{outline:none;border-color:var(--black)}
 .si-claro .si-veh-name { color: #6B6B70; font-size: 11px; }
 .si-claro .si-veh-km, .si-claro .si-veh-plano { color: #6B6B70; font-size: 11px; margin-left: 0; }
 .si-claro .si-veh-badge { font-size: 8.5px; letter-spacing: 0.08em; border-radius: 3px; color: #fff; border: 0; margin-bottom: 0; }
-.si-claro .si-veh-badge.overdue, .si-claro .si-veh-badge.sem_reg { background: #DC2626; }
+.si-claro .si-veh-badge.overdue { background: #DC2626; }
 .si-claro .si-veh-badge.due_soon { background: #D97706; }
 .si-claro .si-veh-badge.ok { background: #16A34A; }
+.si-claro .si-veh-badge.inspecao { background: #2563EB; }
+.si-claro .si-veh-badge.sem_reg { background: #E6FF00; color: #111; }
+.si-claro .si-veh-card.inspecao { border-left-color: #2563EB; }
+.si-claro .si-veh-card.sem_reg { border-left-color: #E6FF00; }
+.si-claro .si-meta-dot.blue { background: #2563EB; } .si-claro .si-meta-count strong.blue { color: #2563EB; }
+.si-claro .si-meta-dot.acid { background: #E6FF00; border: 1px solid #B5C800; } .si-claro .si-meta-count strong.acid { color: #8A9A00; }
 .si-claro .si-veh-issue-count { color: #6B6B70; font-size: 10.5px; }
 .si-claro .si-due-item { color: #444; }
 .si-claro .si-due-date { color: #6B6B70; }
@@ -3126,7 +3146,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.16';
+const APP_VERSION = '5.10.17';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -9378,12 +9398,14 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     OVERDUE:      'VENCIDO',
     SEM_REGISTRO: 'SEM REGISTRO',
     DUE_SOON:     'A VENCER',
+    INSPECAO:     'INSPEÇÃO',      // v5.10.17
     OK:           'EM DIA',
   };
   const STATUS_CSS = {
     OVERDUE:      'overdue',
     SEM_REGISTRO: 'sem_reg',
     DUE_SOON:     'due_soon',
+    INSPECAO:     'inspecao',      // v5.10.17
     OK:           'ok',
   };
   const MN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -9461,7 +9483,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
     // v5.10.15 — a busca só vale nas abas de status; nas outras some.
     const buscaEl = document.getElementById('si-busca');
-    if (buscaEl) buscaEl.classList.toggle('oculta', !['ALL','OVERDUE','DUE_SOON','OK'].includes(siFilter));
+    if (buscaEl) buscaEl.classList.toggle('oculta', !['ALL','OVERDUE','DUE_SOON','INSPECAO','SEM_REG','OK'].includes(siFilter));
 
     // v5.5.0 — modo período assume a lista inteira: agrupa por mês, mostra os
     // itens que casaram e traz seleção + fila. Os outros filtros seguem iguais.
@@ -9487,8 +9509,10 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     const filtered  = siCards.filter(c => {
       if (siBusca && !_siNorm(`${c.placa} ${c.modelo} ${c.cliente}`).includes(siBusca)) return false;   // v5.10.15
       if (siFilter === 'ALL')      return true;
-      if (siFilter === 'OVERDUE')  return c.statusCode === 'OVERDUE' || c.statusCode === 'SEM_REGISTRO';
+      if (siFilter === 'OVERDUE')  return c.statusCode === 'OVERDUE';            // v5.10.17 — sem registro saiu daqui
       if (siFilter === 'DUE_SOON') return c.statusCode === 'DUE_SOON';
+      if (siFilter === 'INSPECAO') return c.statusCode === 'INSPECAO';
+      if (siFilter === 'SEM_REG')  return c.statusCode === 'SEM_REGISTRO';
       if (siFilter === 'OK')       return c.statusCode === 'OK';
       return true;
     });
@@ -9535,8 +9559,10 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
   // ── UPDATE META BAR ───────────────────────────────────────────────────────
   window.SI_updateMeta = function () {
-    const nOverdue = siCards.filter(c => c.statusCode === 'OVERDUE' || c.statusCode === 'SEM_REGISTRO').length;
+    const nOverdue = siCards.filter(c => c.statusCode === 'OVERDUE').length;      // v5.10.17
     const nSoon    = siCards.filter(c => c.statusCode === 'DUE_SOON').length;
+    const nInsp    = siCards.filter(c => c.statusCode === 'INSPECAO').length;
+    const nSem     = siCards.filter(c => c.statusCode === 'SEM_REGISTRO').length;
     const nOk      = siCards.filter(c => c.statusCode === 'OK').length;
 
     // Last run date
@@ -9554,6 +9580,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     };
     show('si-count-overdue', nOverdue, 'si-n-overdue');
     show('si-count-soon',    nSoon,    'si-n-soon');
+    if (document.getElementById('si-count-insp')) show('si-count-insp', nInsp, 'si-n-insp');   // v5.10.17
+    if (document.getElementById('si-count-sem'))  show('si-count-sem',  nSem,  'si-n-sem');
     show('si-count-ok',      nOk,      'si-n-ok');
   };
 
@@ -9666,7 +9694,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
   // ── SORTING ───────────────────────────────────────────────────────────────
   function byUrgency_(a, b) {
-    const rank = { OVERDUE: 4, SEM_REGISTRO: 3, DUE_SOON: 2, OK: 1 };
+    const rank = { OVERDUE: 5, DUE_SOON: 4, INSPECAO: 3, SEM_REGISTRO: 2, OK: 1 };   // v5.10.17
     const diff = (rank[b.statusCode] || 0) - (rank[a.statusCode] || 0);
     if (diff !== 0) return diff;
     return (a.placa || '').localeCompare(b.placa || '');
@@ -10505,17 +10533,20 @@ window.SI_shareCard = async function() {
     'trava de portas':'trava','travas eletricas':'trava','trava eletrica':'trava','fechadura':'trava',
   };
 
+  // v5.10.17 — SEM REGISTRO amarelo-ácido (texto preto), INSPEÇÃO azul.
   const STATUS_COLOR = {
     OVERDUE:      '#DC2626',
-    SEM_REGISTRO: '#DC2626',
+    SEM_REGISTRO: '#E6FF00',
     DUE_SOON:     '#D97706',
+    INSPECAO:     '#2563EB',
     OK:           '#16A34A',
   };
+  const STATUS_TEXT = { SEM_REGISTRO: '#111' };   // cor do texto da pill quando o fundo é claro
   const STATUS_LABEL = {
-    OVERDUE:'VENCIDO', SEM_REGISTRO:'SEM REGISTRO', DUE_SOON:'A VENCER', OK:'EM DIA'
+    OVERDUE:'VENCIDO', SEM_REGISTRO:'SEM REGISTRO', DUE_SOON:'A VENCER', INSPECAO:'INSPEÇÃO', OK:'EM DIA'
   };
   const STATUS_BG = {
-    OVERDUE:'#FFF8F8', SEM_REGISTRO:'#FFF8F8', DUE_SOON:'#FFFBF2', OK:'#fff'
+    OVERDUE:'#FFF8F8', SEM_REGISTRO:'#FDFFE6', DUE_SOON:'#FFFBF2', INSPECAO:'#F3F7FF', OK:'#fff'
   };
 
   const MN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -10554,11 +10585,13 @@ window.SI_shareCard = async function() {
   window.SI_generatePortraitHTML = function(vehicle) {
     const v = vehicle;
     const items = (v.items || []).slice().sort((a,b) => {
-      const r = {OVERDUE:4,SEM_REGISTRO:3,DUE_SOON:2,OK:1};
+      const r = {OVERDUE:5,DUE_SOON:4,INSPECAO:3,SEM_REGISTRO:2,OK:1};   // v5.10.17
       return (r[b.statusCode]||0)-(r[a.statusCode]||0);
     });
-    const nOver = items.filter(i=>i.statusCode==='OVERDUE'||i.statusCode==='SEM_REGISTRO').length;
+    const nOver = items.filter(i=>i.statusCode==='OVERDUE').length;
     const nSoon = items.filter(i=>i.statusCode==='DUE_SOON').length;
+    const nInsp = items.filter(i=>i.statusCode==='INSPECAO').length;
+    const nSem  = items.filter(i=>i.statusCode==='SEM_REGISTRO').length;
     const nOk   = items.filter(i=>i.statusCode==='OK').length;
     const now   = new Date();
     const dateStr = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()}`;
@@ -10594,8 +10627,9 @@ window.SI_shareCard = async function() {
       }
 
       const col   = STATUS_COLOR[sc]||'#000';
-      const lbl   = STATUS_LABEL[sc]||sc;
+      const lbl   = (STATUS_LABEL[sc]||sc) + (item.semRegistro && sc !== 'SEM_REGISTRO' ? ' · S/REG' : '');   // v5.10.17
       const bg    = STATUS_BG[sc]||'#fff';
+      const txt   = STATUS_TEXT[sc] || '#fff';
       const iconKey = _GI[_norm(item.grupo)];
       const iconImg = _iconSvg(iconKey, col);
       // v5.10.13 — seguro não tem RO; muda a 2ª e a 3ª coluna.
@@ -10609,7 +10643,7 @@ window.SI_shareCard = async function() {
         pct = _wPend.length ? 100 : 0;
       } else if (Number.isFinite(item.pct)) {
         pct = item.pct;
-      } else if (sc==='OVERDUE'||sc==='SEM_REGISTRO') {
+      } else if (sc==='OVERDUE'||sc==='SEM_REGISTRO'||sc==='INSPECAO') {
         pct = 100;
       } else if (sc==='DUE_SOON') {
         // estimate from lastData to now vs interval
@@ -10648,7 +10682,7 @@ window.SI_shareCard = async function() {
             ${iconImg}
             <div style="font-size:13px;font-weight:700;color:#000;line-height:1.2;">${window.SI_nomeGrupo_(item.grupo)}</div>
           </div>
-          <div style="font-size:7.5px;font-weight:800;letter-spacing:.1em;padding:3px 8px;background:${col};color:#fff;white-space:nowrap;flex-shrink:0;">${lbl}</div>
+          <div style="font-size:7.5px;font-weight:800;letter-spacing:.1em;padding:3px 8px;background:${col};color:${txt};white-space:nowrap;flex-shrink:0;">${lbl}</div>
         </div>
         <div style="font-size:10px;color:#000;margin-bottom:8px;padding-left:${iconKey?'30px':'0'}">${descOverride || item.descricao || ''}</div>
         <div style="position:relative;height:3px;background:#E5E7EB;margin-bottom:9px;">
@@ -10664,7 +10698,9 @@ window.SI_shareCard = async function() {
             <div style="font-size:7px;font-weight:700;letter-spacing:.2em;color:#000;text-transform:uppercase;margin-bottom:2px;">${ehSeguro ? 'Apólice' : 'Última realização'}</div>
             <div style="font-size:10.5px;color:#000;">${ehSeguro
               ? [`início ${item.lastData||'—'}`, item.seguradora || '', item.vigenciaFim ? `até ${item.vigenciaFim}` : ''].filter(Boolean).join(' · ')
-              : item.lastRo?`RO #${item.lastRo} · ${item.lastData||''}${item.lastKm?' · '+item.lastKm.toLocaleString('pt-BR')+' km':''}` : '<span style="color:#DC2626;font-style:italic;">Não localizado</span>'}</div>
+              : item.lastRo?`RO #${item.lastRo} · ${item.lastData||''}${item.lastKm?' · '+item.lastKm.toLocaleString('pt-BR')+' km':''}`
+              : item.semRegistro && item.base ? `<span style="font-style:italic;">Sem registro aqui · desde ${item.base.fonte==='entrega' ? 'a entrega ' + item.base.data : 'o ano-modelo ' + String(item.base.data||'').slice(-4)}</span>`
+              : '<span style="color:#DC2626;font-style:italic;">Não localizado</span>'}</div>
           </div>
           <div>
             <div style="font-size:7px;font-weight:700;letter-spacing:.2em;color:#000;text-transform:uppercase;margin-bottom:2px;">${ehSeguro ? 'Contatar em' : 'Vencimento'}</div>
@@ -10717,9 +10753,11 @@ window.SI_shareCard = async function() {
         </div>
       </div>
       <!-- SUMMARY -->
-      <div style="padding:10px 20px;display:flex;gap:6px;align-items:center;background:#fff;border-bottom:1px solid #EBEBEB;">
+      <div style="padding:10px 20px;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;background:#fff;border-bottom:1px solid #EBEBEB;">
         ${nOver>0?`<div style="display:flex;align-items:center;font-size:12px;color:#000;"><span style="width:7px;height:7px;border-radius:50%;background:#DC2626;display:inline-block;margin-right:5px;"></span><strong style="color:#DC2626;margin-right:3px;">${nOver}</strong> vencido${nOver!==1?'s':''}</div><span style="color:#DDD;margin:0 7px;">·</span>`:''}
         ${nSoon>0?`<div style="display:flex;align-items:center;font-size:12px;color:#000;"><span style="width:7px;height:7px;border-radius:50%;background:#D97706;display:inline-block;margin-right:5px;"></span><strong style="color:#D97706;margin-right:3px;">${nSoon}</strong> a vencer</div><span style="color:#DDD;margin:0 7px;">·</span>`:''}
+        ${nInsp>0?`<div style="display:flex;align-items:center;font-size:12px;color:#000;"><span style="width:7px;height:7px;border-radius:50%;background:#2563EB;display:inline-block;margin-right:5px;"></span><strong style="color:#2563EB;margin-right:3px;">${nInsp}</strong> inspeção</div><span style="color:#DDD;margin:0 7px;">·</span>`:''}
+        ${nSem>0?`<div style="display:flex;align-items:center;font-size:12px;color:#000;"><span style="width:7px;height:7px;border-radius:50%;background:#E6FF00;border:1px solid #B5C800;display:inline-block;margin-right:5px;"></span><strong style="color:#8A9A00;margin-right:3px;">${nSem}</strong> sem registro</div><span style="color:#DDD;margin:0 7px;">·</span>`:''}
         <div style="display:flex;align-items:center;font-size:12px;color:#000;"><span style="width:7px;height:7px;border-radius:50%;background:#16A34A;display:inline-block;margin-right:5px;"></span><strong style="color:#16A34A;margin-right:3px;">${nOk}</strong> em dia</div>
       </div>
       <!-- SERVICE ITEMS -->
@@ -11403,6 +11441,14 @@ function Polaris_brl(n) {
       <span class="si-meta-dot amber"></span>
       <strong class="amber" id="si-n-soon">0</strong> a vencer
     </span>
+    <span id="si-count-insp" class="si-meta-count" style="display:none">
+      <span class="si-meta-dot blue"></span>
+      <strong class="blue" id="si-n-insp">0</strong> inspeção
+    </span>
+    <span id="si-count-sem" class="si-meta-count" style="display:none">
+      <span class="si-meta-dot acid"></span>
+      <strong class="acid" id="si-n-sem">0</strong> sem registro
+    </span>
     <span id="si-count-ok" class="si-meta-count" style="display:none">
       <span class="si-meta-dot green"></span>
       <strong class="green" id="si-n-ok">0</strong> em dia
@@ -11414,6 +11460,8 @@ function Polaris_brl(n) {
     <button class="si-filter-btn active" data-filter="ALL"      onclick="SI_setFilter(this,'ALL')">Todos</button>
     <button class="si-filter-btn"        data-filter="OVERDUE"  onclick="SI_setFilter(this,'OVERDUE')">Vencidos</button>
     <button class="si-filter-btn"        data-filter="DUE_SOON" onclick="SI_setFilter(this,'DUE_SOON')">A Vencer</button>
+    <button class="si-filter-btn"        data-filter="INSPECAO" onclick="SI_setFilter(this,'INSPECAO')">Inspeção</button>
+    <button class="si-filter-btn"        data-filter="SEM_REG"  onclick="SI_setFilter(this,'SEM_REG')">Sem registro</button>
     <button class="si-filter-btn"        data-filter="OK"       onclick="SI_setFilter(this,'OK')">Em Dia</button>
     <button class="si-filter-btn"        data-filter="PERIODO"  onclick="SI_setFilter(this,'PERIODO')">Por período</button>
     <button class="si-filter-btn"        data-filter="RECALL"   onclick="SI_setFilter(this,'RECALL')">Recall</button>
