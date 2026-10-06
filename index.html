@@ -1,5 +1,17 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.18 — Build: 2026-10-03 00:05 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.19 — Build: 2026-10-05 23:20 BRT -->
+<!-- v5.10.19: SI — FILTRO POR SERVIÇO COM ORDEM DE PRIORIDADE.
+     Barra de chips abaixo da busca (abas de status): Óleo · Fluido de
+     freio · Velas · Filtro de ar. Cada chip marcado soma carros com aquele
+     item PENDENTE (vencido, a vencer, inspeção ou sem registro). A ORDEM
+     em que os chips são marcados é a ordem de prioridade: o 1º (numerado
+     no chip) ordena a lista pela data de vencimento daquele item, o 2º
+     desempata, e assim por diante; carro sem o item vai para o fim. Botão
+     ↑/↓ inverte (mais cedo primeiro / mais tarde primeiro). A linha do
+     carro passa a mostrar o vencimento do serviço prioritário
+     ("óleo vence Jun/2026"). Sem chip marcado, nada muda. Oculto nas abas
+     Por período / Recall / Garantia, como a busca.
+     Code.gs: LATEST_PWA_VERSION 5.10.19. -->
 <!-- v5.10.18: SI — rótulo da base "primeira OS" (SI.gs 4.3.11): item sem
      registro contado desde a 1ª OS do carro mostra "desde a 1ª OS
      dd/mm/aaaa". Nada mais muda. Code.gs: LATEST_PWA_VERSION 5.10.18. -->
@@ -1637,6 +1649,14 @@ input:focus{outline:none;border-color:var(--black)}
 .si-claro .si-busca input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-size: 13px; color: #111; padding: 9px 0; outline: none; }
 .si-claro .si-busca input::placeholder { color: #9A9AA0; }
 .si-claro .si-busca.oculta { display: none; }
+.si-claro .si-serv { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 12px 2px; align-items: center; }
+.si-claro .si-serv.oculta { display: none; }
+.si-claro .si-serv-chip { font: inherit; font-size: 11.5px; font-weight: 600; color: #444; background: #fff; border: 1px solid #D6D6DA; border-radius: 14px; padding: 5px 11px; cursor: pointer; white-space: nowrap; }
+.si-claro .si-serv-chip.on { background: #FFF2F4; border-color: #C8102E; color: #C8102E; }
+.si-claro .si-serv-chip.on::before { content: attr(data-ordem); display: inline-block; min-width: 14px; height: 14px; line-height: 14px; border-radius: 7px; background: #C8102E; color: #fff; font-size: 9px; font-weight: 800; text-align: center; margin-right: 5px; }
+.si-claro .si-serv-dir { font: inherit; font-size: 11px; font-weight: 600; color: #6B6B70; background: #F6F6F7; border: 1px solid #E3E3E6; border-radius: 4px; padding: 5px 9px; cursor: pointer; margin-left: auto; white-space: nowrap; }
+.si-claro .si-serv-dir:disabled { opacity: .4; cursor: default; }
+.si-claro .si-veh-prio { color: #C8102E; font-weight: 600; }
 .si-claro .si-range-bar { background: #F6F6F7; border-bottom: 1px solid #E3E3E6; }
 .si-claro .si-range-preset { background: #fff; border-color: #D6D6DA; color: #444; }
 .si-claro .si-range-preset:hover { color: #111; border-color: #999; }
@@ -3149,7 +3169,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.18';
+const APP_VERSION = '5.10.19';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -9391,6 +9411,34 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
   let siCards       = [];   // raw array from server
   let siFilter      = 'ALL';
   let siBusca       = '';   // v5.10.15 — texto da busca, normalizado
+  // v5.10.19 — filtro por serviço: grupos na ORDEM em que foram marcados.
+  let siServ        = [];
+  let siServDir     = 'asc';
+  const SI_SERV_NOME = { 'troca de oleo': 'óleo', 'fluido de freio': 'fluido de freio', 'velas de ignicao': 'velas', 'filtro de ar': 'filtro de ar' };
+  window.SI_toggleServ = function (el) {
+    const g = el.dataset.grupo;
+    const i = siServ.indexOf(g);
+    if (i === -1) siServ.push(g); else siServ.splice(i, 1);
+    SI_pintaServ_();
+    if (typeof window.SI_renderList === 'function') window.SI_renderList();
+  };
+  window.SI_toggleServDir = function () {
+    siServDir = siServDir === 'asc' ? 'desc' : 'asc';
+    SI_pintaServ_();
+    if (typeof window.SI_renderList === 'function') window.SI_renderList();
+  };
+  function SI_pintaServ_() {
+    document.querySelectorAll('.si-serv-chip').forEach(b => {
+      const i = siServ.indexOf(b.dataset.grupo);
+      b.classList.toggle('on', i !== -1);
+      b.dataset.ordem = i === -1 ? '' : String(i + 1);
+    });
+    const d = document.getElementById('si-serv-dir');
+    if (d) { d.textContent = siServDir === 'asc' ? '↑ mais cedo' : '↓ mais tarde'; d.disabled = !siServ.length; }
+  }
+  // item pendente do grupo (qualquer status que não seja EM DIA)
+  const _siItemPend = (c, g) => (c.items || []).find(i => i && i.grupo === g && i.statusCode !== 'OK') || null;
+  const _siChaveData = i => (i && i.dueISO) ? i.dueISO : null;
   const _siNorm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   window.SI_setBusca = function (txt) {
     siBusca = _siNorm(txt).trim();
@@ -9487,6 +9535,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
     // v5.10.15 — a busca só vale nas abas de status; nas outras some.
     const buscaEl = document.getElementById('si-busca');
     if (buscaEl) buscaEl.classList.toggle('oculta', !['ALL','OVERDUE','DUE_SOON','INSPECAO','SEM_REG','OK'].includes(siFilter));
+    const servEl = document.getElementById('si-serv');   // v5.10.19
+    if (servEl) servEl.classList.toggle('oculta', !['ALL','OVERDUE','DUE_SOON','INSPECAO','SEM_REG','OK'].includes(siFilter));
 
     // v5.5.0 — modo período assume a lista inteira: agrupa por mês, mostra os
     // itens que casaram e traz seleção + fila. Os outros filtros seguem iguais.
@@ -9509,8 +9559,9 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       return;
     }
 
-    const filtered  = siCards.filter(c => {
+    let filtered  = siCards.filter(c => {
       if (siBusca && !_siNorm(`${c.placa} ${c.modelo} ${c.cliente}`).includes(siBusca)) return false;   // v5.10.15
+      if (siServ.length && !siServ.some(g => _siItemPend(c, g))) return false;                          // v5.10.19
       if (siFilter === 'ALL')      return true;
       if (siFilter === 'OVERDUE')  return c.statusCode === 'OVERDUE';            // v5.10.17 — sem registro saiu daqui
       if (siFilter === 'DUE_SOON') return c.statusCode === 'DUE_SOON';
@@ -9519,6 +9570,22 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       if (siFilter === 'OK')       return c.statusCode === 'OK';
       return true;
     });
+
+    // v5.10.19 — ordem de prioridade: data do 1º serviço marcado, depois do
+    // 2º… Carro sem o item vai para o fim em qualquer direção.
+    if (siServ.length) {
+      const dir = siServDir === 'asc' ? 1 : -1;
+      filtered = filtered.slice().sort((a, b) => {
+        for (const g of siServ) {
+          const da = _siChaveData(_siItemPend(a, g)), db = _siChaveData(_siItemPend(b, g));
+          if (da === db) continue;
+          if (!da) return 1;
+          if (!db) return -1;
+          return da < db ? -dir : dir;
+        }
+        return (a.placa || '').localeCompare(b.placa || '');
+      });
+    }
 
     if (!filtered.length) {
       container.innerHTML = `
@@ -9540,7 +9607,15 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
       const plano = v.plano && v.plano.fonte === 'form'
         ? `formulário ${v.plano.geracao || ''}`.trim()
         : (v.plano && v.plano.fonte === 'matrix' ? 'tabela genérica' : '');
-      const l2 = [nome, v.kmEstimado ? `~${v.kmEstimado.toLocaleString('pt-BR')} km` : '', plano]
+      // v5.10.19 — com filtro por serviço, a linha 2 mostra o vencimento do
+      // serviço prioritário em vez da origem do plano.
+      let prio = '';
+      if (siServ.length) {
+        const g  = siServ.find(x => _siItemPend(v, x));
+        const it = g ? _siItemPend(v, g) : null;
+        if (it) prio = `<span class="si-veh-prio">${SI_SERV_NOME[g] || g} ${it.statusCode === 'SEM_REGISTRO' ? 'sem registro' : 'vence ' + (it.dueBy || '—')}</span>`;
+      }
+      const l2 = [nome, v.kmEstimado ? `~${v.kmEstimado.toLocaleString('pt-BR')} km` : '', prio || plano]
         .filter(Boolean).join(' · ');
       return `
         <div class="si-veh-card si-linha ${css}" onclick="SI_openCard('${v.placa}')">
@@ -11475,6 +11550,15 @@ function Polaris_brl(n) {
   <div id="si-busca" class="si-busca">
     <span aria-hidden="true">&#9906;</span>
     <input type="search" id="si-busca-input" placeholder="Placa, modelo ou cliente" autocomplete="off" oninput="SI_setBusca(this.value)">
+  </div>
+
+  <!-- v5.10.19 — filtro por serviço, com ordem de prioridade -->
+  <div id="si-serv" class="si-serv">
+    <button class="si-serv-chip" data-grupo="troca de oleo"   onclick="SI_toggleServ(this)">Óleo</button>
+    <button class="si-serv-chip" data-grupo="fluido de freio" onclick="SI_toggleServ(this)">Fluido de freio</button>
+    <button class="si-serv-chip" data-grupo="velas de ignicao" onclick="SI_toggleServ(this)">Velas</button>
+    <button class="si-serv-chip" data-grupo="filtro de ar"    onclick="SI_toggleServ(this)">Filtro de ar</button>
+    <button class="si-serv-dir" id="si-serv-dir" onclick="SI_toggleServDir()" title="Ordem pela data de vencimento">↑ mais cedo</button>
   </div>
 
   <!-- v5.5.0 — barra de período (só aparece na aba "Por período") -->
