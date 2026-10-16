@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.19 — Build: 2026-10-05 23:20 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.20 — Build: 2026-10-16 17:00 BRT -->
+<!-- v5.10.20: VAL de Entrada / VAL de Saída REFAZÍVEIS mesmo a 100% — ficam
+     clicáveis depois de concluídas (badge "↺ Refazer"); o % continua 100 e
+     cada refação gera um novo registro de trabalho. As demais joblines
+     seguem travadas ao concluir. Só front (joblineCard + isValRefazivel_);
+     backend não precisa mudar: lockRO não barra jobline a 100% e openJobline
+     não tem trava de 100%. -->
 <!-- v5.10.19: SI — FILTRO POR SERVIÇO COM ORDEM DE PRIORIDADE.
      Barra de chips abaixo da busca (abas de status): Óleo · Fluido de
      freio · Velas · Filtro de ar. Cada chip marcado soma carros com aquele
@@ -3169,7 +3175,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.19';
+const APP_VERSION = '5.10.20';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3288,6 +3294,17 @@ const DEFAULT_JOBLINES = [
   'Checklist saida',
   'VAL de saida',
 ];
+
+// v5.10.20 — VAL de Entrada / VAL de Saida sao REFAZIVEIS mesmo a 100%:
+// as vezes a VAL precisa ser refeita depois de o tecnico ja ter concluido.
+// Diferente das outras joblines (que a 100% ficam travadas), estas duas
+// seguem clicaveis — o % continua 100 e cada refacao gera um novo registro
+// de trabalho. Reconhece pela descricao, tolerando acento e caixa.
+function isValRefazivel_(j) {
+  var d = String((j && j.job_description) || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  return d.indexOf('val de entrada') !== -1 || d.indexOf('val de saida') !== -1;
+}
 
 const PARTS_STATUSES = ['Not Authorized', 'On Stock', 'To Be Ordered', 'Ordered', 'Confirmed', 'Back Order', 'Delivered'];
 const PARTS_STATUS_PT = {
@@ -5673,11 +5690,15 @@ function joblineCard(j) {
   const isPaused   = j.lock_status === 'paused';
   const isDone     = j.completion_pct >= 100;
   const lockedByMe = isLocked && j.locked_by === currentTech;
+  // v5.10.20 — VAL concluida continua refazivel (ver isValRefazivel_).
+  const redoable   = isDone && !isLocked && isValRefazivel_(j);
 
   let dot = 'd-g', status = 'Disponível', bc = 'b-liv', bt = 'Livre';
 
   if (isDone) {
-    dot = 'd-g'; status = 'Concluída'; bc = 'b-atv'; bt = '&#x2714; Concluída';
+    dot = 'd-g'; bc = 'b-atv';
+    if (redoable) { status = 'Concluída — pode refazer'; bt = '&#x21BA; Refazer'; }
+    else          { status = 'Concluída'; bt = '&#x2714; Concluída'; }
   } else if (lockedByMe) {
     dot = 'd-a'; status = 'Em andamento por você'; bc = 'b-pau'; bt = '&#x21BA; Retomar';
   } else if (isLocked) {
@@ -5705,7 +5726,7 @@ function joblineCard(j) {
       ((isLocked && !lockedByMe) ? ' locked' : '') +
       (lockedByMe                ? ' retomar' : '') +
       (isPaused                  ? ' pausado'  : '') +
-      (isDone                    ? ' done-jl'  : '') +
+      ((isDone && !redoable)     ? ' done-jl'  : '') +
       (j.is_default              ? ' default-jl' : '') +
     '" data-id="' + j.jobline_id + '" data-ro="' + j.ro_number + '">' +
       '<div class="crow"><div><div class="cro">' + j.job_description + '</div></div>' +
