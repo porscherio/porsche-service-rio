@@ -1,5 +1,20 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.21 — Build: 2026-10-16 23:30 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.31 — Build: 2026-10-25 18:40 BRT -->
+<!-- v5.10.31: ENTREGA PELA TELA — CONFIRMAÇÃO AO CLIENTE SÓ COM APROVAÇÃO (Eytan, 25/10/2026).
+     Regra única com o agente (Code.gs 5.10.31): NENHUMA ENTREGA agendada avisa o cliente
+     sozinha. Depois de criar a ENTREGA, a tela PERGUNTA "Enviar a confirmação ao cliente?":
+       OK       -> se não há celular, pede o número; POST confirmarEntregaPrometida
+                   (notificar_cliente=true, mobile) — o cliente recebe o card verde
+                   "Entrega confirmada" e o celular é gravado na Customers/FINDER/SERVICOS.
+       Cancelar -> nada vai ao cliente; a ENTREGA fica PENDENTE de confirmação (lembretes
+                   mudos) e pode ser confirmada depois pela tela ou pelo agente
+                   ("confirma a entrega da RO X").
+     O POST de criação é no-cors (resposta opaca), então o evento recém-criado é localizado
+     por GET getAgendamentos (RO/placa + horário) antes de perguntar.
+     SERVICOS: celular do cliente passa a ser exigido no formulário (a confirmação do serviço
+     vai por WhatsApp); só segue sem telefone se o Aprovador confirmar que o cliente não tem
+     WhatsApp. VERSÃO: índice e Code.gs passam a andar na MESMA linha 5.10.xx (era 5.10.21
+     aqui / 4.10.31 lá; o celular mostrava 5.10.29) — ambos agora 5.10.31, preservando o patch 31. -->
 <!-- v5.10.21: TODA jobline PADRÃO agora é REFAZÍVEL a 100% (VAL entrada/saída,
      Checklist entrada/saída, Diagnostico, Lavagem) — generaliza a v5.10.20,
      que cobria só VAL. Regra = j.is_default, então default novo já entra
@@ -3180,7 +3195,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.29';
+const APP_VERSION = '5.10.31';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -8594,6 +8609,61 @@ function agdConfirmCreate() {
   agdSeguirCriacao(agdForcarCapacidade);
 }
 
+// v5.10.31 — Depois de criar uma ENTREGA pela tela: NADA foi ao cliente (Code.gs 5.10.31).
+// Localiza o evento recém-criado (o POST é no-cors, sem resposta) e pergunta ao Aprovador
+// se envia a confirmação. OK -> garante o celular (pede se faltar) e POST
+// confirmarEntregaPrometida(notificar_cliente=true, mobile). Cancelar -> fica pendente.
+async function agdPerguntarConfirmacaoCliente(body) {
+  const digitos = s => String(s || '').replace(/\D/g, '');
+  const ro    = digitos(body.ro_number);
+  const placa = String(body.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const alvoT = new Date(body.start).getTime();
+
+  let ev = null;
+  try {
+    const res = await fetch(API_URL + '?action=getAgendamentos&calendar=entrega&include_delivered=0');
+    const j = await res.json();
+    const lista = (j && j.ok && Array.isArray(j.events)) ? j.events : [];
+    const cands = lista.filter(e => {
+      const eRo = digitos(e.ro_number), ePl = String(e.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const casa = (ro && eRo === ro) || (placa && ePl === placa);
+      return casa && Math.abs(new Date(e.start).getTime() - alvoT) < 5 * 60000;
+    });
+    ev = cands[0] || null;
+  } catch (e) { ev = null; }
+
+  if (!ev) {
+    alert('ENTREGA criada. O cliente ainda NÃO foi avisado — não consegui localizar o evento agora; ' +
+          'confirme depois pelo agente ("confirma a entrega da RO ' + (ro || placa) + '").');
+    return;
+  }
+
+  const nome = ev.client_name || body.client_name || '';
+  const quando = String(ev.start).slice(0, 16).replace('T', ' ');
+  const enviar = confirm('ENTREGA agendada para ' + nome + ' (' + quando + ').' +
+    '\n\nEnviar a confirmação ao cliente por WhatsApp agora?' +
+    '\n\nOK = enviar.' +
+    '\nCancelar = NÃO enviar (fica pendente; pode confirmar depois pela tela ou pelo agente).');
+  if (!enviar) { showToast('Confirmação NÃO enviada — ENTREGA pendente.'); return; }
+
+  let mobile = digitos(ev.mobile || body.mobile);
+  if (mobile.length < 10) {
+    const p = prompt('O cadastro não tem o celular de ' + nome + '. Informe o celular (com DDD) para enviar a confirmação:', '');
+    mobile = digitos(p);
+    if (mobile.length < 10) { showToast('Sem telefone: confirmação NÃO enviada — ENTREGA pendente.'); return; }
+  }
+
+  try {
+    await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({
+      action: 'confirmarEntregaPrometida', event_id: ev.id, tech: currentTech,
+      notificar_cliente: true, mobile: mobile
+    }) });
+    showToast('Confirmação enviada ao cliente (' + mobile + ').');
+  } catch (e) {
+    showToast('Erro ao enviar a confirmação — ENTREGA pendente.');
+  }
+}
+
 // Quem realmente monta e envia o POST. Separado do agdConfirmCreate
 // para a checagem poder chamá-lo depois da decisão do Aprovador.
 var agdCapacidadeJaConferida = false;
@@ -8641,6 +8711,16 @@ function agdSeguirCriacao(forcar) {
     body.vin          = document.getElementById('agd-c-f-vin').value.trim().toUpperCase();
     body.mobile       = document.getElementById('agd-c-f-mobile').value.trim();
     body.location_key = document.getElementById('agd-c-f-location').value;
+
+    // v5.10.31 — celular do cliente exigido: a confirmação do serviço vai por WhatsApp
+    // e o número alimenta o cadastro (Customers/FINDER). Só segue sem telefone se o
+    // Aprovador confirmar que o cliente não tem WhatsApp.
+    if (String(body.mobile).replace(/\D/g, '').length < 10) {
+      const semZap = confirm('Sem celular do cliente a confirmação do agendamento NÃO chega a ele.' +
+        '\n\nOK = continuar SEM telefone (cliente não tem WhatsApp).' +
+        '\nCancelar = voltar e informar o celular.');
+      if (!semZap) { try { document.getElementById('agd-c-f-mobile').focus(); } catch (e) {} return; }
+    }
   }
 
   // Disable the button immediately to prevent double-submission —
@@ -8674,6 +8754,8 @@ function agdSeguirCriacao(forcar) {
       agdCapacidadeJaConferida = false;
       agdForcarCapacidade = false;
       agdGoStep1();
+      // v5.10.31 — ENTREGA: o cliente NÃO foi avisado; pergunta ao Aprovador.
+      if (body.calendar === 'entrega') agdPerguntarConfirmacaoCliente(body);
     })
     .catch(() => {
       showToast('Erro ao criar agendamento.');
