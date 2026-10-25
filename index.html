@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.31 — Build: 2026-10-25 18:40 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.32 — Build: 2026-10-25 19:45 BRT -->
+<!-- v5.10.32: SERVICOS SOB A MESMA REGRA DA ENTREGA (Eytan, 25/10/2026). Criar um SERVICOS
+     pela tela também NÃO avisa o cliente sozinho: a tela pergunta "Enviar a confirmação ao
+     cliente?" (OK -> confirmarEntregaPrometida com calendar=servicos; Cancelar -> fica
+     pendente). Agendamento RETROATIVO (data já passada ou carro já NO PÁTIO) não pergunta:
+     avisa que nada vai ao cliente — é só a âncora que a ENTREGA exige. Mesma função
+     agdPerguntarConfirmacaoCliente, agora para os dois calendários. Code.gs 5.10.32. -->
 <!-- v5.10.31: ENTREGA PELA TELA — CONFIRMAÇÃO AO CLIENTE SÓ COM APROVAÇÃO (Eytan, 25/10/2026).
      Regra única com o agente (Code.gs 5.10.31): NENHUMA ENTREGA agendada avisa o cliente
      sozinha. Depois de criar a ENTREGA, a tela PERGUNTA "Enviar a confirmação ao cliente?":
@@ -3195,7 +3201,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.31';
+const APP_VERSION = '5.10.32';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -8619,9 +8625,20 @@ async function agdPerguntarConfirmacaoCliente(body) {
   const placa = String(body.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const alvoT = new Date(body.start).getTime();
 
+  const cal = (body.calendar === 'servicos') ? 'servicos' : 'entrega';
+  const rotulo = (cal === 'servicos') ? 'Agendamento de serviço' : 'ENTREGA';
+
+  // v5.10.32 — retroativo: data já passada -> nunca avisa o cliente, nem pergunta.
+  if (cal === 'servicos' && new Date(body.start).getTime() <= Date.now()) {
+    alert('Agendamento de serviço retroativo criado. Nenhuma mensagem vai ao cliente ' +
+          '(é só a âncora administrativa para a ENTREGA).');
+    return;
+  }
+
   let ev = null;
   try {
-    const res = await fetch(API_URL + '?action=getAgendamentos&calendar=entrega&include_delivered=0');
+    const res = await fetch(API_URL + '?action=getAgendamentos&calendar=' + cal +
+                            (cal === 'entrega' ? '&include_delivered=0' : '&include_resolvidos=1'));
     const j = await res.json();
     const lista = (j && j.ok && Array.isArray(j.events)) ? j.events : [];
     const cands = lista.filter(e => {
@@ -8633,34 +8650,40 @@ async function agdPerguntarConfirmacaoCliente(body) {
   } catch (e) { ev = null; }
 
   if (!ev) {
-    alert('ENTREGA criada. O cliente ainda NÃO foi avisado — não consegui localizar o evento agora; ' +
-          'confirme depois pelo agente ("confirma a entrega da RO ' + (ro || placa) + '").');
+    alert(rotulo + ' criado(a). O cliente ainda NÃO foi avisado — não consegui localizar o evento agora; ' +
+          'confirme depois pelo agente' + (cal === 'entrega' ? ' ("confirma a entrega da RO ' + (ro || placa) + '")' : '') + '.');
+    return;
+  }
+
+  // v5.10.32 — carro já NO PÁTIO: retroativo, nada ao cliente.
+  if (cal === 'servicos' && ev.chegada) {
+    alert('Agendamento de serviço criado para um carro que JÁ está no pátio. Nenhuma mensagem vai ao cliente.');
     return;
   }
 
   const nome = ev.client_name || body.client_name || '';
   const quando = String(ev.start).slice(0, 16).replace('T', ' ');
-  const enviar = confirm('ENTREGA agendada para ' + nome + ' (' + quando + ').' +
+  const enviar = confirm(rotulo + ' agendado(a) para ' + nome + ' (' + quando + ').' +
     '\n\nEnviar a confirmação ao cliente por WhatsApp agora?' +
     '\n\nOK = enviar.' +
     '\nCancelar = NÃO enviar (fica pendente; pode confirmar depois pela tela ou pelo agente).');
-  if (!enviar) { showToast('Confirmação NÃO enviada — ENTREGA pendente.'); return; }
+  if (!enviar) { showToast('Confirmação NÃO enviada — ' + rotulo + ' pendente.'); return; }
 
   let mobile = digitos(ev.mobile || body.mobile);
   if (mobile.length < 10) {
     const p = prompt('O cadastro não tem o celular de ' + nome + '. Informe o celular (com DDD) para enviar a confirmação:', '');
     mobile = digitos(p);
-    if (mobile.length < 10) { showToast('Sem telefone: confirmação NÃO enviada — ENTREGA pendente.'); return; }
+    if (mobile.length < 10) { showToast('Sem telefone: confirmação NÃO enviada — ' + rotulo + ' pendente.'); return; }
   }
 
   try {
     await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({
-      action: 'confirmarEntregaPrometida', event_id: ev.id, tech: currentTech,
+      action: 'confirmarEntregaPrometida', calendar: cal, event_id: ev.id, tech: currentTech,
       notificar_cliente: true, mobile: mobile
     }) });
     showToast('Confirmação enviada ao cliente (' + mobile + ').');
   } catch (e) {
-    showToast('Erro ao enviar a confirmação — ENTREGA pendente.');
+    showToast('Erro ao enviar a confirmação — ' + rotulo + ' pendente.');
   }
 }
 
@@ -8755,7 +8778,7 @@ function agdSeguirCriacao(forcar) {
       agdForcarCapacidade = false;
       agdGoStep1();
       // v5.10.31 — ENTREGA: o cliente NÃO foi avisado; pergunta ao Aprovador.
-      if (body.calendar === 'entrega') agdPerguntarConfirmacaoCliente(body);
+      agdPerguntarConfirmacaoCliente(body);   // v5.10.32 — SERVICOS e ENTREGA
     })
     .catch(() => {
       showToast('Erro ao criar agendamento.');
