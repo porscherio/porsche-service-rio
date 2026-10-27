@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.32 — Build: 2026-10-25 19:45 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.37 — Build: 2026-10-27 00:55 BRT -->
+<!-- v5.10.37: VENDA BALCÃO no Gerir Peças (Eytan, 27/10/2026). Digitando um número
+     de OS, o painel oferece "Buscar OS de Venda Balcão" e abre uma OS que não é RO
+     viva (sem placa, fora de liveROs), lendo o cabeçalho de counterSaleOS no Code.gs.
+     Sebastião/Aprovadores registram a compra (PO) igual à peça de RO, no mesmo
+     PartsRequests. renderPkgROList + pkgSelectRO + pkgLookupCounterSale/pkgOpenHeader_.
+     Code.gs 5.10.37. -->
 <!-- v5.10.32: SERVICOS SOB A MESMA REGRA DA ENTREGA (Eytan, 25/10/2026). Criar um SERVICOS
      pela tela também NÃO avisa o cliente sozinho: a tela pergunta "Enviar a confirmação ao
      cliente?" (OK -> confirmarEntregaPrometida com calendar=servicos; Cancelar -> fica
@@ -3201,7 +3207,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.32';
+const APP_VERSION = '5.10.37';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -8793,7 +8799,8 @@ function pkgGoStep1() {
 }
 
 function renderPkgROList(query) {
-  const q   = (query || '').toLowerCase().replace(/[-\s]/g, '');
+  const raw = (query || '').trim();
+  const q   = raw.toLowerCase().replace(/[-\s]/g, '');
   const ros = q
     ? liveROs.filter(r =>
         String(r.ro_number).includes(q) ||
@@ -8802,8 +8809,20 @@ function renderPkgROList(query) {
       )
     : liveROs;
   const el = document.getElementById('pkg-ro-list');
+
+  // Venda Balcão não está em liveROs (sem placa). Quando o texto digitado é
+  // um número de OS, oferece buscá-la direto na base.
+  const osDigits = raw.replace(/\D/g, '');
+  const vbBtn = (osDigits && osDigits.length >= 3)
+    ? '<div style="padding:10px 0;border-top:1px solid #eee;margin-top:8px">' +
+        '<button onclick="pkgLookupCounterSale(\'' + osDigits + '\')" ' +
+          'style="width:100%;padding:10px;border:1px dashed #bbb;border-radius:8px;background:#fafafa;cursor:pointer;font-size:13px;color:#444">' +
+          '&#x1F9FE; Buscar OS de Venda Balc&atilde;o: <b>' + osDigits + '</b>' +
+        '</button></div>'
+    : '';
+
   if (!ros.length) {
-    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">Nenhuma OS encontrada.</div>';
+    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:24px 0">Nenhuma OS de oficina encontrada.</div>' + vbBtn;
     return;
   }
   el.innerHTML = ros.map(r => {
@@ -8821,21 +8840,50 @@ function renderPkgROList(query) {
         '</div>' +
       '</div>'
     );
-  }).join('');
+  }).join('') + vbBtn;
   el.querySelectorAll('[data-ro-pkg]').forEach(card => {
     card.addEventListener('click', () => pkgSelectRO(card.dataset.roPkg));
   });
 }
 
 async function pkgSelectRO(roNumber) {
-  pkgCurrentRO = liveROs.find(r => String(r.ro_number) === String(roNumber));
-  document.getElementById('pkg-ro-title').textContent = 'RO #' + roNumber;
-  document.getElementById('pkg-ro-sub').textContent   = pkgCurrentRO
-    ? vehicleWithYear(pkgCurrentRO.vehicle, pkgCurrentRO.vin) + ' · ' + pkgCurrentRO.plate : '';
+  const ro = liveROs.find(r => String(r.ro_number) === String(roNumber));
+  pkgOpenHeader_(ro || { ro_number: roNumber });
+}
+
+// Venda Balcão: busca o cabeçalho na base (NEW) e abre o mesmo passo 2.
+async function pkgLookupCounterSale(os) {
+  const list = document.getElementById('pkg-ro-list');
+  list.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A procurar OS ' + os + '...</div></div>';
+  try {
+    const res  = await fetch(API_URL + '?action=counterSaleOS&os=' + encodeURIComponent(os));
+    const data = await res.json();
+    if (!data || !data.ok || !data.found) {
+      list.innerHTML = '<div class="err-box">&#x26A0; Não achei a OS ' + os + ' na base.</div>' +
+        '<div style="text-align:center;padding:10px 0"><button onclick="renderPkgROList(document.getElementById(\'pkg-search\').value)" style="padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:12px">Voltar</button></div>';
+      return;
+    }
+    pkgOpenHeader_({
+      ro_number: data.ro_number, plate: data.plate || '',
+      vehicle: data.vehicle || '', vin: data.vin || '',
+      cust_name: data.cust_name || '', _counterSale: !data.plate
+    });
+  } catch(e) {
+    list.innerHTML = '<div class="err-box">&#x26A0; Sem ligação ao servidor.</div>';
+  }
+}
+
+async function pkgOpenHeader_(ro) {
+  pkgCurrentRO = ro;
+  const isVB = !!(ro && (ro._counterSale || !ro.plate));
+  document.getElementById('pkg-ro-title').textContent = (isVB ? 'Venda Balcão · OS #' : 'RO #') + ro.ro_number;
+  document.getElementById('pkg-ro-sub').textContent = isVB
+    ? ((ro.cust_name || 'Venda de balcão') + (ro.vehicle ? ' · ' + ro.vehicle : ''))
+    : (ro.vehicle ? vehicleWithYear(ro.vehicle, ro.vin) + ' · ' + (ro.plate || '') : (ro.plate || ''));
   document.getElementById('pkg-step1').style.display = 'none';
   document.getElementById('pkg-step2').style.display = 'flex';
   document.getElementById('pkg-add-form').style.display = 'none';
-  await pkgLoadParts(roNumber);
+  await pkgLoadParts(ro.ro_number);
 }
 
 function pkgReload() {
