@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.37 — Build: 2026-10-27 00:55 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.41 — Build: 2026-11-04 16:05 BRT -->
+<!-- v5.10.41: TEMPORARIAMENTE FORA DO PÁTIO (Eytan, 04/11/2026). Overlay aditivo (ForaTemp.gs)
+     que marca a RO como fisicamente fora do pátio SEM mexer na situação — a RO segue Aberta e
+     com joblines. Card e s2 suprimem o selo NO PÁTIO e mostram FORA DO PÁTIO âmbar com o motivo;
+     s2 ganha o controle do Aprovador (marcar/encerrar, taxonomia fixa + "outro"). A volta normal
+     é um novo Checklist entrada (backend encerra sozinho). Code.gs 5.10.41. Par realinhado:
+     BACKEND estava 5.10.40, PWA 5.10.37 — ambos agora 5.10.41. -->
 <!-- v5.10.37: VENDA BALCÃO no Gerir Peças (Eytan, 27/10/2026). Digitando um número
      de OS, o painel oferece "Buscar OS de Venda Balcão" e abre uma OS que não é RO
      viva (sem placa, fora de liveROs), lendo o cabeçalho de counterSaleOS no Code.gs.
@@ -3207,7 +3213,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.37';
+const APP_VERSION = '5.10.41';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -4171,7 +4177,18 @@ function roCard(r) {
   // getROs()/getChegadaByPlateMap in Code.gs). Toggling only happens
   // inside Agendamento Management, never from this list, so there's
   // only ever one place controlling the flag.
-  const chegadaPill = r.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
+  // v5.10.41 — "Temporariamente fora do pátio" (ForaTemp.gs). O carro
+  // ainda tem ro.chegada=true (nenhum sinal de chegada foi apagado), mas
+  // NÃO está fisicamente no pátio. Então o selo NO PÁTIO é SUPRIMIDO e dá
+  // lugar ao selo âmbar FORA DO PÁTIO com o motivo — senão o card mostraria
+  // os dois e pareceria contraditório. A RO segue Aberta e com joblines.
+  const chegadaPill = (r.chegada && !r.fora_temp) ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
+  const foraTempPill = r.fora_temp
+    ? '<span class="chegada-pill" style="background:#FFF3D6;color:#8A5B00" title="' +
+      escapeHtml(String((r.fora_temp_motivo_label||'') + (r.fora_temp_detalhe ? ' — ' + r.fora_temp_detalhe : ''))) +
+      '">&#x1F17F;&#x27A1; FORA DO P&#xC1;TIO' +
+      (r.fora_temp_motivo_label ? ' &middot; ' + escapeHtml(String(r.fora_temp_motivo_label)) : '') + '</span>'
+    : '';
   // v4.1.2 — Marcar Entregue Sem Agendamento pill (Aprovador-only).
   // v4.7.2 — a pill de REVERTER passa a vir do SERVIDOR
   // (r.manual_entrega_event_id, novo em Code.gs v4.7.1). O
@@ -4280,6 +4297,7 @@ function roCard(r) {
     campPill,
     diagPill,
     chegadaPill,
+    foraTempPill,
     entregueTag,
     // v5.10.11 — priorityPill saiu daqui: virou a tag URGENTE do
     // cabecalho. A const continua definida logo acima porque e a
@@ -5131,8 +5149,13 @@ function openRO(roNumber) {
   // Chegada pill (v2.7.0) — same read-only, plate-matched value as
   // the s1 list card. Switched to innerHTML (was textContent) only
   // for this one element, specifically to allow the pill's markup.
-  const chegadaPillS2 = ro.chegada ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
-  document.getElementById('s2-ro-title').innerHTML = 'RO #'+escapeHtml(String(ro.ro_number))+chegadaPillS2;
+  // v5.10.41 — fora-do-pátio suprime o NO PÁTIO também no título do s2.
+  const chegadaPillS2 = (ro.chegada && !ro.fora_temp) ? '<span class="chegada-pill">&#x2705; NO P&#xC1;TIO</span>' : '';
+  const foraTempPillS2 = ro.fora_temp
+    ? '<span class="chegada-pill" style="background:#FFF3D6;color:#8A5B00">&#x1F17F;&#x27A1; FORA DO P&#xC1;TIO' +
+      (ro.fora_temp_motivo_label ? ' &middot; ' + escapeHtml(String(ro.fora_temp_motivo_label)) : '') + '</span>'
+    : '';
+  document.getElementById('s2-ro-title').innerHTML = 'RO #'+escapeHtml(String(ro.ro_number))+chegadaPillS2+foraTempPillS2;
   // Mileage check (v2.7.6) — same blinking-pill / plain-text rule as
   // the s1 list card. s2-ro-vehicle switched to innerHTML (was
   // textContent) for the same reason s2-ro-title was in v2.7.0.
@@ -5146,6 +5169,7 @@ function openRO(roNumber) {
   document.getElementById('s2-gantt-link').href = GANTT_URL + '?os=' + ro.ro_number;
   document.getElementById('s2-complaint').textContent = ro.complaint;
   renderManualPatioRow(ro);
+  renderForaTempRow(ro);
   renderPriorityRow(ro);
   renderHoldRow(ro);
   goTo('s2');
@@ -5165,6 +5189,89 @@ function renderManualPatioRow(ro) {
   row.innerHTML = ro.manual_patio
     ? '<span class="chegada-pill clickable" style="background:#E8DEF8;color:#4A2E7A" onclick="toggleManualPatio(\''+escapeHtml(String(ro.ro_number))+'\',true)">&#x1F4CD; NO P&#xC1;TIO (manual) &mdash; toque para remover</span>'
     : '<span class="chegada-chip-off" style="margin-left:0" onclick="toggleManualPatio(\''+escapeHtml(String(ro.ro_number))+'\',false)">&#x1F4CD; Marcar no P&#xC1;tio (manual)</span>';
+}
+
+// ── v5.10.41 — "Temporariamente fora do pátio" (Aprovador-only) ──────
+// Mesma transport no-cors JSON das outras ações. A RO NÃO muda de
+// situação e as joblines seguem disponíveis; o overlay só diz que o
+// carro não está fisicamente no pátio agora. A volta normal é um novo
+// Checklist entrada (o backend encerra sozinho), mas este controle dá
+// o caminho manual — espelho do comando do agente Lubicz.
+var FT_MOTIVOS_PWA = [
+  { code:'aguardando_peca', label:'Aguardando peça (cliente usando o carro)' },
+  { code:'blindadora',      label:'Na blindadora' },
+  { code:'servico_externo', label:'Em serviço externo (retorna)' },
+  { code:'outro',           label:'Outro' }
+];
+function renderForaTempRow(ro) {
+  // Cria o container logo depois da linha do pátio manual (não exige
+  // mudança no HTML estático).
+  var ancora = document.getElementById('s2-manual-patio-row');
+  if (!ancora) return;
+  var row = document.getElementById('s2-fora-temp-row');
+  if (!row) {
+    row = document.createElement('div');
+    row.id = 's2-fora-temp-row';
+    row.style.marginTop = '6px';
+    ancora.parentNode.insertBefore(row, ancora.nextSibling);
+  }
+  if (!isApproverTech) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+  var roNum = escapeHtml(String(ro.ro_number));
+  if (ro.fora_temp) {
+    var motivo = escapeHtml(String(ro.fora_temp_motivo_label || '')) +
+                 (ro.fora_temp_detalhe ? ' — ' + escapeHtml(String(ro.fora_temp_detalhe)) : '');
+    row.innerHTML =
+      '<span class="chegada-pill clickable" style="background:#FFF3D6;color:#8A5B00" ' +
+        'onclick="clearForaTempPWA(\''+roNum+'\')" title="Toque para encerrar o fora-do-pátio">' +
+        '&#x1F17F;&#x27A1; FORA DO P&#xC1;TIO' + (motivo ? ' &middot; ' + motivo : '') +
+        ' &mdash; toque para encerrar</span>';
+  } else {
+    row.innerHTML =
+      '<span class="chegada-chip-off" style="margin-left:0" ' +
+        'onclick="setForaTempPWA(\''+roNum+'\')">&#x1F17F;&#x27A1; Marcar fora do P&#xC1;tio (tempor&#xE1;rio)</span>';
+  }
+}
+function setForaTempPWA(roNumber) {
+  var promptTxt = 'Motivo de sair temporariamente do pátio (a RO continua ABERTA):\n\n' +
+    FT_MOTIVOS_PWA.map(function(m,i){ return (i+1) + ') ' + m.label; }).join('\n') +
+    '\n\nDigite o número (1-' + FT_MOTIVOS_PWA.length + '):';
+  var escolha = prompt(promptTxt, '');
+  if (escolha === null) return;
+  var idx = parseInt(String(escolha).trim(), 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= FT_MOTIVOS_PWA.length) { showToast('Opção inválida.', true); return; }
+  var motivo = FT_MOTIVOS_PWA[idx];
+  var detalhe = '';
+  if (motivo.code === 'outro') {
+    detalhe = prompt('Descreva o motivo:', '');
+    if (detalhe === null) return;
+    detalhe = String(detalhe).trim();
+    if (!detalhe) { showToast('Para "Outro", o motivo é obrigatório.', true); return; }
+  }
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action:'setForaTemp', ro_number: roNumber, motivo: motivo.code, detalhe: detalhe, tech: currentTech }),
+  }).then(function(){
+    showToast('&#x1F17F;&#x27A1; RO marcada fora do pátio (temporário).');
+    var ro = liveROs.find(function(r){ return String(r.ro_number) === String(roNumber); });
+    var patch = { fora_temp:true, fora_temp_motivo:motivo.code, fora_temp_motivo_label:motivo.label, fora_temp_detalhe:detalhe };
+    if (ro) Object.assign(ro, patch);
+    if (activeRO && String(activeRO.ro_number) === String(roNumber)) { Object.assign(activeRO, patch); openRO(roNumber); }
+    renderROList(liveROs);
+  }).catch(function(){ showToast('Erro ao marcar fora do pátio.', true); });
+}
+function clearForaTempPWA(roNumber) {
+  if (!confirm('Encerrar o "fora do pátio" desta RO? (o carro volta a contar como no pátio)')) return;
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action:'clearForaTemp', ro_number: roNumber, tech: currentTech }),
+  }).then(function(){
+    showToast('Fora-do-pátio encerrado.');
+    var ro = liveROs.find(function(r){ return String(r.ro_number) === String(roNumber); });
+    if (ro) ro.fora_temp = false;
+    if (activeRO && String(activeRO.ro_number) === String(roNumber)) { activeRO.fora_temp = false; openRO(roNumber); }
+    renderROList(liveROs);
+  }).catch(function(){ showToast('Erro ao encerrar fora do pátio.', true); });
 }
 
 // ── v4.1.2: Marcar Entregue Sem Agendamento ─────────────────────────
