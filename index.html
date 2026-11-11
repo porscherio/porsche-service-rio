@@ -1,5 +1,29 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.41 — Build: 2026-11-04 16:05 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.47 — Build: 2026-11-11 00:45 BRT -->
+<!-- v5.10.47: FOTOS/VÍDEOS À PROVA DE QUEDA DE INTERNET + VISOR LIMPO (Eytan, 11/11/2026).
+     Caso real (10/11/2026): técnico tirou várias fotos sem rede, não olhou o selo, e
+     nenhuma chegou ao Dropbox — a foto vivia só na memória e o envio era um POST no-cors
+     ao Apps Script, sem retry. Pior: no-cors não deixa ler a resposta, então o selo
+     "Enviada ✓" aparecia mesmo quando o Apps Script/Dropbox falhava.
+     (1) FILA LOCAL (IndexedDB "psr_media_queue"): toda foto/vídeo é gravada NO APARELHO
+         antes de qualquer rede. Um uploader único envia em ordem, direto ao Dropbox
+         (mesmo padrão do vídeo: token por GET get_dropbox_token, resposta legível), com
+         timeout de 90s e espera crescente (5s→2min). Tenta de novo em: evento online,
+         volta ao app, nova captura, a cada 20s com fila pendente, e ao ABRIR o app (a
+         fila sobrevive a fechar/reabrir). Só apaga do aparelho com o OK do Dropbox.
+         Nome de arquivo único (PSR_ddMMyyyy_HHmmss_xxxx.jpg) + autorename:false: um
+         reenvio de algo que já chegou dá conflito no Dropbox e conta como enviado —
+         nunca duplica. Token 401 → renova e tenta de novo.
+     (2) Selo verdadeiro na miniatura: "na fila" / "a enviar…" / "sem rede – tentará de
+         novo" / "Enviada ✓" (só com confirmação do Dropbox). Pílula fixa no topo
+         "⏳ N por enviar" em qualquer tela (toque = tentar agora). Pausar/Concluir
+         mostram aviso âmbar se houver mídia na fila — NÃO bloqueia.
+     (3) VISOR: a faixa de GPS/técnico/RO saiu de cima do vídeo ao vivo (continua
+         carimbada na foto salva, igual antes). No lugar, um chip pequeno no canto
+         ("📍 GPS ✓" / "📍 a obter…"). Visor maior (até 58vh) e object-fit:contain —
+         o que aparece no visor é o quadro inteiro que será salvo (antes o cover cortava).
+         Câmera pede 1920×1080 ideal, então o carimbo ocupa uma fração menor da foto.
+     Code.gs 5.10.47 (só versão; rota upload_media fica intacta, sem uso pelas fotos). -->
 <!-- v5.10.41: TEMPORARIAMENTE FORA DO PÁTIO (Eytan, 04/11/2026). Overlay aditivo (ForaTemp.gs)
      que marca a RO como fisicamente fora do pátio SEM mexer na situação — a RO segue Aberta e
      com joblines. Card e s2 suprimem o selo NO PÁTIO e mostram FORA DO PÁTIO âmbar com o motivo;
@@ -1090,9 +1114,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:va
 .spinner{display:inline-block;width:24px;height:24px;border:2px solid #eee;border-top-color:var(--black);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .camera-section{background:#111;border-radius:8px;overflow:hidden;margin-bottom:12px;position:relative}
-#video-preview{width:100%;max-height:240px;object-fit:cover;display:none}
+#video-preview{width:100%;height:auto;max-height:58vh;object-fit:contain;background:#000;display:none}
 .cam-placeholder{width:100%;height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:#1a1a1a}
 .cam-overlay{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.80);padding:8px 10px;font-size:9.5px;color:#fff;line-height:1.7;font-family:monospace}
+/* v5.10.47 — a faixa grande sai do visor (ids mantidos: updateOverlay/startTask ainda escrevem nela) */
+.camera-section .cam-overlay{display:none}
+.cam-chip{position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:12px;pointer-events:none;display:none}
+.cam-chip.ok{color:#9be29b}
+.cam-chip.wait{color:#ffd27a}
+.us-queued{background:#666;color:#fff}
+.us-retry{background:var(--amber);color:#fff}
+#mq-pill{position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);z-index:1500;background:var(--amber);color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.25);display:none;cursor:pointer;white-space:nowrap}
+#mq-pill.busy{background:#1a73e8}
+.mq-warn{display:none;margin:6px 0 10px}
 .ov-ro{color:var(--red);font-weight:700}
 .media-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .mthumb{background:var(--bg);border:1px solid var(--border);border-radius:6px;height:80px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
@@ -2339,6 +2373,7 @@ input:focus{outline:none;border-color:var(--black)}
           <span style="font-size:10px;color:#444;margin-top:4px">Toque em "Abrir câmera"</span>
         </div>
         <canvas id="photo-canvas"></canvas>
+        <div class="cam-chip wait" id="cam-chip">&#x1F4CD; a obter GPS…</div>
         <div class="cam-overlay">
           <div id="ov-ts">--/--/---- --:--:--</div>
           <div id="ov-gps" style="color:#bbb">GPS: a obter...</div>
@@ -2358,7 +2393,7 @@ input:focus{outline:none;border-color:var(--black)}
         <button class="bigbtn btn-stop" id="btn-stop-rec" style="display:none">&#x23F9; Parar gravação</button>
       </div>
       <div class="media-grid" id="media-grid"></div>
-      <div class="audit-note">&#x1F6E1; GPS, técnico, RO e versão gravados e enviados para Dropbox automaticamente</div>
+      <div class="audit-note">&#x1F6E1; GPS, técnico, RO e versão carimbados na foto. Sem internet? A foto fica guardada no aparelho e sobe sozinha quando a rede voltar.</div>
       <div style="height:12px"></div>
       <button class="bigbtn btn-sec" onclick="stopCamera();goTo('s4')">&#8592; Voltar ao timer</button>
     </div>
@@ -2376,6 +2411,7 @@ input:focus{outline:none;border-color:var(--black)}
       <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s6p-job"></span></div>
       <div class="drow"><span class="dlbl">Tempo desta sessão</span><span class="dval" id="s6p-time"></span></div>
       <div class="drow"><span class="dlbl">Fotos tiradas</span><span class="dval" id="s6p-photos"></span></div>
+      <div class="alert-box mq-warn" id="s6p-mqwarn"></div>
       <div class="pct-row">
         <span class="pct-lbl">% concluído</span>
         <select class="pct-sel" id="pct-pause">
@@ -2400,6 +2436,7 @@ input:focus{outline:none;border-color:var(--black)}
       <div class="drow"><span class="dlbl">Serviço</span><span class="dval" id="s6c-job"></span></div>
       <div class="drow"><span class="dlbl">Tempo desta sessão</span><span class="dval" id="s6c-time"></span></div>
       <div class="drow"><span class="dlbl">Fotos tiradas</span><span class="dval" id="s6c-photos"></span></div>
+      <div class="alert-box mq-warn" id="s6c-mqwarn"></div>
       <div class="pct-row">
         <span class="pct-lbl">% concluído</span>
         <select class="pct-sel" id="pct-done">
@@ -3213,7 +3250,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.41';
+const APP_VERSION = '5.10.47';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3402,6 +3439,7 @@ if (navigator.geolocation) {
     gpsCurrent = p.coords.latitude.toFixed(5)+', '+p.coords.longitude.toFixed(5);
     const el = document.getElementById('ov-gps');
     if (el) el.textContent = 'GPS: '+gpsCurrent;
+    camChipUpdate(p.coords.accuracy);
   }, ()=>{}, {enableHighAccuracy:true});
 }
 
@@ -3681,6 +3719,7 @@ function goTo(id) {
     }
   }
   if (id==='s5') { updateOverlay(); requestCameraPermission(); }
+  if (id==='s6p'||id==='s6c') mqRenderWarn();
   if (id==='s0') { seconds=0; document.getElementById('timer-disp').textContent='00:00'; }
 }
 
@@ -6181,13 +6220,15 @@ function requestCameraPermission(){ document.getElementById('btn-open-cam').styl
 
 document.getElementById('btn-open-cam').addEventListener('click', async()=>{
   try {
-    videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:true});
+    // v5.10.47 — pede resolução maior (ideal = sem erro se o aparelho não tiver)
+    videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:true});
     const v = document.getElementById('video-preview');
     v.srcObject=videoStream; v.style.display='block';
     document.getElementById('cam-placeholder').style.display='none';
     document.getElementById('btn-open-cam').style.display='none';
     document.getElementById('btn-capture').style.display='flex';
     document.getElementById('video-rec-controls').style.display='block';
+    document.getElementById('cam-chip').style.display='block'; camChipUpdate();
     updateOverlay();
   } catch(e) { showToast('Câmera: '+e.message); }
 });
@@ -6207,26 +6248,28 @@ async function capturePhoto() {
   ctx.fillStyle='rgba(0,0,0,0.80)';ctx.fillRect(0,canvas.height-oh,canvas.width,oh);
   ctx.font='bold 16px monospace';ctx.textAlign='left';
   lines.forEach((line,i)=>{const y=canvas.height-oh+p2+lh*i+14;if(i===1){ctx.fillStyle='#E00000';ctx.fillText('RO: ',p2,y);const w=ctx.measureText('RO: ').width;ctx.fillStyle='#fff';ctx.fillText(line.replace('RO: ',''),p2+w,y);}else{ctx.fillStyle=i===3?'#fff':'#ccc';ctx.fillText(line,p2,y);}});
-  const dataUrl=canvas.toDataURL('image/jpeg',0.92), b64=dataUrl.split(',')[1];
-  const filename='PSR_'+fmtFileDate(n)+'.jpg';
+  // v5.10.47 — a foto vai PRIMEIRO para a fila local (IndexedDB) e só depois
+  // para a rede. Ver bloco MEDIA QUEUE abaixo.
+  const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.90));
+  if(!blob){showToast('Erro ao gerar a foto — tente de novo');return;}
+  const mqId=mqNewId();
+  const filename='PSR_'+fmtFileDate(n)+'_'+mqId.slice(-4)+'.jpg';
   photoCount++;
-  const div=document.createElement('div');div.className='mthumb';
-  const img=document.createElement('img');img.src=dataUrl;
+  const div=document.createElement('div');div.className='mthumb';div.dataset.mqid=mqId;
+  const img=document.createElement('img');img.src=URL.createObjectURL(blob);
   const badge=document.createElement('div');badge.className='mcount';badge.textContent='auditada';
-  const statusEl=document.createElement('div');statusEl.className='us us-loading';statusEl.textContent='a enviar...';
+  const statusEl=document.createElement('div');statusEl.className='us us-queued';statusEl.textContent='na fila';
   div.appendChild(img);div.appendChild(badge);div.appendChild(statusEl);
   document.getElementById('media-grid').appendChild(div);
-  showToast('Foto '+photoCount+' — a enviar para Dropbox...');
-  try {
-    await fetch(API_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upload_media',ro_number:activeTask?activeTask.ro_number:'0',jobline_description:activeTask?activeTask.job_description:'demo',filename,data:b64})});
-    statusEl.className='us us-ok';statusEl.textContent='Enviada \u2713';
-    showToast('Foto '+photoCount+' enviada para Dropbox');
-  } catch(e){statusEl.className='us us-err';statusEl.textContent='Erro';showToast('Erro ao enviar foto');}
+  await mqEnqueue({id:mqId,kind:'photo',ro_number:activeTask?String(activeTask.ro_number):'0',
+    job_description:activeTask?activeTask.job_description:'demo',filename,blob,mime:'image/jpeg',tech:currentTech||''});
+  showToast('Foto '+photoCount+' guardada — a enviar...');
 }
 
 function stopCamera() {
   if(videoStream){videoStream.getTracks().forEach(t=>t.stop());videoStream=null;}
   const v=document.getElementById('video-preview');v.style.display='none';
+  document.getElementById('cam-chip').style.display='none';
   document.getElementById('cam-placeholder').style.display='flex';
   document.getElementById('btn-open-cam').style.display='flex';
   document.getElementById('btn-capture').style.display='none';
@@ -6285,34 +6328,203 @@ function stopRecording() {
 }
 
 async function uploadVideo(mimeType) {
+  // v5.10.47 — vídeo entra na mesma fila local das fotos (antes o blob
+  // se perdia se a rede caísse no meio do envio).
   const ext=mimeType.includes('mp4')?'mp4':'webm', n=new Date();
-  const filename='PSR_VID_'+fmtFileDate(n)+'.'+ext;
+  const mqId=mqNewId();
+  const filename='PSR_VID_'+fmtFileDate(n)+'_'+mqId.slice(-4)+'.'+ext;
   const blob=new Blob(recordedChunks,{type:mimeType});
-  showToast('Vídeo '+fmtTime(recSeconds)+' — a enviar para Dropbox...');
-  const div=document.createElement('div');div.className='mthumb';
+  const div=document.createElement('div');div.className='mthumb';div.dataset.mqid=mqId;
   const icon=document.createElement('div');icon.style.cssText='font-size:28px;text-align:center';icon.textContent='🎥';
   const badge=document.createElement('div');badge.className='mcount';badge.textContent=filename;
-  const statusEl=document.createElement('div');statusEl.className='us us-loading';statusEl.textContent='a enviar...';
+  const statusEl=document.createElement('div');statusEl.className='us us-queued';statusEl.textContent='na fila';
   div.appendChild(icon);div.appendChild(badge);div.appendChild(statusEl);
   document.getElementById('media-grid').appendChild(div);
   photoCount++;
-  try {
-    const tokenRes=await fetch(API_URL+'?action=get_dropbox_token');
-    const tokenData=await tokenRes.json();
-    if(!tokenData.ok)throw new Error('Token fetch failed');
-    const roNum=activeTask?String(activeTask.ro_number):'0', roInt=parseInt(roNum);
-    const floor1000=Math.floor(roInt/1000)*1000, floor100=Math.floor(roInt/100)*100;
-    const rangeL1='#'+floor1000+' a #'+(floor1000+999), rangeL2='#'+floor100+' a #'+(floor100+99);
-    const jobDesc=sanitiseNameClient(activeTask?activeTask.job_description:'demo');
-    const dropboxPath='/CTPRJ_NEW/vag ros/'+rangeL1+'/'+rangeL2+'/#'+roNum+'/fotos/'+roNum+'_'+jobDesc+'/'+filename;
-    const apiArgs=JSON.stringify({path:dropboxPath,mode:'add',autorename:true,mute:false});
-    const uploadRes=await fetch('https://content.dropboxapi.com/2/files/upload',{method:'POST',headers:{'Authorization':'Bearer '+tokenData.token,'Dropbox-API-Arg':apiArgs,'Content-Type':'application/octet-stream'},body:blob});
-    const result=await uploadRes.json();
-    if(result.error_summary)throw new Error(result.error_summary);
-    statusEl.className='us us-ok';statusEl.textContent='Vídeo ✓';
-    showToast('Vídeo guardado: '+result.path_display);
-  } catch(e){statusEl.className='us us-err';statusEl.textContent='Erro';showToast('Erro ao enviar vídeo: '+e.message);}
+  await mqEnqueue({id:mqId,kind:'video',ro_number:activeTask?String(activeTask.ro_number):'0',
+    job_description:activeTask?activeTask.job_description:'demo',filename,blob,mime:mimeType,tech:currentTech||''});
+  showToast('Vídeo '+fmtTime(recSeconds)+' guardado — a enviar...');
 }
+
+// ══════════════════════════════════════════════════════════════════
+// MEDIA QUEUE (v5.10.47) — fila local à prova de queda de internet
+// ──────────────────────────────────────────────────────────────────
+// Regra única: nada vai para a rede sem antes estar gravado no aparelho.
+// IndexedDB "psr_media_queue" / store "items" guarda {id, kind, ro_number,
+// job_description, filename, blob, mime, tech, created, attempts, last_error}.
+// Um único uploader (mqRun) envia o mais antigo primeiro, DIRETO ao Dropbox
+// (resposta legível — ao contrário do POST no-cors ao Apps Script, que não
+// deixava saber se deu certo). Só apaga o item com OK do Dropbox. Conflito
+// de caminho = já tinha chegado numa tentativa anterior cuja resposta se
+// perdeu → conta como enviado (autorename:false + nome único = nunca duplica).
+// Se o IndexedDB não abrir (raro), cai para memória: ainda tenta enquanto o
+// app estiver aberto, mas não sobrevive a fechar o app.
+// ══════════════════════════════════════════════════════════════════
+const MQ_DB='psr_media_queue', MQ_STORE='items';
+const MQ_UPLOAD_TIMEOUT_MS=90000;
+const MQ_BACKOFF_MS=[5000,15000,30000,60000,120000];
+let _mqDbP=null, _mqMem=[], _mqRunning=false, _mqNextTry=0, _mqFails=0, _mqCurrentId=null;
+let _mqStatus={};      // id -> 'queued' | 'sending' | 'retry'
+let _mqCache=[];       // metadados (sem blob) para a UI
+let _mqToken=null, _mqTokenAt=0;
+let _mqPersistAsked=false;
+
+function mqNewId(){
+  const r=(window.crypto&&window.crypto.getRandomValues)?Array.from(window.crypto.getRandomValues(new Uint8Array(4))).map(b=>b.toString(16).padStart(2,'0')).join(''):Math.random().toString(16).slice(2,10);
+  return Date.now().toString(36)+'-'+r;
+}
+
+function mqDb(){
+  if(_mqDbP) return _mqDbP;
+  _mqDbP=new Promise((res)=>{
+    try{
+      if(!('indexedDB' in window)) return res(null);
+      const rq=indexedDB.open(MQ_DB,1);
+      rq.onupgradeneeded=()=>{const db=rq.result;if(!db.objectStoreNames.contains(MQ_STORE))db.createObjectStore(MQ_STORE,{keyPath:'id'});};
+      rq.onsuccess=()=>res(rq.result);
+      rq.onerror=()=>{console.warn('mq: IndexedDB indisponível',rq.error);res(null);};
+      rq.onblocked=()=>res(null);
+    }catch(e){console.warn('mq: IndexedDB erro',e);res(null);}
+  });
+  return _mqDbP;
+}
+function _mqTx(db,mode,fn){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(MQ_STORE,mode), st=tx.objectStore(MQ_STORE);
+    let out; const r=fn(st); if(r) r.onsuccess=()=>{out=r.result;};
+    tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error);
+  });
+}
+async function mqPut(item){const db=await mqDb(); if(!db){const i=_mqMem.findIndex(x=>x.id===item.id); if(i>=0)_mqMem[i]=item; else _mqMem.push(item); return;} await _mqTx(db,'readwrite',st=>st.put(item));}
+async function mqDelete(id){const db=await mqDb(); if(!db){_mqMem=_mqMem.filter(x=>x.id!==id); return;} await _mqTx(db,'readwrite',st=>st.delete(id));}
+async function mqAll(){const db=await mqDb(); if(!db) return _mqMem.slice(); const all=await _mqTx(db,'readonly',st=>st.getAll()); return (all||[]).sort((a,b)=>a.created-b.created);}
+
+async function mqEnqueue(item){
+  item.created=Date.now(); item.attempts=0; item.last_error='';
+  try{ await mqPut(item); }
+  catch(e){ console.warn('mq: falha ao gravar no aparelho, usando memória',e); _mqMem.push(item); showToast('Atenção: pouco espaço no aparelho — mantenha o app aberto até enviar'); }
+  _mqStatus[item.id]='queued';
+  if(!_mqPersistAsked && navigator.storage && navigator.storage.persist){ _mqPersistAsked=true; navigator.storage.persist().catch(()=>{}); }
+  _mqNextTry=0; // captura nova = tenta já
+  await mqRefresh(); mqKick();
+}
+
+async function mqGetToken(force){
+  if(!force && _mqToken && (Date.now()-_mqTokenAt)<3*3600*1000) return _mqToken;
+  const r=await mqFetchTimeout(API_URL+'?action=get_dropbox_token',{},20000);
+  const d=await r.json();
+  if(!d||!d.ok||!d.token) throw new Error('token');
+  _mqToken=d.token; _mqTokenAt=Date.now(); return _mqToken;
+}
+function mqFetchTimeout(url,opts,ms){
+  const ac=('AbortController' in window)?new AbortController():null;
+  const t=ac?setTimeout(()=>ac.abort(),ms):null;
+  return fetch(url,Object.assign({},opts,ac?{signal:ac.signal}:{})).finally(()=>{if(t)clearTimeout(t);});
+}
+
+// Envia um item. Devolve true (no Dropbox) ou lança erro (tentar de novo).
+async function mqUploadOne(item, retried401){
+  const path=buildDropboxFolderPath(item.ro_number,item.job_description)+item.filename;
+  const token=await mqGetToken(!!retried401);
+  const apiArgs=JSON.stringify({path:path,mode:'add',autorename:false,mute:false})
+    .replace(/[\u007f-\uffff]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)); // header HTTP só aceita ASCII
+  const res=await mqFetchTimeout('https://content.dropboxapi.com/2/files/upload',{method:'POST',
+    headers:{'Authorization':'Bearer '+token,'Dropbox-API-Arg':apiArgs,'Content-Type':'application/octet-stream'},
+    body:item.blob},Math.max(MQ_UPLOAD_TIMEOUT_MS,Math.round((item.blob.size||0)/50))); // ≥90s, ou ~50 KB/s para vídeo grande
+  if(res.status===401 && !retried401){ _mqToken=null; return mqUploadOne(item,true); }
+  const txt=await res.text(); let j=null; try{j=JSON.parse(txt);}catch(_){}
+  if(res.ok && j && j.path_display) return true;
+  const es=(j&&j.error_summary)||txt||('HTTP '+res.status);
+  if(/path\/conflict/.test(es)) return true; // já tinha chegado antes
+  throw new Error(es.slice(0,120));
+}
+
+function mqKick(manual){
+  if(manual){ _mqNextTry=0; if(_mqCache.length) showToast('A tentar enviar '+_mqCache.length+' item(ns)...'); }
+  if(_mqRunning) return;
+  if(Date.now()<_mqNextTry) return;
+  mqRun();
+}
+
+async function mqRun(){
+  if(_mqRunning) return; _mqRunning=true;
+  try{
+    while(true){
+      const items=await mqAll();
+      if(!items.length){ _mqFails=0; break; }
+      if(navigator.onLine===false){ items.forEach(it=>_mqStatus[it.id]='retry'); _mqNextTry=Date.now()+MQ_BACKOFF_MS[0]; break; }
+      const it=items[0];
+      _mqCurrentId=it.id; _mqStatus[it.id]='sending'; await mqRefresh();
+      try{
+        await mqUploadOne(it);
+        await mqDelete(it.id);
+        delete _mqStatus[it.id]; _mqFails=0;
+        mqMarkThumb(it.id,'ok');
+      }catch(e){
+        it.attempts=(it.attempts||0)+1; it.last_error=String(e&&e.message||e);
+        try{ await mqPut(it); }catch(_){}
+        _mqStatus[it.id]='retry';
+        _mqNextTry=Date.now()+MQ_BACKOFF_MS[Math.min(_mqFails,MQ_BACKOFF_MS.length-1)];
+        _mqFails++;
+        console.warn('mq: falha no envio, nova tentativa em',Math.round((_mqNextTry-Date.now())/1000),'s —',it.last_error);
+        break;
+      }finally{ _mqCurrentId=null; }
+    }
+  }finally{ _mqRunning=false; await mqRefresh(); }
+}
+
+async function mqRefresh(){
+  try{ _mqCache=(await mqAll()).map(x=>({id:x.id,kind:x.kind,ro_number:x.ro_number,job_description:x.job_description})); }catch(_){ }
+  _mqCache.forEach(x=>{ if(!_mqStatus[x.id]) _mqStatus[x.id]='queued'; mqMarkThumb(x.id,_mqStatus[x.id]); });
+  const pill=document.getElementById('mq-pill');
+  if(pill){
+    const n=_mqCache.length;
+    if(!n){ pill.style.display='none'; }
+    else{
+      const sending=!!_mqCurrentId;
+      pill.className=sending?'busy':'';
+      pill.textContent=(sending?'⬆ a enviar · ':'⏳ ')+n+' '+(n===1?'item':'itens')+' por enviar'+(sending?'':' · toque p/ tentar');
+      pill.style.display='block';
+    }
+  }
+  mqRenderWarn();
+}
+
+function mqMarkThumb(id,st){
+  const div=document.querySelector('.mthumb[data-mqid="'+id+'"]'); if(!div) return;
+  const el=div.querySelector('.us'); if(!el) return;
+  if(st==='ok'){ el.className='us us-ok'; el.textContent='Enviada \u2713'; }
+  else if(st==='sending'){ el.className='us us-loading'; el.textContent='a enviar...'; }
+  else if(st==='retry'){ el.className='us us-retry'; el.textContent='sem rede – tentará de novo'; }
+  else { el.className='us us-queued'; el.textContent='na fila'; }
+}
+
+function mqRenderWarn(){
+  const roNum=activeTask?String(activeTask.ro_number):null;
+  const mine=roNum?_mqCache.filter(x=>x.ro_number===roNum&&x.job_description===activeTask.job_description).length:0;
+  const total=_mqCache.length;
+  ['s6p-mqwarn','s6c-mqwarn'].forEach(idw=>{
+    const el=document.getElementById(idw); if(!el) return;
+    if(!total){ el.style.display='none'; return; }
+    el.innerHTML='&#x23F3; '+(mine?(mine+' foto(s)/vídeo(s) desta tarefa ainda não chegaram ao Dropbox'):(total+' item(ns) de mídia ainda na fila'))+
+      '. Ficam guardados no aparelho e sobem sozinhos quando houver rede — pode continuar. Não limpe os dados do app nem o desinstale até a pílula do topo sumir.';
+    el.style.display='flex';
+  });
+}
+
+function camChipUpdate(acc){
+  const c=document.getElementById('cam-chip'); if(!c) return;
+  if(gpsCurrent){ c.className='cam-chip ok'; c.textContent='📍 GPS ✓'+(acc?(' ±'+Math.round(acc)+' m'):''); }
+  else { c.className='cam-chip wait'; c.textContent='📍 a obter GPS…'; }
+}
+
+// Gatilhos: abrir o app (fila de sessão anterior), voltar a rede, voltar ao
+// app, e um tique a cada 20s enquanto houver pendência.
+window.addEventListener('online',()=>{ _mqNextTry=0; mqKick(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ _mqNextTry=0; mqKick(); } });
+setInterval(()=>{ if(_mqCache.length) mqKick(); },20000);
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>mqRefresh().then(()=>mqKick()));
+else mqRefresh().then(()=>mqKick());
 
 function sanitiseNameClient(str){return String(str).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9 _-]/g,'').replace(/\s+/g,'_').substring(0,50);}
 
@@ -13008,5 +13220,6 @@ window.Orcamento_waba     = Orcamento_waba;
 </script>
 
 
+<div id="mq-pill" onclick="mqKick(true)"></div>
 </body>
 </html>
