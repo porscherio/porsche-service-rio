@@ -1,5 +1,16 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.48 — Build: 2026-11-11 23:55 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.49 — Build: 2026-11-12 00:20 BRT -->
+<!-- v5.10.49: VOLTAR DE OUTRO APP SEM LOGIN DE NOVO + LISTA INSTANTÂNEA (Eytan, 12/11/2026).
+     Sintoma (Android, ícone na tela inicial): usa o PWA, abre outro app, volta → o Android
+     recarregou a aba, aparece o LOGIN, loga de novo e ainda espera "A carregar ordens...".
+     Causa: a sessão (v5.7.0) JÁ era retomada sozinha, mas só no DOMContentLoaded — depois de
+     baixar e executar o arquivo inteiro (~1,4 MB). O s0 (login) fica no topo do <body> e é
+     pintado logo, então durante esses segundos o técnico via a tela de login e logava à mão.
+     (1) Script mínimo no <head> lê a sessão salva ANTES de pintar: se houver sessão válida,
+         o s0 nem aparece — mostra "A retomar sessão…" até o sesRetomar_ decidir. Se a
+         retomada falhar, o login volta; rede de segurança de 20s.
+     (2) Lista de ROs em CACHE local (por técnico, 12h): aparece na hora ao retomar/logar e
+         é atualizada do servidor por trás, sem spinner. -->
 <!-- v5.10.48: CONCLUIR JOBLINE NÃO "TRAVA" MAIS + FIM DO "RO #0000" (caso Alvaro, 11/11/2026).
      Sintoma: parar o timer → Concluir → SIM → tela parada, cabeçalho "RO #0000"; às vezes
      confirmava depois de um tempo, às vezes só reiniciando o app. Três causas no front:
@@ -2169,9 +2180,33 @@ input:focus{outline:none;border-color:var(--black)}
 .rel-resumo{font-size:11px;color:#888;margin:0 0 10px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- v5.10.49 — decide ANTES da primeira pintura se há sessão a retomar
+     (mesma chave/TTL do sesLer_: psr_sessao, 8h). Sem isto o s0 (login)
+     aparecia durante o download/parse do arquivo e o técnico logava à mão. -->
+<style>
+html.ses-retomando #s0{display:none!important}
+#ses-splash{display:none}
+html.ses-retomando #ses-splash{display:flex;position:fixed;inset:0;z-index:99999;background:#fff;
+  flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#888;letter-spacing:.04em}
+#ses-splash b{font-size:15px;color:#1a1a1a;letter-spacing:.12em}
+</style>
+<script>
+(function(){
+  try{
+    var d=JSON.parse(localStorage.getItem('psr_sessao')||'null');
+    if(d&&d.tech&&d.ts&&(Date.now()-d.ts)<8*60*60*1000){
+      document.documentElement.classList.add('ses-retomando');
+      // rede de segurança: se algo travar antes do sesRetomar_, o login volta
+      setTimeout(function(){document.documentElement.classList.remove('ses-retomando');},20000);
+    }
+  }catch(e){}
+})();
+</script>
 </head>
 
 <body>
+<div id="ses-splash"><b>PORSCHE | RJ</b><span>A retomar sessão…</span></div>
 <div id="app">
   <div class="sbar">
     <span id="clk">--:--</span>
@@ -3268,7 +3303,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.48';
+const APP_VERSION = '5.10.49';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3634,7 +3669,12 @@ function doLogout() {
 // houver sessao valida, o s0 ja esta visivel por omissao (class="screen on")
 // e nada muda em relacao a antes.
 (function bootRetomarSessao_() {
-  const tentar = () => { try { sesRetomar_(); } catch (e) { console.warn('[sessao]', e); } };
+  // v5.10.49 — tira o splash do <head> depois da decisão (retomou → s1/tela
+  // salva já está 'on'; não retomou → o s0 volta a aparecer).
+  const tentar = () => {
+    try { sesRetomar_(); } catch (e) { console.warn('[sessao]', e); }
+    document.documentElement.classList.remove('ses-retomando');
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tentar);
   else tentar();
 })();
@@ -3931,21 +3971,52 @@ function activeLockDiscardAndPause() {
   showToast('Finalize esta tarefa (tempo recalculado: '+t+') antes de iniciar outra.');
 }
 
+// v5.10.49 — CACHE LOCAL DA LISTA DE ROs. Depois que o Android descarrega a
+// aba, o técnico esperava "A carregar ordens..." a cada volta. Agora a última
+// lista (deste técnico, até 12h) aparece na hora e a do servidor substitui por
+// trás. Só leitura: qualquer ação continua indo ao servidor com dado fresco.
+const ROS_CACHE_KEY = 'psr_ros_cache';
+const ROS_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+function rosCacheLer_() {
+  try {
+    const c = JSON.parse(localStorage.getItem(ROS_CACHE_KEY) || 'null');
+    if (!c || c.tech !== currentTech || !Array.isArray(c.data) || (Date.now() - c.ts) > ROS_CACHE_TTL_MS) return null;
+    return c.data;
+  } catch (e) { return null; }
+}
+function rosCacheGravar_(data) {
+  try { localStorage.setItem(ROS_CACHE_KEY, JSON.stringify({ tech: currentTech, ts: Date.now(), data: data })); }
+  catch (e) { /* quota — sem cache, segue normal */ }
+}
+
 async function loadROs() {
-  document.getElementById('ro-list-content').innerHTML =
-    '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar ordens...</div></div>';
+  const temCache = !liveROs.length && (function () {
+    const c = rosCacheLer_();
+    if (!c || !c.length) return false;
+    liveROs = c;
+    renderROList(c);
+    return true;
+  })();
+  if (!temCache && !liveROs.length) {
+    document.getElementById('ro-list-content').innerHTML =
+      '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar ordens...</div></div>';
+  }
   try {
     const res = await fetch(API_URL+'?action=ros&tech='+encodeURIComponent(currentTech));
     const data = await res.json();
     if (Array.isArray(data)) {
       liveROs = data;
       renderROList(data);
+      rosCacheGravar_(data);
       loadPartsSummaries(data.map(r => r.ro_number));
-    } else {
+    } else if (!liveROs.length) {
       showError('ro-list-content', 'Erro ao carregar ordens: '+(data.error||'desconhecido'));
+    } else {
+      showToast('Não foi possível atualizar as ordens — mostrando a última lista.');
     }
   } catch(e) {
-    showError('ro-list-content', 'Sem ligação ao servidor. Verifique a internet.');
+    if (!liveROs.length) showError('ro-list-content', 'Sem ligação ao servidor. Verifique a internet.');
+    else showToast('Sem ligação — mostrando a última lista de ordens.');
   }
 }
 
