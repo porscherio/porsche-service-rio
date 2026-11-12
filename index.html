@@ -1,5 +1,23 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.47 — Build: 2026-11-11 00:45 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.48 — Build: 2026-11-11 23:55 BRT -->
+<!-- v5.10.48: CONCLUIR JOBLINE NÃO "TRAVA" MAIS + FIM DO "RO #0000" (caso Alvaro, 11/11/2026).
+     Sintoma: parar o timer → Concluir → SIM → tela parada, cabeçalho "RO #0000"; às vezes
+     confirmava depois de um tempo, às vezes só reiniciando o app. Três causas no front:
+     (1) releaseJoblineReliably() fazia fetch SEM timeout — com rede ruim a promessa podia
+         ficar pendurada minutos, e a única pista era o botão a 60% de opacidade. Agora cada
+         chamada tem timeout de 25s (vira o modal "Tentar novamente") e o botão mostra
+         "A salvar…" com spinner enquanto espera.
+     (2) Depois de salvar, o app ia direto para o s2 (joblines da RO). Mas o cabeçalho do s2
+         só é preenchido pelo openRO(). Quando a tarefa veio do RETOMAR (app recarregado →
+         activeLockResume) ou da Tarefa Sugerida, o openRO nunca rodou → s2 com o placeholder
+         "RO #0000" e lista vazia/antiga = parece travado (a conclusão JÁ tinha sido gravada).
+         Agora voltarParaRO_() reabre a RO de verdade (openRO + loadJoblines) ou cai no s1.
+     (3) A sessão salva (v5.7.0) retomava direto em s2/s3/s5 após reload, também sem RO
+         carregada — mesmo "RO #0000", e no s5 a foto saía com RO "0". s2/s3 agora guardam o
+         número da RO e reabrem por ela depois do loadROs; s5 saiu da lista (o RETOMAR do
+         lock cobre a tarefa em andamento).
+     Também: confirmarConclusao/confirmarPausa tiram uma CÓPIA da tarefa no início, então
+     nada que zere activeTask no meio do caminho manda POST com RO vazia. -->
 <!-- v5.10.47: FOTOS/VÍDEOS À PROVA DE QUEDA DE INTERNET + VISOR LIMPO (Eytan, 11/11/2026).
      Caso real (10/11/2026): técnico tirou várias fotos sem rede, não olhou o selo, e
      nenhuma chegou ao Dropbox — a foto vivia só na memória e o envio era um POST no-cors
@@ -3250,7 +3268,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.47';
+const APP_VERSION = '5.10.48';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -3468,7 +3486,7 @@ async function doLogin() {
 // v5.7.0 — extraido do doLogin sem alterar nada do que ele fazia, para que a
 // retoma de sessao passe exatamente pelo mesmo caminho. A UNICA diferenca
 // entre entrar com PIN e retomar e o PIN: dali para a frente e o mesmo codigo.
-function entrarApp_(tech, tela) {
+function entrarApp_(tech, tela, roRetomar) {
   currentTech = tech;
   const h = new Date().getHours();
   const saudacao = (h<12?'Bom dia':h<18?'Boa tarde':'Boa noite')+', '+tech.split(' ')[0];
@@ -3490,7 +3508,15 @@ function entrarApp_(tech, tela) {
   // already looking at, instead of deciding what screen to show.
   goTo(tela || 's1');
   sesGravar_({ tela: tela || 's1' });
-  loadROs();
+  // v5.10.48 — retomada de sessão em s2/s3: reabre a RO depois que a lista
+  // chega, e só se o técnico ainda estiver parado no s1 (não atropela o
+  // modal de RETOMAR nem um toque que ele já tenha dado).
+  loadROs().then(() => {
+    if (!roRetomar) return;
+    const s1 = document.getElementById('s1');
+    if (!s1 || !s1.classList.contains('on')) return;
+    if ((liveROs || []).some(r => String(r.ro_number) === String(roRetomar))) openRO(roRetomar);
+  }).catch(() => {});
   checkSuggestedTasksBackground(); // fire-and-forget — see below, never blocks login
   checkForActiveLock(); // v3.0.0 — pode abrir o modal de retomar/liberar por cima de s1
 }
@@ -3635,7 +3661,10 @@ const SES_TTL_MS = 8 * 60 * 60 * 1000;
 // que o reload destruiu — camera, gravacao, e o s4, cujo temporizador ja tem
 // dono: o checkForActiveLock() decide se retoma ou liberta, e nao queremos
 // duas coisas a disputar isso.
-const SES_TELAS_OK = ['s1','s2','s3','s5','s-hist','s-rel','s-no-patio'];
+// v5.10.48 — s5 SAIU: depois do reload não há tarefa ativa, e a câmera
+// gravava a foto com RO "0". s2/s3 continuam, mas só reabrem pela RO salva
+// (ver sesRetomar_) — antes abriam com o placeholder "RO #0000".
+const SES_TELAS_OK = ['s1','s2','s3','s-hist','s-rel','s-no-patio'];
 
 function sesGravar_(patch) {
   if (!currentTech) return;
@@ -3665,7 +3694,12 @@ function sesRetomar_() {
   const d = sesLer_();
   if (!d) return false;
   try {
-    entrarApp_(d.tech, SES_TELAS_OK.includes(d.tela) ? d.tela : 's1');
+    // v5.10.48 — s2/s3 dependem de uma RO aberta (openRO). Entra pelo s1 e
+    // reabre a RO salva quando a lista chegar; sem RO salva, fica no s1.
+    let tela = SES_TELAS_OK.includes(d.tela) ? d.tela : 's1';
+    const roRetomar = (tela === 's2' || tela === 's3') ? (d.ro || '') : '';
+    if (tela === 's2' || tela === 's3') tela = 's1';
+    entrarApp_(d.tech, tela, roRetomar);
     if (d.si) setTimeout(() => { try { SI_restoreState(d.si); } catch (e) {} }, 300);
     return true;
   } catch (e) {
@@ -3691,7 +3725,7 @@ const SCREENS_WITH_TECH_BAR = ['s2','s3','s4','s5','s6p','s6c'];
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
-  if (id !== 's0') sesGravar_({ tela: id });   // v5.7.0
+  if (id !== 's0') sesGravar_({ tela: id, ro: (activeRO && activeRO.ro_number) ? String(activeRO.ro_number) : '' });   // v5.7.0 · v5.10.48 guarda a RO
   const sbarTech = document.getElementById('sbar-tech');
   if (sbarTech) {
     if (SCREENS_WITH_TECH_BAR.includes(id)) {
@@ -6059,28 +6093,68 @@ function startTask(j) {
 // retry the exact same attempt or stop cleanly.
 let _pendingReleaseResolve = null; // resolves the modal's promise with true/false
 
+// v5.10.48 — TIMEOUT. Antes era fetch puro: com rede ruim a promessa podia
+// ficar pendurada por minutos sem resolver nem falhar, e o técnico via só
+// o botão apagado (caso Alvaro, 11/11/2026). 25s cobre um doPost lento do
+// Apps Script (updateCompletion lê a aba Joblines inteira); passou disso,
+// vira erro → modal "Tentar novamente". Repetir é seguro: releaseRO acha a
+// mesma linha de lock e regrava os mesmos valores.
+const RELEASE_TIMEOUT_MS = 25000;
+function fetchComTimeout_(url, opts, ms) {
+  const ac = ('AbortController' in window) ? new AbortController() : null;
+  const t  = ac ? setTimeout(() => ac.abort(), ms) : null;
+  return fetch(url, Object.assign({}, opts, ac ? { signal: ac.signal } : {}))
+    .finally(() => { if (t) clearTimeout(t); });
+}
+
+// v5.10.48 — feedback visível enquanto salva (antes só opacity 0.6).
+function btnSalvando_(btn, on) {
+  if (!btn) return;
+  if (on) {
+    if (!btn.dataset.txtOrig) btn.dataset.txtOrig = btn.innerHTML;
+    btn.disabled = true; btn.style.opacity = '0.75';
+    btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin:0 8px -2px 0;border-top-color:#fff"></span>A salvar… aguarde';
+  } else {
+    btn.disabled = false; btn.style.opacity = '1';
+    if (btn.dataset.txtOrig) { btn.innerHTML = btn.dataset.txtOrig; delete btn.dataset.txtOrig; }
+  }
+}
+
+// v5.10.48 — volta para a lista de joblines da RO SÓ se ela estiver
+// carregada de verdade. O cabeçalho do s2 é preenchido apenas pelo
+// openRO(); quando a tarefa veio do RETOMAR (activeLockResume) ou da
+// Tarefa Sugerida, ele nunca rodou e o s2 aparecia com o placeholder
+// "RO #0000" e lista vazia — parecia travado. openRO recarrega as
+// joblines do servidor, então a lista já vem com a conclusão.
+function voltarParaRO_(roNumber) {
+  const ro = (liveROs || []).find(r => String(r.ro_number) === String(roNumber));
+  if (ro) { openRO(ro.ro_number); return; }
+  goTo('s1');
+  loadROs();   // RO pode ter saído da lista (ex.: todas as joblines concluídas)
+}
+
 async function releaseJoblineReliably(args) {
   while (true) {
     try {
-      const releaseRes = await fetch(API_URL, {
+      const releaseRes = await fetchComTimeout_(API_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'release', ro_number: args.roNumber, jobline_id: args.joblineId,
           tech: args.tech, pct: args.pct, elapsed_seconds: args.elapsedSeconds,
           is_default: args.isDefault,
         }),
-      }).then(r => r.json());
+      }, RELEASE_TIMEOUT_MS).then(r => r.json());
 
       if (!releaseRes || releaseRes.ok !== true) throw new Error('release not ok');
 
       if (args.isDefault && args.pct >= 100) {
-        const compRes = await fetch(API_URL, {
+        const compRes = await fetchComTimeout_(API_URL, {
           method: 'POST',
           body: JSON.stringify({
             action: 'complete_default', ro_number: args.roNumber, jobline_id: args.joblineId,
             job_description: args.jobDescription, tech: args.tech, pct: args.pct,
           }),
-        }).then(r => r.json());
+        }, RELEASE_TIMEOUT_MS).then(r => r.json());
         if (!compRes || compRes.ok !== true) throw new Error('complete_default not ok');
       }
 
@@ -6111,23 +6185,32 @@ function saveRetryCancel() {
 async function confirmarPausa() {
   const pct = parseInt(document.getElementById('pct-pause').value);
   const btn = document.getElementById('btn-confirmar-pausa');
-  btn.disabled = true; btn.style.opacity = '0.6';
+  if (btn.disabled) return;   // v5.10.48 — duplo toque
+  // v5.10.48 — CÓPIA da tarefa: o que acontecer com activeTask durante os
+  // awaits (reload parcial, outro handler) não pode mandar RO vazia.
+  const task = activeTask ? Object.assign({}, activeTask) : null;
+  if (!task || !task.ro_number || !task.jobline_id) {
+    showToast('Tarefa não encontrada — abra a RO de novo.'); goTo('s1'); loadROs(); return;
+  }
+  const secs = seconds;
+  btnSalvando_(btn, true);
 
-  await logWork('paused', pct);
+  await logWork('paused', pct, task, secs);
   const succeeded = await releaseJoblineReliably({
-    roNumber: activeTask.ro_number, joblineId: activeTask.jobline_id, tech: currentTech,
-    pct: pct, elapsedSeconds: seconds, isDefault: activeTask.is_default,
-    jobDescription: activeTask.job_description,
+    roNumber: task.ro_number, joblineId: task.jobline_id, tech: currentTech,
+    pct: pct, elapsedSeconds: secs, isDefault: task.is_default,
+    jobDescription: task.job_description,
   });
 
-  btn.disabled = false; btn.style.opacity = '1';
+  btnSalvando_(btn, false);
   if (!succeeded) return; // tech cancelled the retry — stay right here, nothing changed
 
-  updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
-  updateLocalROProgress(activeTask.ro_number);
+  updateLocalJobline(task.ro_number, task.jobline_id, pct, currentTech);
+  updateLocalROProgress(task.ro_number);
   clearTimer();
+  activeTask = null;
   showToast('Pausada em '+pct+'%. Bloqueio libertado.');
-  goTo('s2');
+  voltarParaRO_(task.ro_number);
 }
 
 // ── CONFIRM 100% COMPLETION (v1.14) ───────────────────────────────
@@ -6158,22 +6241,30 @@ function confirm100Cancel() {
 async function confirmarConclusao() {
   const pct = parseInt(document.getElementById('pct-done').value);
   const btn = document.getElementById('btn-confirmar-conclusao');
-  btn.disabled = true; btn.style.opacity = '0.6';
+  if (btn.disabled) return;   // v5.10.48 — duplo toque
+  // v5.10.48 — CÓPIA da tarefa (ver confirmarPausa).
+  const task = activeTask ? Object.assign({}, activeTask) : null;
+  if (!task || !task.ro_number || !task.jobline_id) {
+    showToast('Tarefa não encontrada — abra a RO de novo.'); goTo('s1'); loadROs(); return;
+  }
+  const secs = seconds;
+  const veic = activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '';
+  btnSalvando_(btn, true);
 
-  await logWork(pct>=100?'completed':'paused', pct);
+  await logWork(pct>=100?'completed':'paused', pct, task, secs);
   const succeeded = await releaseJoblineReliably({
-    roNumber: activeTask.ro_number, joblineId: activeTask.jobline_id, tech: currentTech,
-    pct: pct, elapsedSeconds: seconds, isDefault: activeTask.is_default,
-    jobDescription: activeTask.job_description,
+    roNumber: task.ro_number, joblineId: task.jobline_id, tech: currentTech,
+    pct: pct, elapsedSeconds: secs, isDefault: task.is_default,
+    jobDescription: task.job_description,
   });
 
-  btn.disabled = false; btn.style.opacity = '1';
+  btnSalvando_(btn, false);
   if (!succeeded) return; // tech cancelled the retry — stay right here, nothing changed
 
-  updateLocalJobline(activeTask.ro_number, activeTask.jobline_id, pct, currentTech);
-  updateLocalROProgress(activeTask.ro_number);
+  updateLocalJobline(task.ro_number, task.jobline_id, pct, currentTech);
+  updateLocalROProgress(task.ro_number);
   if (pct>=100) {
-    sessionHistory.unshift({ro:activeTask.ro_number, vehicle:activeRO ? vehicleWithYear(activeRO.vehicle, activeRO.vin) : '', job:activeTask.job_description, time:fmtTime(seconds), date:new Date().toLocaleString('pt-BR')});
+    sessionHistory.unshift({ro:task.ro_number, vehicle:veic, job:task.job_description, time:fmtTime(secs), date:new Date().toLocaleString('pt-BR')});
     renderHistory();
     showToast('Concluída! ✔ Log registado.');
   } else {
@@ -6181,17 +6272,22 @@ async function confirmarConclusao() {
   }
   clearTimer();
   activeTask=null;
-  goTo('s2');
+  voltarParaRO_(task.ro_number);   // v5.10.48 — era goTo('s2') (cabeçalho "RO #0000" quando a RO não tinha sido aberta)
 }
 
-async function logWork(event, pct) {
-  if (!activeTask) return;
+// v5.10.48 — aceita a tarefa e os segundos explícitos (cópia tirada no
+// início da pausa/conclusão). Sem eles, usa o estado global como antes.
+async function logWork(event, pct, task, secs) {
+  const t = task || activeTask;
+  if (!t) return;
   try {
-    await fetch(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({
-      action:'log_work', ro_number:activeTask.ro_number, jobline_id:activeTask.jobline_id,
-      job_description:activeTask.job_description, tech:currentTech, event:event, pct:pct,
-      elapsed_seconds:seconds, gps_start:gpsStart||'', gps_stop:gpsCurrent||'', app_version:APP_VERSION,
-    })});
+    // v5.10.48 — com timeout: este await vem ANTES do release, então um
+    // fetch pendurado aqui segurava a conclusão inteira sem aviso nenhum.
+    await fetchComTimeout_(API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify({
+      action:'log_work', ro_number:t.ro_number, jobline_id:t.jobline_id,
+      job_description:t.job_description, tech:currentTech, event:event, pct:pct,
+      elapsed_seconds:(secs == null ? seconds : secs), gps_start:gpsStart||'', gps_stop:gpsCurrent||'', app_version:APP_VERSION,
+    })}, 15000);
   } catch(e) { console.warn('logWork failed', e); }
 }
 
