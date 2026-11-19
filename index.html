@@ -1,5 +1,16 @@
 <!DOCTYPE html>
-<!-- Porsche Service Rio PWA — v5.10.49 — Build: 2026-11-12 00:20 BRT -->
+<!-- Porsche Service Rio PWA — v5.10.50 — Build: 2026-11-19 01:35 BRT -->
+<!-- v5.10.50: ENTREGUE COM PENDÊNCIA (Eytan, 19/11/2026). Veículo entregue mas ainda sem
+     pagamento e/ou sem OS assinada passa a ter lugar próprio no PWA (só Aprovador):
+     (1) Cartão "Entregue com pendência" no topo da tela Ordens, com a contagem (some quando
+         não há nenhuma). Alimentado por action=getEntregasPendentes (Code.gs 5.10.50).
+     (2) Toque no cartão → tela com as ROs já ENTREGUES que têm pendência, cada uma com o
+         que falta (pagamento / OS assinada) e há quantos dias foi entregue.
+     (3) Toque na RO → o MESMO modal "Documentos de Entrega" de sempre, agora com dois
+         botões novos: "Marcar como PAGO" e "Marcar OS como ASSINADA" — confirmam SEM
+         documento (action=confirmEntregaItem). O documento pode ser digitalizado depois,
+         como sempre. Confirmado sem documento aparece como "Confirmado · sem doc.".
+     O agente Lubicz grava na mesma aba EntregaDocs, então PWA e agente mostram o mesmo. -->
 <!-- v5.10.49: VOLTAR DE OUTRO APP SEM LOGIN DE NOVO + LISTA INSTANTÂNEA (Eytan, 12/11/2026).
      Sintoma (Android, ícone na tela inicial): usa o PWA, abre outro app, volta → o Android
      recarregou a aba, aparece o LOGIN, loga de novo e ainda espera "A carregar ordens...".
@@ -1322,6 +1333,20 @@ input:focus{outline:none;border-color:var(--black)}
 .edoc-icon-label{font-size:11.5px;font-weight:600;color:var(--black);text-align:center;line-height:1.3}
 .edoc-icon-status{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#999}
 .edoc-icon-btn.done .edoc-icon-status{color:var(--green-text)}
+/* v5.10.50 — Entregue com pendência */
+.edoc-mark-row{display:flex;gap:10px;margin-top:8px}
+.edoc-mark-btn{flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:11px;font-weight:600;color:var(--black);cursor:pointer;line-height:1.3}
+.edoc-mark-btn:active{opacity:.7}
+.edoc-mark-btn.undo{background:#fff;color:#888;font-weight:500}
+.entpend-kpi{display:flex;align-items:center;gap:12px;margin:8px 16px 0;padding:10px 14px;border:1px solid #F0C36D;border-left:5px solid #E69500;border-radius:10px;background:#FFF8E8;cursor:pointer;flex-shrink:0}
+.entpend-kpi:active{opacity:.75}
+.entpend-kpi-n{font-size:26px;font-weight:700;color:#8A5A00;min-width:30px;text-align:center;line-height:1}
+.entpend-kpi-t{font-size:12.5px;font-weight:700;color:#5C3D00;letter-spacing:.02em}
+.entpend-kpi-s{font-size:11px;color:#8A6A2A;margin-top:2px}
+.entpend-chip{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin:6px 6px 0 0;white-space:nowrap}
+.entpend-chip.falta{background:#FDE3E3;color:#A32020}
+.entpend-chip.ok{background:var(--green-bg);color:var(--green-text)}
+.entpend-dias{font-size:10.5px;font-weight:700;color:#8A5A00;background:#FFF1CC;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .edoc-page-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0}
 .edoc-page-thumb{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border);aspect-ratio:3/4}
 .edoc-page-thumb img{width:100%;height:100%;object-fit:cover;display:block}
@@ -2298,6 +2323,15 @@ html.ses-retomando #ses-splash{display:flex;position:fixed;inset:0;z-index:99999
         <span id="ro-entregue-cnt" style="margin-left:auto;font-size:11px;color:var(--muted)"></span>
       </label>
     </div>
+    <!-- v5.10.50 — cartão "Entregue com pendência" (só Aprovador; some com zero) -->
+    <div class="entpend-kpi" id="ent-pend-kpi" style="display:none" onclick="entPendAbrir()">
+      <div class="entpend-kpi-n" id="ent-pend-kpi-n">0</div>
+      <div style="flex:1">
+        <div class="entpend-kpi-t">ENTREGUE COM PEND&#xCA;NCIA</div>
+        <div class="entpend-kpi-s" id="ent-pend-kpi-s"></div>
+      </div>
+      <div style="font-size:18px;color:#B98A2E">&#x203A;</div>
+    </div>
     <div class="scroll" id="ro-list-content">
       <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
     </div>
@@ -2655,6 +2689,23 @@ html.ses-retomando #ses-splash{display:flex;position:fixed;inset:0;z-index:99999
     </div>
   </div>
 
+  <!-- ENTREGUE COM PENDÊNCIA (v5.10.50) — ROs já entregues com pagamento
+       e/ou OS assinada pendente. Toque na RO abre o modal de Documentos
+       de Entrega logo abaixo. -->
+  <div class="screen" id="s-ent-pend">
+    <div class="topbar">
+      <button class="back" onclick="goTo('s1')" aria-label="Voltar">&#8592;</button>
+      <div style="flex:1">
+        <div class="tb-title">&#x1F9FE; Entregue com pend&#xEA;ncia</div>
+        <div class="tb-sub" id="ent-pend-sub">A carregar...</div>
+      </div>
+      <button style="background:none;border:none;cursor:pointer;font-size:18px;color:#aaa" onclick="entPendCarregarLista()" title="Actualizar">&#x21BB;</button>
+    </div>
+    <div class="scroll" id="ent-pend-list">
+      <div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>
+    </div>
+  </div>
+
   <!-- DOCUMENTOS DE ENTREGA — CHOOSER MODAL (v2.7.7) — pops
        automatically right after a tech confirms ENTREGUE (Management
        ENTREGA list, toggling ON only — see agdToggleEntregaFromList).
@@ -2678,6 +2729,11 @@ html.ses-retomando #ses-splash{display:flex;position:fixed;inset:0;z-index:99999
           <span class="edoc-icon-label">Pagamento</span>
           <span class="edoc-icon-status" id="edoc-status-pagamento">Pendente</span>
         </button>
+      </div>
+      <!-- v5.10.50 — confirmar SEM documento (só Aprovador) -->
+      <div class="edoc-mark-row" id="edoc-mark-row" style="display:none">
+        <button class="edoc-mark-btn" id="edoc-mark-os_saida" onclick="edocMarcarItem('os_saida')"></button>
+        <button class="edoc-mark-btn" id="edoc-mark-pagamento" onclick="edocMarcarItem('pagamento')"></button>
       </div>
       <div style="font-size:11px;color:#999;margin:12px 0 4px;line-height:1.4">Pode digitalizar um agora e o outro depois — o progresso fica guardado.</div>
       <button class="bigbtn btn-sec" style="margin-top:10px;margin-bottom:0" onclick="edocCloseChooser()">Fechar</button>
@@ -3303,7 +3359,7 @@ const API_URL     = 'https://script.google.com/macros/s/AKfycbyEXU1XIwlXfVveC56f
 //           SI panel CSS, HTML and JS integrated from SI_UI.html.
 //           Panel loads from ?action=getSICards and renders inline.
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '5.10.49';
+const APP_VERSION = '5.10.50';
 // v5.5.1: as notas da v5.4.0/5.4.1/5.4.2 viviam AQUI e nunca subiram para o
 //   cabecalho, que tinha parado na v5.3.1. Lido de cima para baixo, o
 //   arquivo mostrava 5.5.0 seguida de 5.3.1, com a 5.4.x aparecendo mil
@@ -4228,6 +4284,7 @@ function renderROList(ros) {
   // ficaram de fora sem precisar de o escrever.
   const roTotal = ros.length;
   ros = roFiltrarEntregues(ros);
+  entPendAtualizarKpi(false);   // v5.10.50 — no máximo 1 busca por minuto
   const cntEl = document.getElementById('ro-entregue-cnt');
   if (cntEl) {
     cntEl.textContent = isApproverTech ? (ros.length + '/' + roTotal) : '';
@@ -6880,6 +6937,7 @@ async function checkAndShowApprovalButton() {
   // responder DEPOIS do loadROs, e nesse caso a primeira lista foi
   // desenhada sem filtro nenhum.
   roMostrarLinhaEntregues();
+  entPendAtualizarKpi(true);   // v5.10.50 — cartão "Entregue com pendência"
   if (isApproverTech && liveROs && liveROs.length) {
     const q = (document.getElementById('ro-search').value || '').trim();
     if (q) filterAndRenderROList(q); else renderROList(liveROs);
@@ -7492,6 +7550,9 @@ async function edocOpenChooser(roNumber) {
 function edocCloseChooser() {
   document.getElementById('edoc-chooser-backdrop').style.display = 'none';
   _edocRO = null;
+  // v5.10.50 — veio da tela de pendências: a lista pode ter mudado.
+  const tela = document.getElementById('s-ent-pend');
+  if (tela && tela.classList.contains('on')) entPendCarregarLista();
 }
 
 function edocResetIconState(docType) {
@@ -7499,6 +7560,135 @@ function edocResetIconState(docType) {
   const status = document.getElementById('edoc-status-' + docType);
   btn.classList.remove('done');
   status.textContent = 'Pendente';
+  _edocEstado[docType] = null;
+  edocPintarMarcar(docType);
+}
+
+// ── v5.10.50 — confirmar pagamento / OS assinada SEM documento ─────
+// _edocEstado[docType]: null (pendente) | 'doc' | 'confirmado'
+const _edocEstado = { os_saida: null, pagamento: null };
+const EDOC_MARCAR = {
+  os_saida:  'Marcar OS como ASSINADA<br><span style="font-weight:400;color:#888">sem documento</span>',
+  pagamento: 'Marcar como PAGO<br><span style="font-weight:400;color:#888">sem comprovante</span>',
+};
+
+function edocPintarIcone(docType) {
+  const btn = document.getElementById('edoc-btn-' + docType);
+  const status = document.getElementById('edoc-status-' + docType);
+  const st = _edocEstado[docType];
+  if (st) {
+    btn.classList.add('done');
+    status.textContent = st === 'confirmado' ? '\u2705 Confirmado \u00B7 sem doc.' : '\u2705 Enviado';
+  } else {
+    btn.classList.remove('done');
+    status.textContent = 'Pendente';
+  }
+  edocPintarMarcar(docType);
+}
+
+function edocPintarMarcar(docType) {
+  const row = document.getElementById('edoc-mark-row');
+  const b = document.getElementById('edoc-mark-' + docType);
+  if (!row || !b) return;
+  row.style.display = isApproverTech ? 'flex' : 'none';
+  const st = _edocEstado[docType];
+  if (st === 'doc') { b.style.visibility = 'hidden'; return; }      // já tem documento: nada a marcar
+  b.style.visibility = 'visible';
+  if (st === 'confirmado') { b.classList.add('undo'); b.innerHTML = '\u21A9 Desfazer confirma\u00E7\u00E3o'; }
+  else { b.classList.remove('undo'); b.innerHTML = EDOC_MARCAR[docType]; }
+}
+
+function edocMarcarItem(docType) {
+  if (!isApproverTech || !_edocRO) return;
+  const desfazer = _edocEstado[docType] === 'confirmado';
+  const rot = docType === 'pagamento' ? 'o PAGAMENTO' : 'a OS ASSINADA';
+  const msg = desfazer
+    ? 'Desfazer a confirma\u00E7\u00E3o d' + rot + ' da RO #' + _edocRO + '? Volta a ficar pendente.'
+    : 'Confirmar ' + rot + ' da RO #' + _edocRO + ' SEM documento?';
+  if (!confirm(msg)) return;
+  const ro = _edocRO;
+  fetch(API_URL, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify({ action: 'confirmEntregaItem', ro_number: ro, item: docType,
+                           confirmado: !desfazer, tech: currentTech }),
+  }).then(function () {
+    // no-cors não devolve corpo: pinta otimista e confere no servidor logo depois.
+    if (_edocRO === ro) { _edocEstado[docType] = desfazer ? null : 'confirmado'; edocPintarIcone(docType); }
+    showToast(desfazer ? 'Confirma\u00E7\u00E3o desfeita.' : '\u2705 ' + (docType === 'pagamento' ? 'Pagamento confirmado.' : 'OS assinada confirmada.'));
+    setTimeout(function () { if (_edocRO === ro) edocRefreshChooserStatus(); entPendAtualizarKpi(true); }, 2500);
+  }).catch(function () { showToast('Sem liga\u00E7\u00E3o \u2014 n\u00E3o foi gravado.'); });
+}
+
+// ── v5.10.50 — ENTREGUE COM PENDÊNCIA: cartão + lista ──────────────
+let _entPendUltimo = 0;
+function entPendBuscar() {
+  return fetch(API_URL + '?action=getEntregasPendentes').then(r => r.json());
+}
+
+// Cartão no topo da tela Ordens. Só Aprovador; no máximo 1 busca/min
+// (renderROList chama isto a cada redesenho), salvo forcar=true.
+function entPendAtualizarKpi(forcar) {
+  const card = document.getElementById('ent-pend-kpi');
+  if (!card) return;
+  if (!isApproverTech) { card.style.display = 'none'; return; }
+  const agora = Date.now();
+  if (!forcar && agora - _entPendUltimo < 60000) return;
+  _entPendUltimo = agora;
+  entPendBuscar().then(function (d) {
+    if (!d || !d.ok || !d.total) { card.style.display = 'none'; return; }
+    document.getElementById('ent-pend-kpi-n').textContent = d.total;
+    document.getElementById('ent-pend-kpi-s').textContent =
+      d.sem_pagamento + ' sem pagamento \u00B7 ' + d.sem_os + ' sem OS assinada';
+    card.style.display = 'flex';
+  }).catch(function () { /* silencioso: o cartão só não atualiza */ });
+}
+
+function entPendAbrir() {
+  goTo('s-ent-pend');
+  entPendCarregarLista();
+}
+
+function entPendCarregarLista() {
+  const el = document.getElementById('ent-pend-list');
+  el.innerHTML = '<div class="loading-box"><div class="spinner"></div><div style="font-size:12px;color:#888">A carregar...</div></div>';
+  document.getElementById('ent-pend-sub').textContent = 'A carregar...';
+  entPendBuscar().then(function (d) {
+    if (!d || !d.ok) { el.innerHTML = '<div class="err-box">&#x26A0; Erro ao carregar.</div>'; return; }
+    const lista = d.pendentes || [];
+    document.getElementById('ent-pend-sub').textContent = lista.length
+      ? (lista.length + ' RO(s) \u00B7 ' + d.sem_pagamento + ' sem pagamento \u00B7 ' + d.sem_os + ' sem OS assinada')
+      : 'Nenhuma pend\u00EAncia';
+    if (!lista.length) {
+      el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:40px 0">&#x2705; Nenhuma entrega com pend&#xEA;ncia.</div>';
+      entPendAtualizarKpi(true);
+      return;
+    }
+    const chip = function (ok, item, rotOk, rotFalta) {
+      if (!ok) return '<span class="entpend-chip falta">' + rotFalta + '</span>';
+      const semDoc = item && item.status === 'confirmado';
+      return '<span class="entpend-chip ok">&#x2705; ' + rotOk + (semDoc ? ' \u00B7 sem doc.' : '') + '</span>';
+    };
+    el.innerHTML = lista.map(function (p) {
+      const d0 = new Date(p.entrega_date);
+      const quando = pad(d0.getDate()) + '/' + pad(d0.getMonth() + 1);
+      const dias = p.dias === 0 ? 'hoje' : (p.dias === 1 ? 'h\u00E1 1 dia' : 'h\u00E1 ' + p.dias + ' dias');
+      return (
+        '<div class="card" onclick="edocOpenChooser(\'' + escapeHtml(String(p.ro_number)) + '\')">' +
+          '<div class="crow"><div>' +
+            '<div class="cro">RO #' + escapeHtml(String(p.ro_number)) + '</div>' +
+            (p.client_name ? '<div class="cjob">&#x1F464; ' + escapeHtml(p.client_name) + '</div>' : '') +
+            '<div class="cjob">' + escapeHtml([p.modelo, p.plate].filter(Boolean).join(' \u00B7 ') || '\u2014') + '</div>' +
+          '</div>' +
+          '<span class="entpend-dias">Entregue ' + quando + ' \u00B7 ' + dias + '</span>' +
+          '</div>' +
+          '<div>' +
+            chip(p.pago, p.pagamento, 'Pago', '&#x1F4B3; Pagamento pendente') +
+            chip(p.assinada, p.os_saida, 'OS assinada', '&#x1F4C4; OS n\u00E3o assinada') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }).catch(function () { el.innerHTML = '<div class="err-box">&#x26A0; Sem liga&#xE7;&#xE3;o ao servidor.</div>'; });
 }
 
 // Pulls current status from the backend (getEntregaDocsStatus) so the
@@ -7511,15 +7701,9 @@ async function edocRefreshChooserStatus() {
     if (!res) return;
     ['os_saida', 'pagamento'].forEach(docType => {
       const info = res[docType];
-      const btn = document.getElementById('edoc-btn-' + docType);
-      const status = document.getElementById('edoc-status-' + docType);
-      if (info) {
-        btn.classList.add('done');
-        status.textContent = '\u2705 Enviado';
-      } else {
-        btn.classList.remove('done');
-        status.textContent = 'Pendente';
-      }
+      // v5.10.50 — 'doc' (tem PDF) ou 'confirmado' (Aprovador confirmou sem documento)
+      _edocEstado[docType] = info ? (info.status === 'confirmado' ? 'confirmado' : 'doc') : null;
+      edocPintarIcone(docType);
     });
   } catch (e) {
     // Silent — chooser still works for scanning even if the status
@@ -7692,6 +7876,7 @@ async function edocFinalizePdf() {
     _edocPages = [];
     document.getElementById('edoc-scan-backdrop').style.display = 'none';
     edocRefreshChooserStatus(); // updates the ✅/pending icon back on the chooser
+    setTimeout(function () { entPendAtualizarKpi(true); }, 2500);   // v5.10.50
   } catch (e) {
     errEl.textContent = '\u26A0 Erro ao enviar: ' + e.message + '. As páginas NÃO foram perdidas — tente novamente.';
     errEl.style.display = 'block';
